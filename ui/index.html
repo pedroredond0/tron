@@ -59,6 +59,19 @@
       --app-text-dim: #a0a0a0;
     }
 
+    [data-theme="windows10-light"] {
+      --app-bg: #f3f3f3;
+      --app-surface: #ffffff;
+      --app-sidebar: #e5e5e5;
+      --app-border: #d2d2d2;
+      --app-hover: #e0e0e0;
+      --app-active: #0078d7;
+      --app-active-hover: #106ebe;
+      --app-active-text: #ffffff;
+      --app-text: #202020;
+      --app-text-dim: #606060;
+    }
+
     [data-theme="ubuntu"] {
       --app-bg: #2c001e;
       --app-surface: #380c2a;
@@ -69,6 +82,19 @@
       --app-active-hover: #cf4313;
       --app-text: #f7f7f7;
       --app-text-dim: #aea79f;
+    }
+
+    [data-theme="ubuntu-light"] {
+      --app-bg: #f7f7f7;
+      --app-surface: #ffffff;
+      --app-sidebar: #eae6e3;
+      --app-border: #dcd7d3;
+      --app-hover: #dfdbd8;
+      --app-active: #E95420;
+      --app-active-hover: #cf4313;
+      --app-active-text: #ffffff;
+      --app-text: #333333;
+      --app-text-dim: #77716c;
     }
 
     [data-theme="manjaro"] {
@@ -83,6 +109,19 @@
       --app-text-dim: #94a3b8;
     }
 
+    [data-theme="manjaro-light"] {
+      --app-bg: #edf2f4;
+      --app-surface: #ffffff;
+      --app-sidebar: #e1e7ea;
+      --app-border: #c8d3d8;
+      --app-hover: #d5e0e5;
+      --app-active: #16a085;
+      --app-active-hover: #138a72;
+      --app-active-text: #ffffff;
+      --app-text: #243338;
+      --app-text-dim: #607279;
+    }
+
     [data-theme="nvchad"] {
       --app-bg: #1e222a;
       --app-surface: #252931;
@@ -93,6 +132,19 @@
       --app-active-hover: #5d87e0;
       --app-text: #abb2bf;
       --app-text-dim: #5c6370;
+    }
+
+    [data-theme="nvchad-light"] {
+      --app-bg: #fafafa;
+      --app-surface: #ffffff;
+      --app-sidebar: #f0f0f2;
+      --app-border: #dbdbdf;
+      --app-hover: #e6e6eb;
+      --app-active: #4078f2;
+      --app-active-hover: #2f60cc;
+      --app-active-text: #ffffff;
+      --app-text: #383a42;
+      --app-text-dim: #6a6d77;
     }
 
     [data-theme="tokyonight"] {
@@ -107,6 +159,19 @@
       --app-text-dim: #787c99;
     }
 
+    [data-theme="tokyonight-light"] {
+      --app-bg: #e6e7ee;
+      --app-surface: #f4f5fa;
+      --app-sidebar: #dadae3;
+      --app-border: #cbccd9;
+      --app-hover: #d2d4e3;
+      --app-active: #3b5dc9;
+      --app-active-hover: #2c4ba8;
+      --app-active-text: #ffffff;
+      --app-text: #343b58;
+      --app-text-dim: #676e8d;
+    }
+
     [data-theme="matteblack"] {
       --app-bg: #0f0f0f;
       --app-surface: #1a1a1a;
@@ -118,6 +183,19 @@
       --app-active-text: #ffffff;
       --app-text: #f3f4f6;
       --app-text-dim: #9ca3af;
+    }
+
+    [data-theme="matteblack-light"] {
+      --app-bg: #f0f0f0;
+      --app-surface: #ffffff;
+      --app-sidebar: #e4e4e4;
+      --app-border: #cccccc;
+      --app-hover: #dcdcdc;
+      --app-active: #2563eb;
+      --app-active-hover: #1d4ed8;
+      --app-active-text: #ffffff;
+      --app-text: #171717;
+      --app-text-dim: #737373;
     }
 
     [data-theme="light"] {
@@ -263,11 +341,6 @@
 <body id="appBody" class="h-full bg-gnome-bg text-gnome-text flex flex-col font-sans overflow-hidden select-none" data-theme="adwaita">
   <!-- Classic App Menu Bar (GNOME / Windows styled) -->
   <div id="menuBar" class="h-7 bg-gnome-sidebar border-b border-gnome-border flex items-center px-2 text-xs text-gnome-text shrink-0 gap-1 select-none z-30">
-    <!-- Mini App Icon (Sharp render) -->
-    <div class="flex items-center mr-1 pr-1.5 border-r border-gnome-border/60 shrink-0">
-      <img src="icon.png" alt="tron" class="w-4 h-4 object-contain" />
-    </div>
-
     <!-- Archivo -->
     <div class="relative menu-dropdown">
       <button class="menu-btn px-2 py-0.5 rounded hover:bg-gnome-hover hover:text-white transition-colors">Archivo</button>
@@ -462,15 +535,13 @@
       </button>
 
       <!-- Buscador Avanzado Sherlock (Icono de la lupa junto al boton Size) -->
-      <button id="btnActionSherlock" class="p-1 px-2.5 rounded bg-gnome-surface hover:bg-gnome-hover border border-gnome-border text-gnome-text flex items-center gap-1.5 transition-colors font-medium shadow-sm" title="Buscador Avanzado Sherlock (Ctrl+Shift+F)">
+      <button id="btnActionSherlock" class="p-1 px-2 rounded bg-gnome-surface hover:bg-gnome-hover border border-gnome-border text-gnome-text flex items-center justify-center transition-colors font-medium shadow-sm" title="Buscador Avanzado Sherlock (Ctrl+Shift+F)">
         <span>🔍</span>
-        <span>Sherlock</span>
       </button>
 
       <!-- Generador de listados a archivo (txt) -->
-      <button id="btnActionExportList" class="p-1 px-2.5 rounded bg-gnome-surface hover:bg-gnome-hover border border-gnome-border text-gnome-text flex items-center gap-1 transition-colors font-medium shadow-sm" title="Generar listado / árbol del directorio a archivo txt (ls/dir/tree)">
+      <button id="btnActionExportList" class="p-1 px-2 rounded bg-gnome-surface hover:bg-gnome-hover border border-gnome-border text-gnome-text flex items-center justify-center transition-colors font-medium shadow-sm" title="Generar listado / árbol del directorio a archivo txt (ls/dir/tree)">
         <span class="text-xs">🔭📄</span>
-        <span class="hidden sm:inline">Listado</span>
       </button>
     </div>
 
@@ -505,9 +576,8 @@
       </div>
 
       <!-- Preferencias (antes Tema) -->
-      <button id="btnOpenAppearance" class="p-1 px-2 rounded hover:bg-gnome-surface text-gnome-text flex items-center gap-1 transition-colors" title="Preferencias (Temas, tamaños, archivos, editor)">
+      <button id="btnOpenAppearance" class="p-1 px-2 rounded hover:bg-gnome-surface text-gnome-text flex items-center justify-center transition-colors" title="Preferencias (Temas, iconos, tamaños, archivos, editor, apps externas)">
         <span>⚙️</span>
-        <span>Preferencias</span>
       </button>
 
       <!-- QuickView solo con el ojo -->
@@ -866,6 +936,9 @@
         <button type="button" class="pref-tab-btn px-4 py-2 border-b-2 border-transparent text-gnome-textDim hover:text-gnome-text font-medium flex items-center gap-1.5 transition-all" data-tab="tabTerminal">
           <span>💻</span> <span>Terminal</span>
         </button>
+        <button type="button" class="pref-tab-btn px-4 py-2 border-b-2 border-transparent text-gnome-textDim hover:text-gnome-text font-medium flex items-center gap-1.5 transition-all" data-tab="tabExternalApps">
+          <span>⚡</span> <span>Aplicaciones Externas</span>
+        </button>
       </div>
 
       <!-- Tab Content Panels -->
@@ -875,14 +948,37 @@
           <div>
             <label class="block text-gnome-textDim mb-1.5 font-medium">Tema Visual de Tron:</label>
             <select id="selectTheme" class="w-full bg-gnome-sidebar border border-gnome-border rounded-md px-3 py-2 text-xs text-gnome-text focus:outline-none focus:border-gnome-active">
-              <option value="adwaita">GNOME Adwaita Dark (Por defecto)</option>
-              <option value="light">GNOME Adwaita Light (Modo Claro)</option>
-              <option value="windows10">Windows 10 Fluent Dark</option>
-              <option value="ubuntu">Ubuntu Yaru Dark</option>
-              <option value="manjaro">Manjaro Breath Teal</option>
-              <option value="nvchad">NvChad OneDark</option>
-              <option value="tokyonight">Tokyo Night Storm</option>
-              <option value="matteblack">Matte Black Minimal</option>
+              <optgroup label="Temas Oscuros">
+                <option value="adwaita">GNOME Adwaita Dark (Por defecto)</option>
+                <option value="windows10">Windows 10 Fluent Dark</option>
+                <option value="ubuntu">Ubuntu Yaru Dark</option>
+                <option value="manjaro">Manjaro Breath Teal</option>
+                <option value="nvchad">NvChad OneDark</option>
+                <option value="tokyonight">Tokyo Night Storm</option>
+                <option value="matteblack">Matte Black Minimal</option>
+              </optgroup>
+              <optgroup label="Temas Claros (Equivalentes)">
+                <option value="light">GNOME Adwaita Light (Modo Claro)</option>
+                <option value="windows10-light">Windows 10 Fluent Light</option>
+                <option value="ubuntu-light">Ubuntu Yaru Light</option>
+                <option value="manjaro-light">Manjaro Breath Light</option>
+                <option value="nvchad-light">NvChad OneLight</option>
+                <option value="tokyonight-light">Tokyo Night Light</option>
+                <option value="matteblack-light">Matte Black Light Minimal</option>
+              </optgroup>
+            </select>
+          </div>
+
+          <!-- Paquete de iconos -->
+          <div>
+            <label class="block text-gnome-textDim mb-1.5 font-medium">Paquete de Iconos de Archivos:</label>
+            <select id="selectIconPack" class="w-full bg-gnome-sidebar border border-gnome-border rounded-md px-3 py-2 text-xs text-gnome-text focus:outline-none focus:border-gnome-active">
+              <option value="default">Tron Modern (Predeterminado)</option>
+              <option value="slot-dark">Slot Blue Dark Icons (Pack Azul Oscuro)</option>
+              <option value="slot-light">Slot Light Icons (Pack Claro)</option>
+              <option value="yaru">Ubuntu Yaru (Naranja / Linux)</option>
+              <option value="win10">Windows 10 Fluent (Amarillo / Metro)</option>
+              <option value="macos">macOS Big Sur / Monterey (Cian / Squircle)</option>
             </select>
           </div>
 
@@ -1045,6 +1141,23 @@
             <div class="p-2.5 rounded bg-blue-500/10 border border-blue-500/30 text-[11px] text-blue-300">
               💡 Esta terminal se abrirá al pulsar el botón <strong>Terminal</strong> en la barra de herramientas o con el atajo <strong>Ctrl + T</strong>.
             </div>
+          </div>
+        </div>
+
+        <!-- 6. Pestaña: Aplicaciones Externas ("Abrir con...") -->
+        <div id="panelExternalApps" class="pref-tab-panel hidden space-y-4">
+          <div class="p-3 bg-gnome-sidebar/50 rounded-lg border border-gnome-border space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="font-medium text-gnome-text text-sm">Configuración de "Abrir con..."</span>
+              <button id="btnResetExternalApps" type="button" class="text-[11px] text-gnome-active hover:underline">Restaurar por defecto</button>
+            </div>
+            <p class="text-[11px] text-gnome-textDim">
+              Activa o desactiva las aplicaciones que quieres que aparezcan como sugerencias en el menú "Abrir con...". Si una aplicación no se abre con el comando por defecto, escribe su ruta completa al ejecutable (.exe).
+            </p>
+          </div>
+
+          <div id="externalAppsListContainer" class="space-y-3">
+            <!-- Dynamic categories & apps rendered here -->
           </div>
         </div>
       </div>
