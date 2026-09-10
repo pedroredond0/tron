@@ -2086,56 +2086,224 @@ fn search_directory_recursive(base_path: String, query: String, max_results: Opt
 }
 
 #[tauri::command]
-fn open_terminal(path: String) -> Result<(), String> {
+fn open_terminal(path: String, terminal: Option<String>) -> Result<(), String> {
     let p = PathBuf::from(&path);
     if !p.exists() {
-        return Err("Path does not exist".into());
+        return Err("La ruta no existe".into());
     }
 
-    let mut dir = p.clone();
-    if !p.is_dir() {
-        if let Some(parent) = p.parent() {
-            dir = parent.to_path_buf();
-        }
-    }
+    let dir = if p.is_dir() {
+        p
+    } else if let Some(parent) = p.parent() {
+        parent.to_path_buf()
+    } else {
+        PathBuf::from(".")
+    };
+
+    let term = terminal.unwrap_or_else(|| "default".to_string()).trim().to_string();
 
     #[cfg(target_os = "windows")]
     {
-        // Try Windows Terminal first, fallback to cmd
-        let res = std::process::Command::new("wt")
-            .arg("-d")
-            .arg(&dir)
-            .spawn();
-        
-        if res.is_err() {
-            let _ = std::process::Command::new("cmd")
-                .arg("/c")
-                .arg("start")
-                .arg("cmd")
-                .arg("/K")
-                .arg("cd /d")
-                .arg(&dir)
-                .current_dir(&dir)
-                .spawn();
+        match term.as_str() {
+            "wt" => {
+                let _ = std::process::Command::new("wt")
+                    .arg("-d")
+                    .arg(&dir)
+                    .spawn()
+                    .map_err(|e| format!("No se pudo iniciar Windows Terminal (wt): {}", e))?;
+            }
+            "powershell" => {
+                let _ = std::process::Command::new("cmd")
+                    .arg("/C")
+                    .arg("start")
+                    .arg("")
+                    .arg("powershell")
+                    .arg("-NoExit")
+                    .arg("-Command")
+                    .arg(format!("Set-Location -LiteralPath '{}'", dir.to_string_lossy()))
+                    .spawn()
+                    .map_err(|e| format!("No se pudo iniciar PowerShell: {}", e))?;
+            }
+            "pwsh" => {
+                let res = std::process::Command::new("pwsh")
+                    .arg("-NoExit")
+                    .arg("-Command")
+                    .arg(format!("Set-Location -LiteralPath '{}'", dir.to_string_lossy()))
+                    .spawn();
+                if res.is_err() {
+                    let _ = std::process::Command::new("cmd")
+                        .arg("/C")
+                        .arg("start")
+                        .arg("")
+                        .arg("pwsh")
+                        .arg("-NoExit")
+                        .arg("-Command")
+                        .arg(format!("Set-Location -LiteralPath '{}'", dir.to_string_lossy()))
+                        .spawn()
+                        .map_err(|e| format!("No se pudo iniciar PowerShell Core (pwsh): {}", e))?;
+                }
+            }
+            "cmd" => {
+                let _ = std::process::Command::new("cmd")
+                    .arg("/C")
+                    .arg("start")
+                    .arg("cmd")
+                    .arg("/K")
+                    .arg(format!("cd /d \"{}\"", dir.to_string_lossy()))
+                    .current_dir(&dir)
+                    .spawn()
+                    .map_err(|e| format!("No se pudo iniciar CMD: {}", e))?;
+            }
+            "alacritty" => {
+                let _ = std::process::Command::new("alacritty")
+                    .arg("--working-directory")
+                    .arg(&dir)
+                    .spawn()
+                    .map_err(|e| format!("No se pudo iniciar Alacritty: {}", e))?;
+            }
+            "kitty" => {
+                let _ = std::process::Command::new("kitty")
+                    .arg("--directory")
+                    .arg(&dir)
+                    .spawn()
+                    .map_err(|e| format!("No se pudo iniciar Kitty: {}", e))?;
+            }
+            "ghostty" => {
+                let _ = std::process::Command::new("ghostty")
+                    .arg(format!("--working-directory={}", dir.to_string_lossy()))
+                    .spawn()
+                    .map_err(|e| format!("No se pudo iniciar Ghostty: {}", e))?;
+            }
+            "wezterm" => {
+                let _ = std::process::Command::new("wezterm")
+                    .arg("start")
+                    .arg("--cwd")
+                    .arg(&dir)
+                    .spawn()
+                    .map_err(|e| format!("No se pudo iniciar WezTerm: {}", e))?;
+            }
+            "default" | "" => {
+                // Try Windows Terminal first, fallback to powershell, fallback to cmd
+                let res = std::process::Command::new("wt")
+                    .arg("-d")
+                    .arg(&dir)
+                    .spawn();
+                if res.is_err() {
+                    let res_ps = std::process::Command::new("cmd")
+                        .arg("/C")
+                        .arg("start")
+                        .arg("")
+                        .arg("powershell")
+                        .arg("-NoExit")
+                        .arg("-Command")
+                        .arg(format!("Set-Location -LiteralPath '{}'", dir.to_string_lossy()))
+                        .spawn();
+                    if res_ps.is_err() {
+                        let _ = std::process::Command::new("cmd")
+                            .arg("/C")
+                            .arg("start")
+                            .arg("cmd")
+                            .arg("/K")
+                            .arg(format!("cd /d \"{}\"", dir.to_string_lossy()))
+                            .current_dir(&dir)
+                            .spawn();
+                    }
+                }
+            }
+            custom => {
+                let mut res = std::process::Command::new(custom)
+                    .current_dir(&dir)
+                    .spawn();
+                if res.is_err() {
+                    res = std::process::Command::new("cmd")
+                        .arg("/C")
+                        .arg("start")
+                        .arg("")
+                        .arg(custom)
+                        .current_dir(&dir)
+                        .spawn();
+                }
+                res.map_err(|e| format!("No se pudo iniciar la terminal '{}': {}", custom, e))?;
+            }
         }
     }
-    
+
     #[cfg(target_os = "macos")]
     {
-        let _ = std::process::Command::new("open")
-            .arg("-a")
-            .arg("Terminal")
-            .arg(&dir)
-            .spawn();
+        match term.as_str() {
+            "alacritty" => {
+                let _ = std::process::Command::new("alacritty")
+                    .arg("--working-directory")
+                    .arg(&dir)
+                    .spawn();
+            }
+            "kitty" => {
+                let _ = std::process::Command::new("kitty")
+                    .arg("--directory")
+                    .arg(&dir)
+                    .spawn();
+            }
+            "ghostty" => {
+                let _ = std::process::Command::new("ghostty")
+                    .arg(format!("--working-directory={}", dir.to_string_lossy()))
+                    .spawn();
+            }
+            "iterm" | "iterm2" => {
+                let _ = std::process::Command::new("open")
+                    .arg("-a")
+                    .arg("iTerm")
+                    .arg(&dir)
+                    .spawn();
+            }
+            "default" | "" | "Terminal" => {
+                let _ = std::process::Command::new("open")
+                    .arg("-a")
+                    .arg("Terminal")
+                    .arg(&dir)
+                    .spawn();
+            }
+            custom => {
+                let _ = std::process::Command::new(custom)
+                    .current_dir(&dir)
+                    .spawn()
+                    .map_err(|e| format!("No se pudo iniciar la terminal '{}': {}", custom, e))?;
+            }
+        }
     }
 
     #[cfg(target_os = "linux")]
     {
-        // Simple fallback for linux
-        let _ = std::process::Command::new("x-terminal-emulator")
-            .arg("--working-directory")
-            .arg(&dir)
-            .spawn();
+        match term.as_str() {
+            "alacritty" => {
+                let _ = std::process::Command::new("alacritty")
+                    .arg("--working-directory")
+                    .arg(&dir)
+                    .spawn();
+            }
+            "kitty" => {
+                let _ = std::process::Command::new("kitty")
+                    .arg("--directory")
+                    .arg(&dir)
+                    .spawn();
+            }
+            "ghostty" => {
+                let _ = std::process::Command::new("ghostty")
+                    .arg(format!("--working-directory={}", dir.to_string_lossy()))
+                    .spawn();
+            }
+            "default" | "" => {
+                let _ = std::process::Command::new("x-terminal-emulator")
+                    .arg("--working-directory")
+                    .arg(&dir)
+                    .spawn();
+            }
+            custom => {
+                let _ = std::process::Command::new(custom)
+                    .current_dir(&dir)
+                    .spawn()
+                    .map_err(|e| format!("No se pudo iniciar la terminal '{}': {}", custom, e))?;
+            }
+        }
     }
 
     Ok(())

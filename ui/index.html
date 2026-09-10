@@ -854,6 +854,9 @@
         <button type="button" class="pref-tab-btn px-4 py-2 border-b-2 border-transparent text-gnome-textDim hover:text-gnome-text font-medium flex items-center gap-1.5 transition-all" data-tab="tabEditor">
           <span>📝</span> <span>Editor de Texto</span>
         </button>
+        <button type="button" class="pref-tab-btn px-4 py-2 border-b-2 border-transparent text-gnome-textDim hover:text-gnome-text font-medium flex items-center gap-1.5 transition-all" data-tab="tabTerminal">
+          <span>💻</span> <span>Terminal</span>
+        </button>
       </div>
 
       <!-- Tab Content Panels -->
@@ -1001,6 +1004,37 @@
 
             <div class="p-2.5 rounded bg-blue-500/10 border border-blue-500/30 text-[11px] text-blue-300">
               💡 Este editor se usará al pulsar el botón <strong>Editar</strong> en la barra superior, en el menú contextual ("Abrir con Editor") y al editar desde QuickView.
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. Pestaña: Terminal -->
+        <div id="panelTerminal" class="pref-tab-panel hidden space-y-4">
+          <div class="p-3 bg-gnome-sidebar/50 rounded-lg border border-gnome-border space-y-3">
+            <div>
+              <label class="block text-gnome-text font-medium text-sm border-b border-gnome-border/50 pb-1 mb-2">Terminal Predeterminada</label>
+              <select id="selectTerminalApp" class="w-full bg-gnome-surface border border-gnome-border rounded-md px-3 py-2 text-xs text-gnome-text focus:outline-none focus:border-gnome-active">
+                <option value="default">Por defecto del sistema</option>
+                <option value="wt">Windows Terminal (wt)</option>
+                <option value="powershell">PowerShell (powershell)</option>
+                <option value="pwsh">PowerShell Core (pwsh)</option>
+                <option value="cmd">Símbolo del sistema (cmd)</option>
+                <option value="alacritty">Alacritty (alacritty)</option>
+                <option value="kitty">Kitty (kitty)</option>
+                <option value="ghostty">Ghostty (ghostty)</option>
+                <option value="wezterm">WezTerm (wezterm)</option>
+                <option value="custom">Personalizada / Ruta exacta o comando...</option>
+              </select>
+            </div>
+
+            <div id="customTerminalContainer" class="hidden mt-2">
+              <label class="block text-gnome-textDim mb-1 text-[11px] font-medium">Ruta o comando de la terminal:</label>
+              <input id="inputCustomTerminal" type="text" placeholder="Ej: alacritty, kitty, ghostty, o C:\Ruta\terminal.exe" class="w-full bg-gnome-surface border border-gnome-border rounded-md px-3 py-1.5 text-xs text-gnome-text placeholder-gnome-textDim focus:outline-none focus:border-gnome-active" />
+              <p class="text-[10px] text-gnome-textDim mt-1">Introduce el nombre del comando si está en el PATH o la ruta completa al binario ejecutable.</p>
+            </div>
+
+            <div class="p-2.5 rounded bg-blue-500/10 border border-blue-500/30 text-[11px] text-blue-300">
+              💡 Esta terminal se abrirá al pulsar el botón <strong>Terminal</strong> en la barra de herramientas o con el atajo <strong>Ctrl + T</strong>.
             </div>
           </div>
         </div>
