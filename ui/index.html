@@ -395,7 +395,16 @@
       pointer-events: none;
       box-shadow: 0 4px 12px rgba(0,0,0,0.5);
     }
+    /* En macOS, la barra de menus superior del sistema ya contiene Archivo, Edicion, etc. */
+    .is-mac #menuBar {
+      display: none !important;
+    }
   </style>
+  <script>
+    if (typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform || navigator.userAgent)) {
+      document.documentElement.classList.add('is-mac');
+    }
+  </script>
 </head>
 <body id="appBody" class="h-full bg-gnome-bg text-gnome-text flex flex-col font-sans overflow-hidden select-none" data-theme="adwaita">
   <!-- Classic App Menu Bar (GNOME / Windows styled) -->
