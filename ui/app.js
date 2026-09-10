@@ -84,6 +84,7 @@
     sortIconDate: document.getElementById('sortIconDate'),
     // Action bar buttons
     btnActionTerminal: document.getElementById('btnActionTerminal'),
+    btnActionEdit: document.getElementById('btnActionEdit'),
     btnActionNewFile: document.getElementById('btnActionNewFile'),
     btnActionNewFolder: document.getElementById('btnActionNewFolder'),
     btnActionCut: document.getElementById('btnActionCut'),
@@ -136,10 +137,17 @@
     inputCustomEditor: document.getElementById('inputCustomEditor'),
     selectFontSize: document.getElementById('selectFontSize'),
     chkNormalFontWeight: document.getElementById('chkNormalFontWeight'),
+    chkPrefShowHidden: document.getElementById('chkPrefShowHidden'),
+    chkPrefRecursiveSearch: document.getElementById('chkPrefRecursiveSearch'),
     inputCustomTextExts: document.getElementById('inputCustomTextExts'),
     btnCancelAppearance: document.getElementById('btnCancelAppearance'),
     btnConfirmAppearance: document.getElementById('btnConfirmAppearance'),
     btnCloseAppearanceModal: document.getElementById('btnCloseAppearanceModal'),
+    modalRenameItem: document.getElementById('modalRenameItem'),
+    inputRenameItemName: document.getElementById('inputRenameItemName'),
+    btnConfirmRenameItem: document.getElementById('btnConfirmRenameItem'),
+    btnCancelRenameItem: document.getElementById('btnCancelRenameItem'),
+    btnCloseRenameItemModal: document.getElementById('btnCloseRenameItemModal'),
     modalRenameFavorite: document.getElementById('modalRenameFavorite'),
     inputRenameFavName: document.getElementById('inputRenameFavName'),
     btnConfirmRenameFav: document.getElementById('btnConfirmRenameFav'),
@@ -159,6 +167,7 @@
     // Menus
     menuNewFile: document.getElementById('menuNewFile'),
     menuNewFolder: document.getElementById('menuNewFolder'),
+    menuRename: document.getElementById('menuRename'),
     menuOpenDefault: document.getElementById('menuOpenDefault'),
     menuDelete: document.getElementById('menuDelete'),
     menuAddFavorite: document.getElementById('menuAddFavorite'),
@@ -178,6 +187,7 @@
     ctxMenuOpen: document.getElementById('ctxMenuOpen'),
     ctxMenuQuickView: document.getElementById('ctxMenuQuickView'),
     ctxMenuOpenEditor: document.getElementById('ctxMenuOpenEditor'),
+    ctxMenuRename: document.getElementById('ctxMenuRename'),
     ctxMenuCut: document.getElementById('ctxMenuCut'),
     ctxMenuCopy: document.getElementById('ctxMenuCopy'),
     ctxMenuDuplicate: document.getElementById('ctxMenuDuplicate'),
@@ -1342,7 +1352,7 @@
         return;
       }
 
-      // If in any modal input (New File, New Folder, Network UNC, Appearance, Rename Fav)
+      // If in any modal input (New File, New Folder, Network UNC, Appearance, Rename Fav, Rename Item)
       if (e.key === 'Escape') {
         e.preventDefault();
         closeNewFileModal();
@@ -1352,6 +1362,7 @@
         closeAboutModal();
         closeAppearanceModal();
         closeRenameFavoriteModal();
+        closeRenameItemModal();
         closeConfirmExitModal();
         return;
       }
@@ -1366,6 +1377,8 @@
           confirmNewFolder();
         } else if (activeEl === el.inputRenameFavName) {
           saveRenamedFavorite();
+        } else if (activeEl === el.inputRenameItemName) {
+          saveRenamedItem();
         }
         return;
       }
@@ -1457,6 +1470,27 @@
     if (e.ctrlKey && (e.key === 'd' || e.key === 'D')) {
       e.preventDefault();
       duplicateSelectedItem();
+      return;
+    }
+
+    if (e.ctrlKey && (e.key === 'b' || e.key === 'B')) {
+      e.preventDefault();
+      addCurrentToFavorites();
+      return;
+    }
+
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+      e.preventDefault();
+      if (el.searchInput) {
+        el.searchInput.focus();
+        el.searchInput.select();
+      }
+      return;
+    }
+
+    if (e.key === 'F2') {
+      e.preventDefault();
+      openRenameItemModal();
       return;
     }
 
@@ -2201,6 +2235,70 @@
     element.dataset.targetDir = targetDirectory;
   }
 
+  // --- Renombrar Elementos (Archivos / Carpetas) ---
+  let itemToRename = null;
+
+  function openRenameItemModal(item = null) {
+    if (!item) {
+      if (state.selectedIndex >= 0 && state.selectedIndex < state.filteredItems.length) {
+        item = state.filteredItems[state.selectedIndex];
+      }
+    }
+    if (!item) return;
+    itemToRename = item;
+    if (el.inputRenameItemName) {
+      el.inputRenameItemName.value = item.name;
+    }
+    if (el.modalRenameItem) {
+      el.modalRenameItem.classList.remove('hidden');
+      if (el.inputRenameItemName) {
+        el.inputRenameItemName.focus();
+        if (!item.is_directory && item.name.includes('.')) {
+          const lastDot = item.name.lastIndexOf('.');
+          if (lastDot > 0) {
+            el.inputRenameItemName.setSelectionRange(0, lastDot);
+          } else {
+            el.inputRenameItemName.select();
+          }
+        } else {
+          el.inputRenameItemName.select();
+        }
+      }
+    }
+  }
+
+  function closeRenameItemModal() {
+    if (el.modalRenameItem) {
+      el.modalRenameItem.classList.add('hidden');
+    }
+    itemToRename = null;
+    el.fileList.focus();
+  }
+
+  async function saveRenamedItem() {
+    if (!itemToRename || !el.inputRenameItemName) return;
+    const newName = el.inputRenameItemName.value.trim();
+    if (!newName) return;
+    if (newName === itemToRename.name) {
+      closeRenameItemModal();
+      return;
+    }
+    try {
+      await invoke('rename_file_or_folder', {
+        oldPath: itemToRename.path,
+        newName: newName
+      });
+      closeRenameItemModal();
+      await loadDirectory(state.currentDirectory, false);
+      const idx = state.filteredItems.findIndex(i => i.name.toLowerCase() === newName.toLowerCase());
+      if (idx >= 0) {
+        selectItem(idx);
+      }
+    } catch (err) {
+      alert('Error al renombrar: ' + err);
+    }
+  }
+
   let favoriteToRename = null;
 
   function openRenameFavoriteModal(favorite) {
@@ -2242,22 +2340,115 @@
     if (state.favorites.length === 0) {
       const emptyMsg = document.createElement('div');
       emptyMsg.className = 'text-[11px] text-gnome-textDim px-2 py-1 italic';
-      emptyMsg.textContent = 'Sin favoritos aún (Ctrl+D)';
+      emptyMsg.textContent = 'Sin favoritos aún (Ctrl+B)';
       el.favoriteLinks.appendChild(emptyMsg);
       return;
     }
 
-    state.favorites.forEach(f => {
+    state.favorites.forEach((f, idx) => {
       const itemRow = document.createElement('div');
-      itemRow.className = 'group flex items-center justify-between px-2 py-1 rounded-md hover:bg-gnome-hover text-xs text-gnome-text transition-colors cursor-pointer select-none';
-      itemRow.title = `${f.name} (${f.path})\nClic derecho para renombrar`;
-      
+      itemRow.className = 'group flex items-center justify-between px-2 py-1 rounded-md hover:bg-gnome-hover text-xs text-gnome-text transition-colors cursor-pointer select-none relative';
+      itemRow.title = `${f.name} (${f.path})\nArrastra para reordenar o clic derecho para renombrar`;
+      itemRow.draggable = true;
+      itemRow.dataset.favIndex = String(idx);
+
+      // Drag and Drop reordering for favorites
+      itemRow.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('text/plain', String(idx));
+        e.dataTransfer.effectAllowed = 'move';
+        itemRow.classList.add('opacity-40');
+      });
+
+      itemRow.addEventListener('dragend', () => {
+        itemRow.classList.remove('opacity-40');
+        document.querySelectorAll('#favoriteLinks > div').forEach(d => {
+          d.classList.remove('border-t-2', 'border-b-2', 'border-gnome-active');
+        });
+      });
+
+      itemRow.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        const rect = itemRow.getBoundingClientRect();
+        const midY = rect.top + rect.height / 2;
+        if (e.clientY < midY) {
+          itemRow.classList.add('border-t-2', 'border-gnome-active');
+          itemRow.classList.remove('border-b-2');
+        } else {
+          itemRow.classList.add('border-b-2', 'border-gnome-active');
+          itemRow.classList.remove('border-t-2');
+        }
+      });
+
+      itemRow.addEventListener('dragleave', () => {
+        itemRow.classList.remove('border-t-2', 'border-b-2', 'border-gnome-active');
+      });
+
+      itemRow.addEventListener('drop', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        itemRow.classList.remove('border-t-2', 'border-b-2', 'border-gnome-active');
+        const fromIdxStr = e.dataTransfer.getData('text/plain');
+        if (!fromIdxStr && fromIdxStr !== '0') return;
+        const fromIdx = parseInt(fromIdxStr, 10);
+        if (isNaN(fromIdx) || fromIdx < 0 || fromIdx >= state.favorites.length) return;
+
+        const rect = itemRow.getBoundingClientRect();
+        const midY = rect.top + rect.height / 2;
+        let toIdx = idx;
+        if (e.clientY >= midY && fromIdx < idx) {
+          toIdx = idx;
+        } else if (e.clientY < midY && fromIdx > idx) {
+          toIdx = idx;
+        }
+
+        if (fromIdx !== toIdx) {
+          const [movedItem] = state.favorites.splice(fromIdx, 1);
+          state.favorites.splice(toIdx, 0, movedItem);
+          saveFavorites();
+          renderFavorites();
+        }
+      });
+
       const leftPart = document.createElement('div');
       leftPart.className = 'flex items-center gap-2 min-w-0 flex-1 truncate';
-      leftPart.innerHTML = `<span class="text-sm">⭐</span> <span class="truncate">${escapeHtml(f.name)}</span>`;
+      leftPart.innerHTML = `<span class="text-xs opacity-50 cursor-grab" title="Arrastrar para reordenar">⠿</span> <span class="text-sm">⭐</span> <span class="truncate">${escapeHtml(f.name)}</span>`;
 
       const rightPart = document.createElement('div');
-      rightPart.className = 'flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity';
+      rightPart.className = 'flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity';
+
+      // Reorder buttons (Move up / Move down)
+      if (idx > 0) {
+        const btnUp = document.createElement('button');
+        btnUp.className = 'text-gnome-textDim hover:text-gnome-text text-[10px] px-1 py-0.5 leading-none';
+        btnUp.title = 'Mover arriba';
+        btnUp.textContent = '▲';
+        btnUp.onclick = (e) => {
+          e.stopPropagation();
+          const temp = state.favorites[idx];
+          state.favorites[idx] = state.favorites[idx - 1];
+          state.favorites[idx - 1] = temp;
+          saveFavorites();
+          renderFavorites();
+        };
+        rightPart.appendChild(btnUp);
+      }
+
+      if (idx < state.favorites.length - 1) {
+        const btnDown = document.createElement('button');
+        btnDown.className = 'text-gnome-textDim hover:text-gnome-text text-[10px] px-1 py-0.5 leading-none';
+        btnDown.title = 'Mover abajo';
+        btnDown.textContent = '▼';
+        btnDown.onclick = (e) => {
+          e.stopPropagation();
+          const temp = state.favorites[idx];
+          state.favorites[idx] = state.favorites[idx + 1];
+          state.favorites[idx + 1] = temp;
+          saveFavorites();
+          renderFavorites();
+        };
+        rightPart.appendChild(btnDown);
+      }
 
       const btnEdit = document.createElement('button');
       btnEdit.className = 'text-gnome-textDim hover:text-gnome-active text-xs px-1';
@@ -2406,6 +2597,17 @@
         }
       };
     }
+    if (el.btnActionEdit) {
+      el.btnActionEdit.onclick = () => {
+        let targetPath = state.currentDirectory;
+        if (state.selectedIndex >= 0 && state.selectedIndex < state.filteredItems.length) {
+          targetPath = state.filteredItems[state.selectedIndex].path;
+        }
+        if (targetPath) {
+          openInTextEditor(targetPath);
+        }
+      };
+    }
     el.btnActionNewFile.onclick = openNewFileModal;
     el.btnActionNewFolder.onclick = openNewFolderModal;
     el.btnActionCut.onclick = cutSelectedItems;
@@ -2423,6 +2625,7 @@
     setupMenus();
     el.menuNewFile.onclick = () => { closeAllMenus(); openNewFileModal(); };
     el.menuNewFolder.onclick = () => { closeAllMenus(); openNewFolderModal(); };
+    if (el.menuRename) el.menuRename.onclick = () => { closeAllMenus(); openRenameItemModal(); };
     el.menuOpenDefault.onclick = () => {
       closeAllMenus();
       if (state.selectedIndex >= 0 && state.selectedIndex < state.filteredItems.length) {
@@ -2549,13 +2752,32 @@
     });
 
     // Close popup dialogs on backdrop click
-    [el.modalNewFile, el.modalNewFolder, el.modalNetwork, el.modalHelp, el.modalAppearance, el.modalRenameFavorite, el.modalConfirmExit].forEach(m => {
+    [el.modalNewFile, el.modalNewFolder, el.modalNetwork, el.modalHelp, el.modalAppearance, el.modalRenameFavorite, el.modalRenameItem, el.modalConfirmExit, el.modalAbout].forEach(m => {
       if (m) {
         m.addEventListener('click', (e) => {
           if (e.target === m) m.classList.add('hidden');
         });
       }
     });
+
+    // Rename Item Modal Wiring
+    if (el.btnCloseRenameItemModal) el.btnCloseRenameItemModal.onclick = closeRenameItemModal;
+    if (el.btnCancelRenameItem) el.btnCancelRenameItem.onclick = closeRenameItemModal;
+    if (el.btnConfirmRenameItem) el.btnConfirmRenameItem.onclick = saveRenamedItem;
+    if (el.inputRenameItemName) {
+      el.inputRenameItemName.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          e.stopPropagation();
+          saveRenamedItem();
+        }
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          e.stopPropagation();
+          closeRenameItemModal();
+        }
+      });
+    }
 
     // Rename Favorite Modal Wiring
     if (el.btnCloseRenameFavModal) el.btnCloseRenameFavModal.onclick = closeRenameFavoriteModal;
@@ -2586,6 +2808,34 @@
       closeAppearanceModal();
     };
     if (el.btnConfirmAppearance) el.btnConfirmAppearance.onclick = saveAppearanceSettings;
+
+    // Preferences Tabs Switching
+    const prefTabButtons = document.querySelectorAll('.pref-tab-btn');
+    const prefTabPanels = {
+      tabThemes: document.getElementById('panelThemes'),
+      tabTypography: document.getElementById('panelTypography'),
+      tabFiles: document.getElementById('panelFiles'),
+      tabEditor: document.getElementById('panelEditor')
+    };
+    prefTabButtons.forEach(btn => {
+      btn.onclick = () => {
+        prefTabButtons.forEach(b => {
+          b.classList.remove('border-gnome-active', 'text-gnome-active');
+          b.classList.add('border-transparent', 'text-gnome-textDim');
+        });
+        btn.classList.remove('border-transparent', 'text-gnome-textDim');
+        btn.classList.add('border-gnome-active', 'text-gnome-active');
+
+        const targetId = btn.dataset.tab;
+        Object.keys(prefTabPanels).forEach(k => {
+          if (prefTabPanels[k]) {
+            if (k === targetId) prefTabPanels[k].classList.remove('hidden');
+            else prefTabPanels[k].classList.add('hidden');
+          }
+        });
+      };
+    });
+
     if (el.rangeUiScale) {
       el.rangeUiScale.addEventListener('input', (e) => {
         const val = e.target.value;
@@ -2650,6 +2900,15 @@
         }
       };
     }
+    if (el.ctxMenuRename) {
+      el.ctxMenuRename.onclick = () => {
+        const item = state.contextTargetItem || (state.selectedIndex >= 0 ? state.filteredItems[state.selectedIndex] : null);
+        closeFileContextMenu();
+        if (item) {
+          openRenameItemModal(item);
+        }
+      };
+    }
     if (el.ctxMenuCut) {
       el.ctxMenuCut.onclick = () => {
         closeFileContextMenu();
@@ -2689,6 +2948,18 @@
         closeFileContextMenu();
         deleteCurrentItem();
       };
+    }
+
+    // Recursive Search Checkbox (Enabled by default)
+    if (el.chkRecursiveSearch) {
+      const savedRec = localStorage.getItem('tron_recursive_search');
+      el.chkRecursiveSearch.checked = savedRec !== 'false';
+      el.chkRecursiveSearch.addEventListener('change', () => {
+        localStorage.setItem('tron_recursive_search', el.chkRecursiveSearch.checked ? 'true' : 'false');
+        if (state.searchQuery) {
+          triggerSearch();
+        }
+      });
     }
 
     // Transfer Progress Bar & Details Card Wiring
@@ -2838,7 +3109,7 @@
     }
   }
 
-  // --- Appearance Settings ---
+  // --- Appearance & Preferences Settings ---
   function openAppearanceModal() {
     const theme = localStorage.getItem('tron_theme') || 'adwaita';
     const density = localStorage.getItem('tron_density') || 'normal';
@@ -2849,9 +3120,13 @@
     const textEditor = localStorage.getItem('tron_text_editor') || 'notepad';
     const customEditor = localStorage.getItem('tron_text_editor_custom') || '';
     const monochromeIcons = localStorage.getItem('tron_monochrome_icons') === 'true';
+    const recursiveSearch = localStorage.getItem('tron_recursive_search') !== 'false';
 
     if (el.selectTheme) el.selectTheme.value = theme;
     if (el.chkMonochromeIcons) el.chkMonochromeIcons.checked = monochromeIcons;
+    if (el.chkPrefShowHidden) el.chkPrefShowHidden.checked = state.showHiddenFiles;
+    if (el.chkPrefRecursiveSearch) el.chkPrefRecursiveSearch.checked = recursiveSearch;
+
     if (el.selectTextEditor) {
       el.selectTextEditor.value = textEditor;
       if (el.customEditorContainer) {
@@ -2903,6 +3178,8 @@
     const textEditor = el.selectTextEditor ? el.selectTextEditor.value : 'notepad';
     const customEditor = el.inputCustomEditor ? el.inputCustomEditor.value.trim() : '';
     const monochromeIcons = el.chkMonochromeIcons ? el.chkMonochromeIcons.checked : false;
+    const showHidden = el.chkPrefShowHidden ? el.chkPrefShowHidden.checked : state.showHiddenFiles;
+    const recursiveSearch = el.chkPrefRecursiveSearch ? el.chkPrefRecursiveSearch.checked : true;
 
     let density = 'normal';
     const selectedDensity = document.querySelector('input[name="density"]:checked');
@@ -2917,10 +3194,15 @@
     localStorage.setItem('tron_text_editor', textEditor);
     localStorage.setItem('tron_text_editor_custom', customEditor);
     localStorage.setItem('tron_monochrome_icons', monochromeIcons ? 'true' : 'false');
+    localStorage.setItem('tron_show_hidden', showHidden ? 'true' : 'false');
+    localStorage.setItem('tron_recursive_search', recursiveSearch ? 'true' : 'false');
 
     state.textEditor = textEditor;
     state.textEditorCustomPath = customEditor;
     state.monochromeIcons = monochromeIcons;
+    state.showHiddenFiles = showHidden;
+    if (el.chkShowHidden) el.chkShowHidden.checked = showHidden;
+    if (el.chkRecursiveSearch) el.chkRecursiveSearch.checked = recursiveSearch;
 
     state.customTextExts = customExts
       .split(',')
@@ -2929,6 +3211,8 @@
 
     applyAppearanceSettings(theme, density, fontSize, normalWeight, uiScale, monochromeIcons);
     closeAppearanceModal();
+    applyFilter();
+    renderFileList();
   }
 
   function loadAppearanceSettings() {
@@ -2939,6 +3223,10 @@
     const uiScale = localStorage.getItem('tron_ui_scale') || '14';
     const customExts = localStorage.getItem('tron_custom_text_exts') || 'sql, str, log, conf, env, bak';
     const monochromeIcons = localStorage.getItem('tron_monochrome_icons') === 'true';
+    const savedRec = localStorage.getItem('tron_recursive_search');
+    if (el.chkRecursiveSearch) {
+      el.chkRecursiveSearch.checked = savedRec !== 'false';
+    }
 
     state.monochromeIcons = monochromeIcons;
     state.customTextExts = customExts
