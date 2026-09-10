@@ -1650,6 +1650,21 @@ fn copy_file_chunked<F>(src: &Path, dst: &Path, on_bytes: &mut F) -> std::io::Re
 where
     F: FnMut(u64),
 {
+    if src == dst {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "No se puede copiar un archivo sobre sí mismo",
+        ));
+    }
+    if let (Ok(s_canon), Ok(d_canon)) = (src.canonicalize(), dst.canonicalize()) {
+        if s_canon == d_canon {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "No se puede copiar un archivo sobre sí mismo",
+            ));
+        }
+    }
+
     let mut reader = File::open(src)?;
     let mut writer = File::create(dst)?;
     let mut buf = [0u8; 1024 * 512]; // 512 KB chunks for smooth UI updates and high throughput
@@ -1757,11 +1772,38 @@ fn copy_items(
                     Some(n) => n,
                     None => continue,
                 };
-                let dest_path = PathBuf::from(&target_directory).join(file_name);
+                let mut dest_path = PathBuf::from(&target_directory).join(file_name);
+                if dest_path.exists() {
+                    let stem = src_path.file_stem().and_then(|s| s.to_str()).unwrap_or("archivo");
+                    let ext = src_path.extension().and_then(|s| s.to_str()).unwrap_or("");
+                    let ext_suffix = if ext.is_empty() {
+                        String::new()
+                    } else {
+                        format!(".{}", ext)
+                    };
+
+                    let mut counter = 1;
+                    loop {
+                        let candidate_name = if counter == 1 {
+                            format!("{} (copia){}", stem, ext_suffix)
+                        } else {
+                            format!("{} (copia {}){}", stem, counter, ext_suffix)
+                        };
+                        let candidate = PathBuf::from(&target_directory).join(candidate_name);
+                        if !candidate.exists() {
+                            dest_path = candidate;
+                            break;
+                        }
+                        counter += 1;
+                    }
+                }
+
                 let res = if src_path.is_dir() {
                     copy_dir_recursive_with_progress(&src_path, &dest_path, &mut |_| {})
                 } else {
-                    copy_file_chunked(&src_path, &dest_path, &mut |_| {}).map(|_| ())
+                    std::fs::copy(&src_path, &dest_path)
+                        .map(|_| ())
+                        .map_err(|e| format!("{}", e))
                 };
                 if let Err(e) = res {
                     err_msg = Some(format!("Error al copiar: {}", e));
@@ -1859,12 +1901,16 @@ fn move_items(
                     None => continue,
                 };
                 let dest_path = PathBuf::from(&target_directory).join(file_name);
+                if src_path == dest_path {
+                    valid_sources += 1;
+                    continue;
+                }
                 let res = fs::rename(&src_path, &dest_path).or_else(|_| {
                     if src_path.is_dir() {
                         copy_dir_recursive_with_progress(&src_path, &dest_path, &mut |_| {})?;
                         fs::remove_dir_all(&src_path)
                     } else {
-                        copy_file_chunked(&src_path, &dest_path, &mut |_| {})?;
+                        std::fs::copy(&src_path, &dest_path)?;
                         fs::remove_file(&src_path)
                     }
                 });
