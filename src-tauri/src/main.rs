@@ -256,6 +256,15 @@ pub struct UserPlace {
 pub struct DirectoryResult {
     pub current_path: String,
     pub items: Vec<FileItem>,
+    pub free_space_bytes: Option<u64>,
+    pub total_space_bytes: Option<u64>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DiskSpaceInfo {
+    pub free_bytes: u64,
+    pub total_bytes: u64,
+    pub available_bytes: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -884,6 +893,117 @@ fn get_system_drives() -> Vec<DriveItem> {
     drives
 }
 
+#[cfg(target_os = "windows")]
+fn query_disk_space(target_path: &Path) -> Option<(u64, u64)> {
+    extern "system" {
+        fn GetDiskFreeSpaceExW(
+            lpDirectoryName: *const u16,
+            lpFreeBytesAvailableToCaller: *mut u64,
+            lpTotalNumberOfBytes: *mut u64,
+            lpTotalNumberOfFreeBytes: *mut u64,
+        ) -> i32;
+    }
+
+    let mut path_buf = target_path.to_path_buf();
+    if !path_buf.exists() {
+        if let Some(parent) = target_path.parent() {
+            path_buf = parent.to_path_buf();
+        }
+    }
+
+    let mut path_str = path_buf.to_string_lossy().to_string();
+    if path_str.ends_with(':') {
+        path_str.push('\\');
+    }
+
+    let wide_path: Vec<u16> = OsStr::new(&path_str)
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect();
+
+    let mut free_avail: u64 = 0;
+    let mut total: u64 = 0;
+    let mut free_total: u64 = 0;
+
+    let ret = unsafe {
+        GetDiskFreeSpaceExW(
+            wide_path.as_ptr(),
+            &mut free_avail,
+            &mut total,
+            &mut free_total,
+        )
+    };
+
+    if ret != 0 {
+        Some((free_avail, total))
+    } else {
+        if let Some(prefix) = target_path.components().next() {
+            let mut root_str = prefix.as_os_str().to_string_lossy().to_string();
+            if root_str.ends_with(':') {
+                root_str.push('\\');
+            }
+            let wide_root: Vec<u16> = OsStr::new(&root_str)
+                .encode_wide()
+                .chain(std::iter::once(0))
+                .collect();
+            let ret2 = unsafe {
+                GetDiskFreeSpaceExW(
+                    wide_root.as_ptr(),
+                    &mut free_avail,
+                    &mut total,
+                    &mut free_total,
+                )
+            };
+            if ret2 != 0 {
+                return Some((free_avail, total));
+            }
+        }
+        None
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn query_disk_space(target_path: &Path) -> Option<(u64, u64)> {
+    use std::process::Command;
+    let output = Command::new("df")
+        .arg("-Pk")
+        .arg(target_path)
+        .output()
+        .ok()?;
+
+    if output.status.success() {
+        let text = String::from_utf8_lossy(&output.stdout);
+        let lines: Vec<&str> = text.lines().collect();
+        if lines.len() >= 2 {
+            let parts: Vec<&str> = lines[1].split_whitespace().collect();
+            if parts.len() >= 4 {
+                if let (Ok(total_k), Ok(avail_k)) = (parts[1].parse::<u64>(), parts[3].parse::<u64>()) {
+                    return Some((avail_k * 1024, total_k * 1024));
+                }
+            }
+        }
+    }
+    None
+}
+
+#[tauri::command]
+fn get_disk_free_space(path: Option<String>) -> Result<DiskSpaceInfo, String> {
+    let target = match path {
+        Some(p) if !p.trim().is_empty() => PathBuf::from(p),
+        _ => dirs_or_fallback(),
+    };
+
+    if let Some((free_bytes, total_bytes)) = query_disk_space(&target) {
+        Ok(DiskSpaceInfo {
+            free_bytes,
+            total_bytes,
+            available_bytes: free_bytes,
+        })
+    } else {
+        Err("No se pudo obtener el espacio libre en disco".to_string())
+    }
+}
+
 #[tauri::command]
 fn read_directory(path: Option<String>) -> Result<DirectoryResult, String> {
     let target_path = match path {
@@ -970,9 +1090,16 @@ fn read_directory(path: Option<String>) -> Result<DirectoryResult, String> {
         }
     });
 
+    let (free_space_bytes, total_space_bytes) = match query_disk_space(&target_path) {
+        Some((free, total)) => (Some(free), Some(total)),
+        None => (None, None),
+    };
+
     Ok(DirectoryResult {
         current_path: target_path.to_string_lossy().to_string(),
         items,
+        free_space_bytes,
+        total_space_bytes,
     })
 }
 
@@ -3116,7 +3243,8 @@ fn main() {
             compress_to_zip,
             extract_zip_archive,
             list_zip_contents,
-            generate_directory_listing
+            generate_directory_listing,
+            get_disk_free_space
         ])
         .run(tauri::generate_context!());
 

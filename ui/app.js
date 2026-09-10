@@ -50,7 +50,9 @@
     draggedInternalPaths: [],
     activeSherlockFilter: null,
     sherlockResults: null,
-    searchItems: null
+    searchItems: null,
+    freeSpaceBytes: null,
+    totalSpaceBytes: null
   };
 
   // DOM Elements
@@ -68,7 +70,8 @@
     btnParentDir: document.getElementById('btnParentDir'),
     btnRefresh: document.getElementById('btnRefresh'),
     statusItemCount: document.getElementById('statusItemCount'),
-    statusSelection: document.getElementById('statusSelection'),
+    statusDiskSpace: document.getElementById('statusDiskSpace') || document.getElementById('statusSelection'),
+    statusSelection: document.getElementById('statusDiskSpace') || document.getElementById('statusSelection'),
     quickViewModal: document.getElementById('quickViewModal'),
     quickViewCard: document.getElementById('quickViewCard'),
     qvTitle: document.getElementById('qvTitle'),
@@ -566,6 +569,8 @@
 
       state.currentDirectory = res.current_path;
       state.items = res.items || [];
+      state.freeSpaceBytes = res.free_space_bytes ?? null;
+      state.totalSpaceBytes = res.total_space_bytes ?? null;
       state.searchQuery = '';
       state.isSearchingRecursive = false;
       state.sherlockResults = null;
@@ -1024,15 +1029,27 @@
   }
 
   function updateStatusBar() {
-    el.statusItemCount.textContent = `${state.filteredItems.length} elemento${state.filteredItems.length === 1 ? '' : 's'}`;
+    const totalCount = state.filteredItems.length;
     const selCount = state.selectedItems.size;
-    if (selCount === 0) {
-      el.statusSelection.textContent = 'Ningún elemento seleccionado';
-    } else if (selCount === 1 && state.selectedIndex >= 0) {
-      const item = state.filteredItems[state.selectedIndex];
-      el.statusSelection.textContent = `${item.name} (${item.is_directory ? 'Carpeta' : formatSize(item.size)})`;
+    if (selCount > 0) {
+      el.statusItemCount.textContent = `${totalCount} elemento${totalCount === 1 ? '' : 's'} (${selCount} seleccionado${selCount === 1 ? '' : 's'})`;
     } else {
-      el.statusSelection.textContent = `${selCount} seleccionados`;
+      el.statusItemCount.textContent = `${totalCount} elemento${totalCount === 1 ? '' : 's'}`;
+    }
+
+    if (state.freeSpaceBytes !== null && state.freeSpaceBytes !== undefined) {
+      const freeStr = formatSize(state.freeSpaceBytes);
+      if (el.statusDiskSpace) {
+        el.statusDiskSpace.textContent = `Espacio libre: ${freeStr}`;
+        if (state.totalSpaceBytes) {
+          el.statusDiskSpace.title = `Espacio libre: ${freeStr} de ${formatSize(state.totalSpaceBytes)}`;
+        } else {
+          el.statusDiskSpace.title = `Espacio libre: ${freeStr}`;
+        }
+      }
+    } else if (el.statusDiskSpace) {
+      el.statusDiskSpace.textContent = '';
+      el.statusDiskSpace.title = '';
     }
   }
 
@@ -1513,6 +1530,8 @@
       const res = await invoke('read_directory', { path: state.currentDirectory });
       if (res) {
         state.items = res.items || [];
+        state.freeSpaceBytes = res.free_space_bytes ?? null;
+        state.totalSpaceBytes = res.total_space_bytes ?? null;
         applyFilter();
       }
 
@@ -4415,7 +4434,7 @@
     // Recursive search via Rust backend
     try {
       state.isSearchingRecursive = true;
-      el.statusSelection.textContent = 'Buscando recursivamente...';
+      el.statusItemCount.textContent = 'Buscando recursivamente...';
       const results = await invoke('search_directory_recursive', {
         basePath: state.currentDirectory,
         query: q,
