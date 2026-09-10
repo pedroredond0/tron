@@ -279,6 +279,9 @@
           <span>Nueva Carpeta...</span><span class="text-gnome-textDim text-[11px]">Ctrl+Shift+N</span>
         </button>
         <div class="my-1 border-t border-gnome-border/60"></div>
+        <button id="menuRename" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+          <span>Renombrar...</span><span class="text-gnome-textDim text-[11px]">F2</span>
+        </button>
         <button id="menuOpenDefault" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
           <span>Abrir con aplicación</span><span class="text-gnome-textDim text-[11px]">Enter</span>
         </button>
@@ -287,7 +290,7 @@
         </button>
         <div class="my-1 border-t border-gnome-border/60"></div>
         <button id="menuAddFavorite" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
-          <span>Añadir a Favoritos</span><span class="text-gnome-textDim text-[11px]">Ctrl+D</span>
+          <span>Añadir a Favoritos</span><span class="text-gnome-textDim text-[11px]">Ctrl+B</span>
         </button>
         <div class="my-1 border-t border-gnome-border/60"></div>
         <button id="menuForceQuit" class="w-full text-left px-3 py-1.5 hover:bg-red-600 hover:text-white flex items-center justify-between text-red-400">
@@ -383,53 +386,63 @@
         <span class="hidden sm:inline">Ocultos</span>
       </label>
       <label class="flex items-center gap-1.5 text-[11px] text-gnome-textDim hover:text-gnome-text cursor-pointer select-none" title="Buscar en subcarpetas del directorio actual">
-        <input id="chkRecursiveSearch" type="checkbox" class="rounded bg-gnome-sidebar border-gnome-border text-gnome-active focus:ring-0" />
+        <input id="chkRecursiveSearch" type="checkbox" checked class="rounded bg-gnome-sidebar border-gnome-border text-gnome-active focus:ring-0" />
         <span class="hidden sm:inline">Recursivo</span>
       </label>
       <div class="relative w-60">
-        <input id="searchInput" type="text" placeholder="Buscar en carpeta..." class="w-full bg-gnome-sidebar border border-gnome-border rounded-md px-2.5 py-1 text-xs text-gnome-text placeholder-gnome-textDim focus:outline-none focus:border-gnome-active" />
+        <input id="searchInput" type="text" placeholder="Buscar en carpeta... (Ctrl+K)" class="w-full bg-gnome-sidebar border border-gnome-border rounded-md px-2.5 py-1 text-xs text-gnome-text placeholder-gnome-textDim focus:outline-none focus:border-gnome-active" />
         <button id="btnClearSearch" class="hidden absolute right-2 top-1/2 -translate-y-1/2 text-gnome-textDim hover:text-gnome-text text-xs">✕</button>
       </div>
     </div>
   </header>
 
-  <!-- Action Bar (Nuevo archivo, Nueva carpeta, Cortar, Copiar, Pegar, Papelera, Calcular tamaño) -->
+  <!-- Action Bar -->
   <div id="actionBar" class="h-9 bg-gnome-bg border-b border-gnome-border flex items-center justify-between px-3 shrink-0 text-xs text-gnome-text">
     <div class="flex items-center gap-1.5">
       <button id="btnActionTerminal" class="px-2.5 py-1 rounded bg-gnome-surface hover:bg-gnome-hover border border-gnome-border flex items-center gap-1.5 text-xs transition-colors" title="Abrir terminal aquí (Ctrl+T)">
-        <span>&gt;_</span>
+        <span class="font-mono font-bold text-gnome-active">&gt;_</span>
         <span class="hidden sm:inline">Terminal</span>
       </button>
-      <div class="h-4 border-r border-gnome-border/80 mx-1"></div>
-      <button id="btnActionNewFile" class="px-2.5 py-1 rounded bg-gnome-surface hover:bg-gnome-hover border border-gnome-border flex items-center gap-1.5 text-xs transition-colors" title="Crear nuevo archivo (Ctrl+N)">
-        <span>📄</span>
-        <span>Nuevo Archivo</span>
+      <button id="btnActionEdit" class="px-2.5 py-1 rounded bg-gnome-surface hover:bg-gnome-hover border border-gnome-border flex items-center gap-1.5 text-xs transition-colors" title="Abrir con editor de texto">
+        <span>📝</span>
+        <span class="hidden sm:inline">Editar</span>
       </button>
-      <button id="btnActionNewFolder" class="px-2.5 py-1 rounded bg-gnome-surface hover:bg-gnome-hover border border-gnome-border flex items-center gap-1.5 text-xs transition-colors" title="Crear nueva carpeta (Ctrl+Shift+N)">
-        <span>📁</span>
-        <span>Nueva Carpeta</span>
-      </button>
+
       <div class="h-4 border-r border-gnome-border/80 mx-1"></div>
-      <button id="btnActionCut" class="p-1 px-2 rounded hover:bg-gnome-surface text-gnome-text flex items-center gap-1 transition-colors" title="Cortar selección (Ctrl+X)">
+
+      <!-- Nuevo con iconos de archivo y directorio -->
+      <div class="flex items-center rounded bg-gnome-surface border border-gnome-border overflow-hidden">
+        <span class="px-2 py-1 text-xs font-medium text-gnome-text select-none">Nuevo</span>
+        <button id="btnActionNewFile" class="p-1 px-2 hover:bg-gnome-hover text-gnome-text border-l border-gnome-border transition-colors flex items-center justify-center" title="Crear nuevo archivo (Ctrl+N)">
+          <span>📄</span>
+        </button>
+        <button id="btnActionNewFolder" class="p-1 px-2 hover:bg-gnome-hover text-gnome-text border-l border-gnome-border transition-colors flex items-center justify-center" title="Crear nueva carpeta (Ctrl+Shift+N)">
+          <span>📁</span>
+        </button>
+      </div>
+
+      <div class="h-4 border-r border-gnome-border/80 mx-1"></div>
+
+      <!-- Cortar, Copiar, Pegar, Eliminar: Solo iconos -->
+      <button id="btnActionCut" class="p-1.5 px-2 rounded hover:bg-gnome-surface text-gnome-text flex items-center justify-center transition-colors" title="Cortar selección (Ctrl+X)">
         <span>✂️</span>
-        <span class="hidden sm:inline">Cortar</span>
       </button>
-      <button id="btnActionCopy" class="p-1 px-2 rounded hover:bg-gnome-surface text-gnome-text flex items-center gap-1 transition-colors" title="Copiar selección (Ctrl+C)">
+      <button id="btnActionCopy" class="p-1.5 px-2 rounded hover:bg-gnome-surface text-gnome-text flex items-center justify-center transition-colors" title="Copiar selección (Ctrl+C)">
         <span>📋</span>
-        <span class="hidden sm:inline">Copiar</span>
       </button>
-      <button id="btnActionPaste" class="p-1 px-2 rounded hover:bg-gnome-surface text-gnome-text flex items-center gap-1 transition-colors disabled:opacity-40 disabled:pointer-events-none" title="Pegar elementos (Ctrl+V)" disabled>
+      <button id="btnActionPaste" class="p-1.5 px-2 rounded hover:bg-gnome-surface text-gnome-text flex items-center justify-center transition-colors disabled:opacity-40 disabled:pointer-events-none" title="Pegar elementos (Ctrl+V)" disabled>
         <span>📥</span>
-        <span class="hidden sm:inline">Pegar</span>
       </button>
-      <button id="btnActionDelete" class="p-1 px-2 rounded hover:bg-red-600/20 text-red-400 flex items-center gap-1 transition-colors" title="Mover a papelera (Supr)">
+      <button id="btnActionDelete" class="p-1.5 px-2 rounded hover:bg-red-600/20 text-red-400 flex items-center justify-center transition-colors" title="Mover a papelera (Supr)">
         <span>🗑️</span>
-        <span class="hidden sm:inline">Eliminar</span>
       </button>
+
       <div class="h-4 border-r border-gnome-border/80 mx-1"></div>
+
+      <!-- Calcular tamaños que ponga Size -->
       <button id="btnActionCalcDirSizes" class="p-1 px-2 rounded hover:bg-gnome-surface text-gnome-text flex items-center gap-1 transition-colors" title="Calcular espacio ocupado por carpetas">
         <span>📊</span>
-        <span class="hidden md:inline">Calcular Tamaños</span>
+        <span>Size</span>
       </button>
     </div>
 
@@ -463,11 +476,15 @@
         </div>
       </div>
 
-      <button id="btnOpenAppearance" class="p-1 px-2 rounded hover:bg-gnome-surface text-gnome-text flex items-center gap-1 transition-colors" title="Personalizar tema, fuente y colores">
-        <span>🎨 Tema</span>
+      <!-- Preferencias (antes Tema) -->
+      <button id="btnOpenAppearance" class="p-1 px-2 rounded hover:bg-gnome-surface text-gnome-text flex items-center gap-1 transition-colors" title="Preferencias (Temas, tamaños, archivos, editor)">
+        <span>⚙️</span>
+        <span>Preferencias</span>
       </button>
-      <button id="btnActionQuickView" class="p-1 px-2 rounded hover:bg-gnome-surface text-gnome-text flex items-center gap-1" title="Vista previa (Espacio)">
-        <span>👁️ QuickView</span>
+
+      <!-- QuickView solo con el ojo -->
+      <button id="btnActionQuickView" class="p-1 px-2 rounded hover:bg-gnome-surface text-gnome-text flex items-center justify-center transition-colors" title="Vista previa QuickView (Espacio)">
+        <span>👁️</span>
       </button>
     </div>
   </div>
@@ -686,7 +703,7 @@
     <div class="bg-gnome-surface border border-gnome-border rounded-xl shadow-2xl w-full max-w-lg p-5 flex flex-col gap-4">
       <div class="flex items-center justify-between border-b border-gnome-border pb-3">
         <h3 class="text-sm font-semibold text-gnome-text flex items-center gap-2">
-          <span>⚡</span> tronExplorer — Guía de Atajos
+          <span>⚡</span> Tron — Guía de Atajos
         </h3>
         <button id="btnCloseHelpModal" class="text-gnome-textDim hover:text-white text-xs">✕</button>
       </div>
@@ -700,16 +717,17 @@
           <span class="font-medium text-gnome-active">Letra / Número</span><span>Saltar al archivo por inicial</span>
           <span class="font-medium text-gnome-active">Shift + Flechas</span><span>Selección múltiple continua</span>
           <span class="font-medium text-gnome-active">Ctrl + C / X / V</span><span>Copiar, Cortar y Pegar</span>
-          <span class="font-medium text-gnome-active">Arrastrar (+ Ctrl)</span><span>Mover (o Copiar con Ctrl)</span>
-          <span class="font-medium text-gnome-active">Clic derecho</span><span>Menú contextual con Duplicar</span>
+          <span class="font-medium text-gnome-active">Ctrl + D</span><span>Duplicar archivo o carpeta</span>
+          <span class="font-medium text-gnome-active">F2</span><span>Renombrar archivo o carpeta</span>
+          <span class="font-medium text-gnome-active">Ctrl + B</span><span>Añadir carpeta actual a Favoritos</span>
+          <span class="font-medium text-gnome-active">Ctrl + K</span><span>Buscar en carpeta (recursivo)</span>
           <span class="font-medium text-gnome-active">Ctrl + N / Shift+N</span><span>Nuevo archivo / Nueva carpeta</span>
-          <span class="font-medium text-gnome-active">Ctrl + D</span><span>Añadir carpeta actual a Favoritos</span>
           <span class="font-medium text-gnome-active">Ctrl + H</span><span>Mostrar/Ocultar archivos ocultos</span>
           <span class="font-medium text-gnome-active">Delete (Supr)</span><span>Mover a papelera de reciclaje</span>
           <span class="font-medium text-gnome-active">F5 / Ctrl + R</span><span>Actualizar vista</span>
           <span class="font-medium text-gnome-active">Ctrl + T</span><span>Abrir terminal en carpeta actual</span>
           <span class="font-medium text-gnome-active">Alt + ↑</span><span>Subir al directorio padre</span>
-          <span class="font-medium text-gnome-active">Esc</span><span>Cerrar visor / limpiar filtro</span>
+          <span class="font-medium text-gnome-active">Esc</span><span>Cerrar visor / limpiar filtro / cancelar</span>
         </div>
         <p class="text-[11px] text-gnome-textDim text-center pt-2">Tron v0.1.0 — Diseñado con Tauri v2 + Rust + Tailwind CSS para máxima fluidez y bajo consumo.</p>
       </div>
@@ -771,125 +789,207 @@
     </div>
   </div>
 
-  <!-- Styled Modal: Personalización de Aspecto -->
+  <!-- Styled Modal: Preferencias (Rediseñado con Pestañas Horizontales) -->
   <div id="modalAppearance" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-    <div class="bg-gnome-surface border border-gnome-border rounded-xl shadow-2xl w-full max-w-md p-5 flex flex-col gap-4">
+    <div class="bg-gnome-surface border border-gnome-border rounded-xl shadow-2xl w-full max-w-2xl p-5 flex flex-col gap-4">
       <div class="flex items-center justify-between border-b border-gnome-border pb-3">
-          <h3 class="text-sm font-semibold text-gnome-text flex items-center gap-2">
-            <span>⚙️</span> Preferencias
-          </h3>
-          <button id="btnCloseAppearanceModal" class="text-gnome-textDim hover:text-white text-xs">✖</button>
+        <h3 class="text-sm font-semibold text-gnome-text flex items-center gap-2">
+          <span>⚙️</span> Preferencias
+        </h3>
+        <button id="btnCloseAppearanceModal" class="text-gnome-textDim hover:text-white text-xs">✕</button>
+      </div>
+
+      <!-- Horizontal Tabs -->
+      <div class="flex border-b border-gnome-border text-xs gap-1 overflow-x-auto scrollbar-none">
+        <button type="button" class="pref-tab-btn px-4 py-2 border-b-2 border-gnome-active text-gnome-active font-medium flex items-center gap-1.5 transition-all" data-tab="tabThemes">
+          <span>🎨</span> <span>Temas</span>
+        </button>
+        <button type="button" class="pref-tab-btn px-4 py-2 border-b-2 border-transparent text-gnome-textDim hover:text-gnome-text font-medium flex items-center gap-1.5 transition-all" data-tab="tabTypography">
+          <span>🔤</span> <span>Tamaños y Fuente</span>
+        </button>
+        <button type="button" class="pref-tab-btn px-4 py-2 border-b-2 border-transparent text-gnome-textDim hover:text-gnome-text font-medium flex items-center gap-1.5 transition-all" data-tab="tabFiles">
+          <span>📁</span> <span>Archivos</span>
+        </button>
+        <button type="button" class="pref-tab-btn px-4 py-2 border-b-2 border-transparent text-gnome-textDim hover:text-gnome-text font-medium flex items-center gap-1.5 transition-all" data-tab="tabEditor">
+          <span>📝</span> <span>Editor de Texto</span>
+        </button>
+      </div>
+
+      <!-- Tab Content Panels -->
+      <div class="min-h-[260px] max-h-[60vh] overflow-y-auto pr-1 scrollbar-thin text-xs space-y-4">
+        <!-- 1. Pestaña: Temas -->
+        <div id="panelThemes" class="pref-tab-panel space-y-4">
+          <div>
+            <label class="block text-gnome-textDim mb-1.5 font-medium">Tema Visual de Tron:</label>
+            <select id="selectTheme" class="w-full bg-gnome-sidebar border border-gnome-border rounded-md px-3 py-2 text-xs text-gnome-text focus:outline-none focus:border-gnome-active">
+              <option value="adwaita">GNOME Adwaita Dark (Por defecto)</option>
+              <option value="light">GNOME Adwaita Light (Modo Claro)</option>
+              <option value="windows10">Windows 10 Fluent Dark</option>
+              <option value="ubuntu">Ubuntu Yaru Dark</option>
+              <option value="manjaro">Manjaro Breath Teal</option>
+              <option value="nvchad">NvChad OneDark</option>
+              <option value="tokyonight">Tokyo Night Storm</option>
+              <option value="matteblack">Matte Black Minimal</option>
+            </select>
+          </div>
+
+          <!-- Iconos monocromáticos -->
+          <div class="p-3 bg-gnome-sidebar/40 rounded-lg border border-gnome-border">
+            <label class="flex items-center gap-2.5 cursor-pointer select-none">
+              <input id="chkMonochromeIcons" type="checkbox" class="w-4 h-4 rounded bg-gnome-sidebar border-gnome-border text-gnome-active focus:ring-0">
+              <div>
+                <span class="font-normal text-gnome-text block">Iconos monocromáticos (estilo minimalista)</span>
+                <span class="text-[10px] text-gnome-textDim">Convierte todos los iconos a escala de grises para una interfaz más uniforme y sobria.</span>
+              </div>
+            </label>
+          </div>
         </div>
 
-        <div class="space-y-4 text-xs max-h-[70vh] overflow-y-auto pr-2 scrollbar-thin">
-          <!-- Editor de texto (New) -->
+        <!-- 2. Pestaña: Tamaños y Fuente -->
+        <div id="panelTypography" class="pref-tab-panel hidden space-y-4">
+          <!-- Escala y tamaño de elementos de interfaz -->
           <div class="p-3 bg-gnome-sidebar/50 rounded-lg border border-gnome-border space-y-2">
-            <label class="block text-gnome-text font-medium text-sm border-b border-gnome-border/50 pb-1 mb-2">Editor de Texto</label>
-            <select id="selectTextEditor" class="w-full bg-gnome-surface border border-gnome-border rounded-md px-3 py-2 text-xs text-gnome-text focus:outline-none focus:border-gnome-active">
-              <option value="notepad">Bloc de Notas (Windows)</option>
-              <option value="TextEdit">TextEdit (macOS)</option>
-              <option value="code">VSCode (code)</option>
-              <option value="codium">VSCodium (codium)</option>
-              <option value="nvim">Neovim (nvim)</option>
-              <option value="vim">Vim (vim)</option>
-              <option value="nano">Nano (nano)</option>
-              <option value="custom">Personalizado / Ruta exacta...</option>
-            </select>
-            <div id="customEditorContainer" class="hidden mt-2">
-              <input id="inputCustomEditor" type="text" placeholder="Ej: C:\Program Files\MiEditor\editor.exe" class="w-full bg-gnome-surface border border-gnome-border rounded-md px-3 py-1.5 text-xs text-gnome-text placeholder-gnome-textDim focus:outline-none focus:border-gnome-active" />
-              <p class="text-[10px] text-gnome-textDim mt-1">Introduce el nombre del ejecutable (si está en el PATH) o la ruta completa.</p>
+            <div class="flex items-center justify-between">
+              <label for="rangeUiScale" class="font-medium text-gnome-text">Tamaño de elementos de la interfaz:</label>
+              <span id="lblUiScaleValue" class="px-2 py-0.5 rounded bg-gnome-active text-white text-[11px] font-semibold">14px (Normal)</span>
+            </div>
+            <input id="rangeUiScale" type="range" min="12" max="20" step="2" value="14" class="w-full accent-blue-500 cursor-pointer" />
+            <div class="flex justify-between text-[10px] text-gnome-textDim px-0.5">
+              <span>12px</span>
+              <span>14px</span>
+              <span>16px</span>
+              <span>18px</span>
+              <span>20px</span>
+            </div>
+            <p class="text-[10px] text-gnome-textDim">Ajusta armónicamente botones, barras de herramientas, buscador y barra lateral.</p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Densidad de lista -->
+            <div>
+              <label class="block text-gnome-textDim mb-1.5 font-medium">Espaciado de lista de archivos:</label>
+              <div class="grid grid-cols-3 gap-2">
+                <label class="flex items-center gap-1.5 p-2 rounded border border-gnome-border bg-gnome-sidebar/50 cursor-pointer hover:border-gnome-active">
+                  <input type="radio" name="density" value="compact" class="text-gnome-active focus:ring-0">
+                  <span>Compacto</span>
+                </label>
+                <label class="flex items-center gap-1.5 p-2 rounded border border-gnome-border bg-gnome-sidebar/50 cursor-pointer hover:border-gnome-active">
+                  <input type="radio" name="density" value="normal" checked class="text-gnome-active focus:ring-0">
+                  <span>Normal</span>
+                </label>
+                <label class="flex items-center gap-1.5 p-2 rounded border border-gnome-border bg-gnome-sidebar/50 cursor-pointer hover:border-gnome-active">
+                  <input type="radio" name="density" value="spacious" class="text-gnome-active focus:ring-0">
+                  <span>Cómodo</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Tamaño de fuente -->
+            <div>
+              <label class="block text-gnome-textDim mb-1.5 font-medium">Tamaño de texto en la lista:</label>
+              <select id="selectFontSize" class="w-full bg-gnome-sidebar border border-gnome-border rounded-md px-3 py-2 text-xs text-gnome-text focus:outline-none focus:border-gnome-active">
+                <option value="text-xs">Pequeña (12px)</option>
+                <option value="text-sm" selected>Media estándar (14px)</option>
+                <option value="text-base">Grande (16px)</option>
+                <option value="text-lg">Extra Grande (18px)</option>
+                <option value="text-xl">Enorme (20px)</option>
+              </select>
             </div>
           </div>
-        <!-- Tema -->
-        <div>
-          <label class="block text-gnome-textDim mb-1.5 font-medium">Tema Visual:</label>
-          <select id="selectTheme" class="w-full bg-gnome-sidebar border border-gnome-border rounded-md px-3 py-2 text-xs text-gnome-text focus:outline-none focus:border-gnome-active">
-            <option value="adwaita">GNOME Adwaita Dark (Por defecto)</option>
-            <option value="light">GNOME Adwaita Light (Modo Claro)</option>
-            <option value="windows10">Windows 10 Fluent Dark</option>
-            <option value="ubuntu">Ubuntu Yaru Dark</option>
-            <option value="manjaro">Manjaro Breath Teal</option>
-            <option value="nvchad">NvChad OneDark</option>
-            <option value="tokyonight">Tokyo Night Storm</option>
-            <option value="matteblack">Matte Black Minimal</option>
-          </select>
-        </div>
 
-        <!-- Iconos monocromáticos -->
-        <div class="p-3 bg-gnome-sidebar/40 rounded-lg border border-gnome-border">
-          <label class="flex items-center gap-2.5 cursor-pointer select-none">
-            <input id="chkMonochromeIcons" type="checkbox" class="w-4 h-4 rounded bg-gnome-sidebar border-gnome-border text-gnome-active focus:ring-0">
-            <span class="font-normal text-gnome-text">Iconos monocromáticos (estilo minimalista)</span>
-          </label>
-        </div>
-
-        <!-- Escala y tamaño de elementos de interfaz (Slider de 5 niveles: 12px, 14px, 16px, 18px, 20px) -->
-        <div class="p-3 bg-gnome-sidebar/50 rounded-lg border border-gnome-border space-y-2">
-          <div class="flex items-center justify-between">
-            <label for="rangeUiScale" class="font-medium text-gnome-text">Tamaño de elementos de la interfaz:</label>
-            <span id="lblUiScaleValue" class="px-2 py-0.5 rounded bg-gnome-active text-white text-[11px] font-semibold">14px (Normal)</span>
-          </div>
-          <input id="rangeUiScale" type="range" min="12" max="20" step="2" value="14" class="w-full accent-blue-500 cursor-pointer" />
-          <div class="flex justify-between text-[10px] text-gnome-textDim px-0.5">
-            <span>12px</span>
-            <span>14px</span>
-            <span>16px</span>
-            <span>18px</span>
-            <span>20px</span>
-          </div>
-          <p class="text-[10px] text-gnome-textDim">Ajusta armónicamente botones, barra de ruta, buscador y barra lateral.</p>
-        </div>
-
-        <!-- Densidad de lista -->
-        <div>
-          <label class="block text-gnome-textDim mb-1.5 font-medium">Espaciado de lista de archivos:</label>
-          <div class="grid grid-cols-3 gap-2">
-            <label class="flex items-center gap-2 p-2 rounded border border-gnome-border bg-gnome-sidebar/50 cursor-pointer hover:border-gnome-active">
-              <input type="radio" name="density" value="compact" class="text-gnome-active focus:ring-0">
-              <span>Compacto</span>
-            </label>
-            <label class="flex items-center gap-2 p-2 rounded border border-gnome-border bg-gnome-sidebar/50 cursor-pointer hover:border-gnome-active">
-              <input type="radio" name="density" value="normal" checked class="text-gnome-active focus:ring-0">
-              <span>Normal</span>
-            </label>
-            <label class="flex items-center gap-2 p-2 rounded border border-gnome-border bg-gnome-sidebar/50 cursor-pointer hover:border-gnome-active">
-              <input type="radio" name="density" value="spacious" class="text-gnome-active focus:ring-0">
-              <span>Cómodo</span>
+          <!-- Negrita -->
+          <div class="p-3 bg-gnome-sidebar/40 rounded-lg border border-gnome-border">
+            <label class="flex items-center gap-2.5 cursor-pointer">
+              <input id="chkNormalFontWeight" type="checkbox" class="w-4 h-4 rounded bg-gnome-sidebar border-gnome-border text-gnome-active focus:ring-0">
+              <span class="font-normal text-gnome-text">Usar texto estándar (sin negrita excesiva en nombres)</span>
             </label>
           </div>
         </div>
 
-        <!-- Tamaño de fuente -->
-        <div>
-          <label class="block text-gnome-textDim mb-1.5 font-medium">Tamaño de texto en la lista:</label>
-          <select id="selectFontSize" class="w-full bg-gnome-sidebar border border-gnome-border rounded-md px-3 py-2 text-xs text-gnome-text focus:outline-none focus:border-gnome-active">
-            <option value="text-xs">Pequeña (12px)</option>
-            <option value="text-sm" selected>Media estándar (14px)</option>
-            <option value="text-base">Grande (16px)</option>
-            <option value="text-lg">Extra Grande (18px)</option>
-            <option value="text-xl">Enorme (20px)</option>
-          </select>
+        <!-- 3. Pestaña: Archivos -->
+        <div id="panelFiles" class="pref-tab-panel hidden space-y-4">
+          <div class="p-3 bg-gnome-sidebar/40 rounded-lg border border-gnome-border space-y-3">
+            <label class="flex items-center gap-2.5 cursor-pointer select-none">
+              <input id="chkPrefShowHidden" type="checkbox" class="w-4 h-4 rounded bg-gnome-sidebar border-gnome-border text-gnome-active focus:ring-0">
+              <div>
+                <span class="font-medium text-gnome-text block">Mostrar archivos ocultos y del sistema</span>
+                <span class="text-[10px] text-gnome-textDim">Muestra dotfiles (.git, .env) y archivos con atributo oculto en el explorador (Ctrl+H).</span>
+              </div>
+            </label>
+            <div class="border-t border-gnome-border/50 pt-2">
+              <label class="flex items-center gap-2.5 cursor-pointer select-none">
+                <input id="chkPrefRecursiveSearch" type="checkbox" checked class="w-4 h-4 rounded bg-gnome-sidebar border-gnome-border text-gnome-active focus:ring-0">
+                <div>
+                  <span class="font-medium text-gnome-text block">Búsqueda recursiva activada por defecto</span>
+                  <span class="text-[10px] text-gnome-textDim">Al buscar con Ctrl+K o escribir en la barra de búsqueda, rastrea también subcarpetas.</span>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <!-- Extensiones de texto adicionales -->
+          <div class="p-3 bg-gnome-sidebar/50 rounded-lg border border-gnome-border space-y-1.5">
+            <label class="block text-gnome-text font-medium">Extensiones tratadas como texto y previsualización:</label>
+            <input id="inputCustomTextExts" type="text" placeholder="ej: sql, str, log, conf, env, bak" class="w-full bg-gnome-surface border border-gnome-border rounded-md px-3 py-1.5 text-xs text-gnome-text placeholder-gnome-textDim focus:outline-none focus:border-gnome-active" />
+            <p class="text-[10px] text-gnome-textDim">Separadas por comas. Estas extensiones se mostrarán con icono de texto, se previsualizarán con visor de código en QuickView y podrán editarse.</p>
+          </div>
         </div>
 
-        <!-- Negrita -->
-        <div class="p-3 bg-gnome-sidebar/40 rounded-lg border border-gnome-border">
-          <label class="flex items-center gap-2.5 cursor-pointer">
-            <input id="chkNormalFontWeight" type="checkbox" class="w-4 h-4 rounded bg-gnome-sidebar border-gnome-border text-gnome-active focus:ring-0">
-            <span class="font-normal text-gnome-text">Usar texto estándar (sin negrita excesiva en nombres)</span>
-          </label>
-        </div>
+        <!-- 4. Pestaña: Editor de Texto -->
+        <div id="panelEditor" class="pref-tab-panel hidden space-y-4">
+          <div class="p-3 bg-gnome-sidebar/50 rounded-lg border border-gnome-border space-y-3">
+            <div>
+              <label class="block text-gnome-text font-medium text-sm border-b border-gnome-border/50 pb-1 mb-2">Editor de Texto Predeterminado</label>
+              <select id="selectTextEditor" class="w-full bg-gnome-surface border border-gnome-border rounded-md px-3 py-2 text-xs text-gnome-text focus:outline-none focus:border-gnome-active">
+                <option value="notepad">Bloc de Notas (Windows)</option>
+                <option value="code">VS Code (code)</option>
+                <option value="codium">VSCodium (codium)</option>
+                <option value="nvim">Neovim (nvim)</option>
+                <option value="vim">Vim (vim)</option>
+                <option value="nano">Nano (nano)</option>
+                <option value="TextEdit">TextEdit (macOS)</option>
+                <option value="custom">Personalizado / Ruta exacta o comando...</option>
+              </select>
+            </div>
+            
+            <div id="customEditorContainer" class="hidden mt-2">
+              <label class="block text-gnome-textDim mb-1 text-[11px] font-medium">Ruta o comando del editor:</label>
+              <input id="inputCustomEditor" type="text" placeholder="Ej: C:\Program Files\MiEditor\editor.exe o micro" class="w-full bg-gnome-surface border border-gnome-border rounded-md px-3 py-1.5 text-xs text-gnome-text placeholder-gnome-textDim focus:outline-none focus:border-gnome-active" />
+              <p class="text-[10px] text-gnome-textDim mt-1">Introduce el nombre del comando si está en el PATH (ej: code, nvim) o la ruta completa al binario.</p>
+            </div>
 
-        <!-- Extensiones de texto adicionales -->
-        <div class="p-3 bg-gnome-sidebar/50 rounded-lg border border-gnome-border space-y-1.5">
-          <label class="block text-gnome-text font-medium">Extensiones tratadas como texto:</label>
-          <input id="inputCustomTextExts" type="text" placeholder="ej: sql, str, log, conf, env, bak" class="w-full bg-gnome-surface border border-gnome-border rounded-md px-3 py-1.5 text-xs text-gnome-text placeholder-gnome-textDim focus:outline-none focus:border-gnome-active" />
-          <p class="text-[10px] text-gnome-textDim">Separadas por comas. Estas extensiones se mostrarán como archivos de texto y se previsualizarán con visor de código en QuickView.</p>
+            <div class="p-2.5 rounded bg-blue-500/10 border border-blue-500/30 text-[11px] text-blue-300">
+              💡 Este editor se usará al pulsar el botón <strong>Editar</strong> en la barra superior, en el menú contextual ("Abrir con Editor") y al editar desde QuickView.
+            </div>
+          </div>
         </div>
       </div>
 
       <div class="flex items-center justify-end gap-2 border-t border-gnome-border pt-3">
         <button id="btnCancelAppearance" class="px-3 py-1.5 rounded-md hover:bg-gnome-hover text-gnome-text text-xs transition-colors">Cancelar</button>
         <button id="btnConfirmAppearance" class="px-4 py-1.5 rounded-md bg-gnome-active hover:bg-gnome-activeHover text-white font-medium text-xs transition-colors">Aplicar Cambios</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Styled Modal: Renombrar Archivo o Carpeta -->
+  <div id="modalRenameItem" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div class="bg-gnome-surface border border-gnome-border rounded-xl shadow-2xl w-full max-w-sm p-5 flex flex-col gap-4">
+      <div class="flex items-center justify-between border-b border-gnome-border pb-3">
+        <h3 class="text-sm font-semibold text-gnome-text flex items-center gap-2">
+          <span>✏️</span> Renombrar
+        </h3>
+        <button id="btnCloseRenameItemModal" class="text-gnome-textDim hover:text-white text-xs">✕</button>
+      </div>
+
+      <div>
+        <label class="block text-gnome-textDim mb-1.5 text-xs font-medium">Nuevo nombre:</label>
+        <input id="inputRenameItemName" type="text" class="w-full bg-gnome-sidebar border border-gnome-border rounded-md px-3 py-1.5 text-xs text-gnome-text placeholder-gnome-textDim focus:outline-none focus:border-gnome-active" />
+      </div>
+
+      <div class="flex items-center justify-end gap-2 border-t border-gnome-border pt-3">
+        <button id="btnCancelRenameItem" class="px-3 py-1.5 rounded-md hover:bg-gnome-hover text-gnome-text text-xs transition-colors">Cancelar</button>
+        <button id="btnConfirmRenameItem" class="px-4 py-1.5 rounded-md bg-gnome-active hover:bg-gnome-activeHover text-white font-medium text-xs transition-colors">Renombrar</button>
       </div>
     </div>
   </div>
@@ -940,7 +1040,7 @@
     </div>
   </div>
 
-  <!-- Styled Context Menu for File Items (includes Duplicar) -->
+  <!-- Styled Context Menu for File Items (includes Duplicar y Renombrar) -->
   <div id="fileContextMenu" class="hidden fixed z-50 w-52 bg-gnome-surface border border-gnome-border rounded-lg shadow-2xl py-1 text-xs text-gnome-text select-none">
     <button id="ctxMenuOpen" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
       <span>Abrir</span><span class="text-gnome-textDim text-[11px]">Enter</span>
@@ -952,6 +1052,9 @@
       <span>Abrir con Editor</span>
     </button>
     <div class="my-1 border-t border-gnome-border/60"></div>
+    <button id="ctxMenuRename" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+      <span>✏️ Renombrar</span><span class="text-gnome-textDim text-[11px]">F2</span>
+    </button>
     <button id="ctxMenuCut" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
       <span>Cortar</span><span class="text-gnome-textDim text-[11px]">Ctrl+X</span>
     </button>
@@ -959,11 +1062,11 @@
       <span>Copiar</span><span class="text-gnome-textDim text-[11px]">Ctrl+C</span>
     </button>
     <button id="ctxMenuDuplicate" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between font-medium text-gnome-active">
-      <span>Duplicar</span>
+      <span>Duplicar</span><span class="text-gnome-textDim text-[11px]">Ctrl+D</span>
     </button>
     <div class="my-1 border-t border-gnome-border/60"></div>
     <button id="ctxMenuAddFavorite" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
-      <span>Añadir a Favoritos</span>
+      <span>Añadir a Favoritos</span><span class="text-gnome-textDim text-[11px]">Ctrl+B</span>
     </button>
     <button id="ctxMenuDelete" class="w-full text-left px-3 py-1.5 hover:bg-red-600 hover:text-white text-red-400 flex items-center justify-between">
       <span>Mover a Papelera</span><span class="text-gnome-textDim text-[11px]">Supr</span>

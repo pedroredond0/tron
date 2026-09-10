@@ -1749,6 +1749,25 @@ fn open_terminal(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn rename_file_or_folder(old_path: String, new_name: String) -> Result<(), String> {
+    let src = PathBuf::from(&old_path);
+    if !src.exists() {
+        return Err("El elemento a renombrar no existe".into());
+    }
+    let parent = src.parent().ok_or("No se pudo obtener la carpeta contenedora")?;
+    let new_name = new_name.trim();
+    if new_name.is_empty() {
+        return Err("El nuevo nombre no puede estar vacío".into());
+    }
+    let dest = parent.join(new_name);
+    if dest.exists() && dest != src {
+        return Err("Ya existe un archivo o carpeta con ese nombre en este directorio".into());
+    }
+    std::fs::rename(&src, &dest).map_err(|e| format!("Error al renombrar: {}", e))?;
+    Ok(())
+}
+
+#[tauri::command]
 fn open_in_editor(file_path: String, editor: String) -> Result<(), String> {
     if !PathBuf::from(&file_path).exists() {
         return Err("File does not exist".into());
@@ -1758,9 +1777,17 @@ fn open_in_editor(file_path: String, editor: String) -> Result<(), String> {
         return Err("Editor no especificado".into());
     }
 
-    let res = std::process::Command::new(&editor)
+    let mut res = std::process::Command::new(&editor)
         .arg(&file_path)
         .spawn();
+
+    #[cfg(target_os = "windows")]
+    if res.is_err() {
+        // Fallback with cmd /c for .cmd / batch files like code.cmd or codium.cmd or path with spaces
+        res = std::process::Command::new("cmd")
+            .args(["/c", &editor, &file_path])
+            .spawn();
+    }
 
     match res {
         Ok(_) => Ok(()),
@@ -1806,6 +1833,7 @@ fn main() {
             open_file_default,
             create_new_file,
             create_new_directory,
+            rename_file_or_folder,
             copy_items,
             move_items,
             get_directory_size,
