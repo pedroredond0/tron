@@ -2850,22 +2850,39 @@ async function startTransferOperation(action, sources, targetDir) {
       }
     }
 
-    // Position menu within viewport bounds
-    const menuWidth = 224;
-    const menuHeight = isZip ? 430 : 370;
+    // Position menu intelligently: measure actual element dimensions
+    el.fileContextMenu.style.visibility = 'hidden';
+    el.fileContextMenu.classList.remove('hidden');
+    
+    // Ensure menu fits inside small viewports
+    el.fileContextMenu.style.maxHeight = `${window.innerHeight - 20}px`;
+    el.fileContextMenu.style.overflowY = 'auto';
+
+    const menuRect = el.fileContextMenu.getBoundingClientRect();
+    const menuWidth = menuRect.width || 224;
+    const menuHeight = menuRect.height || (isZip ? 520 : 460);
+
     let x = e.clientX;
     let y = e.clientY;
 
+    // Horizontal placement: flip to left if overflowing right edge
     if (x + menuWidth > window.innerWidth) {
-      x = window.innerWidth - menuWidth - 8;
+      x = Math.max(8, e.clientX - menuWidth);
     }
+
+    // Vertical placement: flip upwards if overflowing bottom edge
     if (y + menuHeight > window.innerHeight) {
-      y = window.innerHeight - menuHeight - 8;
+      // Open upwards from the cursor
+      y = e.clientY - menuHeight;
+      // If it also overflows the top, clamp to top padding
+      if (y < 8) {
+        y = 8;
+      }
     }
 
     el.fileContextMenu.style.left = `${Math.max(5, x)}px`;
     el.fileContextMenu.style.top = `${Math.max(5, y)}px`;
-    el.fileContextMenu.classList.remove('hidden');
+    el.fileContextMenu.style.visibility = 'visible';
   }
 
   function closeFileContextMenu() {
