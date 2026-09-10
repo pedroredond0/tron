@@ -195,6 +195,7 @@ pub struct FileItem {
     pub extension: String,
     pub file_type: String, // "folder", "image", "audio", "video", "text", "binary"
     pub is_hidden: bool,
+    pub git_status: Option<String>, // e.g., "clean", "dirty"
 }
 
 #[derive(Debug, Deserialize)]
@@ -1077,6 +1078,7 @@ fn read_directory(path: Option<String>) -> Result<DirectoryResult, String> {
                 extension,
                 file_type,
                 is_hidden,
+            git_status: if is_dir { check_git_status(&p) } else { None },
             });
         }
     }
@@ -1117,6 +1119,52 @@ fn dirs_or_fallback() -> PathBuf {
         }
     }
     PathBuf::from("/")
+}
+
+#[tauri::command]
+fn batch_rename(renames: Vec<(String, String)>) -> Result<Vec<String>, String> {
+    let mut errors = Vec::new();
+    for (old_path, new_path) in renames {
+        if let Err(e) = std::fs::rename(&old_path, &new_path) {
+            errors.push(format!("Error renombrando '{}': {}", old_path, e));
+        }
+    }
+    if errors.is_empty() {
+        Ok(errors)
+    } else {
+        Err(errors.join("\n"))
+    }
+}
+
+#[tauri::command]
+fn read_file_hex(path: String) -> Result<String, String> {
+    use std::io::Read;
+    let mut file = std::fs::File::open(&path).map_err(|e| e.to_string())?;
+    let mut buffer = [0u8; 1024];
+    let n = file.read(&mut buffer).map_err(|e| e.to_string())?;
+    let data = &buffer[..n];
+
+    let mut output = String::new();
+    for (i, chunk) in data.chunks(16).enumerate() {
+        let offset = i * 16;
+        output.push_str(&format!("{:08X}  ", offset));
+        for byte in chunk {
+            output.push_str(&format!("{:02X} ", byte));
+        }
+        for _ in 0..(16 - chunk.len()) {
+            output.push_str("   ");
+        }
+        output.push_str(" |");
+        for byte in chunk {
+            if byte.is_ascii_graphic() || *byte == b' ' {
+                output.push(*byte as char);
+            } else {
+                output.push('.');
+            }
+        }
+        output.push_str("|\n");
+    }
+    Ok(output)
 }
 
 #[tauri::command]
@@ -1809,6 +1857,7 @@ fn build_file_item(entry_path: &Path, meta: &fs::Metadata) -> Option<FileItem> {
         extension: ext,
         file_type,
         is_hidden,
+    git_status: if is_dir { check_git_status(&entry_path) } else { None },
     })
 }
 
@@ -2199,6 +2248,7 @@ fn search_directory_recursive(base_path: String, query: String, max_results: Opt
                         extension: ext,
                         file_type,
                         is_hidden,
+                    git_status: if is_dir { check_git_status(&p) } else { None },
                     });
 
                     if results.len() >= limit {
@@ -3206,6 +3256,28 @@ fn force_exit_app() {
     std::process::exit(0);
 }
 
+
+fn check_git_status(p: &std::path::Path) -> Option<String> {
+    if p.is_dir() && p.join(".git").exists() {
+        match std::process::Command::new("git")
+            .args(["status", "--porcelain"])
+            .current_dir(p)
+            .output()
+        {
+            Ok(output) => {
+                if output.stdout.is_empty() {
+                    return Some("clean".to_string());
+                } else {
+                    return Some("dirty".to_string());
+                }
+            }
+            Err(_) => {
+                return Some("git-repo".to_string());
+            }
+        }
+    }
+    None
+}
 fn main() {
     std::panic::set_hook(Box::new(|info| {
         let msg = format!("PANIC: {:?}\n", info);
@@ -3222,6 +3294,8 @@ fn main() {
             get_system_drives,
             read_directory,
             read_file_preview,
+            read_file_hex,
+            batch_rename,
             delete_file_item,
             open_file_default,
             create_new_file,
@@ -3254,3 +3328,6 @@ fn main() {
         let _ = std::fs::write("tron_crash.log", err_msg);
     }
 }
+
+
+
