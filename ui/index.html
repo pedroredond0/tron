@@ -661,6 +661,14 @@
         </div>
       </div>
 
+      <!-- Lugares Frecuentes -->
+      <div>
+        <div class="text-[11px] font-semibold text-gnome-textDim px-2 mb-1 uppercase tracking-wider">Frecuentes</div>
+        <div id="frequentLinks" class="space-y-0.5">
+          <!-- Frequent links generated dynamically -->
+        </div>
+      </div>
+
       <!-- Ubicaciones del Sistema -->
       <div>
         <div class="text-[11px] font-semibold text-gnome-textDim px-2 mb-1 uppercase tracking-wider">Ubicaciones</div>
@@ -722,29 +730,70 @@
         </div>
       </div>
 
-      <!-- File List Header with Sorting -->
-      <div class="grid grid-cols-12 gap-2 px-4 py-2 border-b border-gnome-border text-xs font-medium text-gnome-textDim bg-gnome-surface/50">
-        <div id="sortHeaderName" class="col-span-6 sort-header flex items-center gap-1 hover:text-white" title="Ordenar por Nombre">
-          <span>Nombre</span>
-          <span id="sortIconName" class="text-[10px] text-gnome-active">▲</span>
-        </div>
-        <div id="sortHeaderType" class="col-span-2 sort-header flex items-center gap-1 hover:text-white" title="Ordenar por Tipo de archivo">
-          <span>Tipo</span>
-          <span id="sortIconType" class="text-[10px] hidden text-gnome-active"></span>
-        </div>
-        <div id="sortHeaderSize" class="col-span-2 sort-header flex items-center justify-end gap-1 hover:text-white" title="Ordenar por Tamaño">
-          <span>Tamaño</span>
-          <span id="sortIconSize" class="text-[10px] hidden text-gnome-active"></span>
-        </div>
-        <div id="sortHeaderDate" class="col-span-2 sort-header flex items-center justify-end gap-1 hover:text-white" title="Ordenar por Fecha de modificación">
-          <span>Modificado</span>
-          <span id="sortIconDate" class="text-[10px] hidden text-gnome-active"></span>
-        </div>
-      </div>
+      <!-- Dual Panel Wrapper -->
+      <div id="panelsWrapper" class="flex-1 flex flex-row min-h-0 bg-gnome-bg">
+        
+        <!-- Panel A -->
+        <div id="panelA" class="flex-1 flex flex-col min-w-0 focus-within:bg-gnome-hover/5 transition-colors" tabindex="-1">
+          <!-- Active Path Indicator (only visible in Split View) -->
+          <div id="pathIndicatorA" class="hidden px-4 py-1 text-[11px] font-semibold text-gnome-active bg-gnome-surface/60 border-b border-gnome-border truncate shrink-0"></div>
+          
+          <!-- File List Header with Sorting (Panel A) -->
+          <div class="grid grid-cols-12 gap-2 px-4 py-2 border-b border-gnome-border text-xs font-medium text-gnome-textDim bg-gnome-surface/50">
+            <div id="sortHeaderName" class="col-span-6 sort-header flex items-center gap-1 hover:text-white" title="Ordenar por Nombre">
+              <span>Nombre</span>
+              <span id="sortIconName" class="text-[10px] text-gnome-active">▲</span>
+            </div>
+            <div id="sortHeaderType" class="col-span-2 sort-header flex items-center gap-1 hover:text-white" title="Ordenar por Tipo de archivo">
+              <span>Tipo</span>
+              <span id="sortIconType" class="text-[10px] hidden text-gnome-active"></span>
+            </div>
+            <div id="sortHeaderSize" class="col-span-2 sort-header flex items-center justify-end gap-1 hover:text-white" title="Ordenar por Tamaño">
+              <span>Tamaño</span>
+              <span id="sortIconSize" class="text-[10px] hidden text-gnome-active"></span>
+            </div>
+            <div id="sortHeaderDate" class="col-span-2 sort-header flex items-center justify-end gap-1 hover:text-white" title="Ordenar por Fecha de modificación">
+              <span>Modificado</span>
+              <span id="sortIconDate" class="text-[10px] hidden text-gnome-active"></span>
+            </div>
+          </div>
 
-      <!-- File List Body -->
-      <div id="fileList" class="flex-1 overflow-y-auto outline-none focus:ring-1 focus:ring-gnome-active/50" tabindex="0">
-        <!-- File rows generated dynamically -->
+          <!-- File List Body (Panel A) -->
+          <div id="fileList" class="flex-1 overflow-y-auto outline-none focus:ring-1 focus:ring-gnome-active/50" tabindex="0">
+            <!-- File rows generated dynamically -->
+          </div>
+        </div>
+
+        <!-- Panel B -->
+        <div id="panelB" class="hidden flex-1 flex flex-col min-w-0 border-l border-gnome-border focus-within:bg-gnome-hover/5 transition-colors" tabindex="-1">
+          <!-- Active Path Indicator -->
+          <div id="pathIndicatorB" class="px-4 py-1 text-[11px] font-semibold text-gnome-text bg-gnome-surface/60 border-b border-gnome-border truncate shrink-0"></div>
+          
+          <!-- File List Header with Sorting (Panel B) -->
+          <div class="grid grid-cols-12 gap-2 px-4 py-2 border-b border-gnome-border text-xs font-medium text-gnome-textDim bg-gnome-surface/50">
+            <div id="sortHeaderNameB" class="col-span-6 sort-header flex items-center gap-1 hover:text-white" title="Ordenar por Nombre">
+              <span>Nombre</span>
+              <span id="sortIconNameB" class="text-[10px] text-gnome-active">▲</span>
+            </div>
+            <div id="sortHeaderTypeB" class="col-span-2 sort-header flex items-center gap-1 hover:text-white" title="Ordenar por Tipo de archivo">
+              <span>Tipo</span>
+              <span id="sortIconTypeB" class="text-[10px] hidden text-gnome-active"></span>
+            </div>
+            <div id="sortHeaderSizeB" class="col-span-2 sort-header flex items-center justify-end gap-1 hover:text-white" title="Ordenar por Tamaño">
+              <span>Tamaño</span>
+              <span id="sortIconSizeB" class="text-[10px] hidden text-gnome-active"></span>
+            </div>
+            <div id="sortHeaderDateB" class="col-span-2 sort-header flex items-center justify-end gap-1 hover:text-white" title="Ordenar por Fecha de modificación">
+              <span>Modificado</span>
+              <span id="sortIconDateB" class="text-[10px] hidden text-gnome-active"></span>
+            </div>
+          </div>
+
+          <!-- File List Body (Panel B) -->
+          <div id="fileListB" class="flex-1 overflow-y-auto outline-none focus:ring-1 focus:ring-gnome-active/50" tabindex="0">
+            <!-- File rows generated dynamically -->
+          </div>
+        </div>
       </div>
 
       <!-- Status Bar Footer -->
@@ -908,7 +957,7 @@
           <span class="font-medium text-gnome-active">Alt + ↑</span><span>Subir al directorio padre</span>
           <span class="font-medium text-gnome-active">Esc</span><span>Cerrar visor / limpiar filtro / cancelar</span>
         </div>
-        <p class="text-[11px] text-gnome-textDim text-center pt-2">Tron v0.1.0 — Diseñado con Tauri v2 + Rust + Tailwind CSS para máxima fluidez y bajo consumo.</p>
+        <p class="text-[11px] text-gnome-textDim text-center pt-2">Tron v1.0.0 - Diseñado con Tauri v2 + Rust + Tailwind CSS para máxima fluidez y bajo consumo.</p>
       </div>
 
       <div class="flex items-center justify-end border-t border-gnome-border pt-3">
@@ -943,7 +992,7 @@
         </div>
         <div class="flex justify-between items-center">
           <span class="text-gnome-textDim font-medium">Versión:</span>
-          <span id="aboutVersion" class="font-mono font-semibold text-gnome-active">0.1.0</span>
+          <span id="aboutVersion" class="font-mono font-semibold text-gnome-active">1.0.0</span>
         </div>
         <div class="flex justify-between items-center">
           <span class="text-gnome-textDim font-medium">Compilación (Unix):</span>
@@ -1229,6 +1278,56 @@
   </div>
 
   <!-- Styled Modal: Renombrar Archivo o Carpeta -->
+  <!-- Styled Modal: Renombrado por Lotes (Batch Rename) -->
+  <div id="modalBatchRename" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div class="bg-gnome-surface border border-gnome-border rounded-xl shadow-2xl w-full max-w-2xl p-5 flex flex-col gap-4">
+      <div class="flex items-center justify-between border-b border-gnome-border pb-3">
+        <h3 class="text-sm font-semibold text-gnome-text flex items-center gap-2">
+          <span>🔄</span> Renombrado por Lotes
+        </h3>
+        <button id="btnCloseBatchRenameModal" class="text-gnome-textDim hover:text-white text-xs">✕</button>
+      </div>
+
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-gnome-textDim mb-1.5 text-xs font-medium">Buscar (Texto o Regex):</label>
+          <input type="text" id="inputBatchSearch" class="w-full bg-gnome-sidebar border border-gnome-border rounded-md px-3 py-1.5 text-sm text-gnome-text focus:outline-none focus:border-gnome-active focus:ring-1 focus:ring-gnome-active" />
+          <div class="mt-1 flex items-center gap-2">
+            <label class="flex items-center gap-1 text-xs text-gnome-textDim cursor-pointer select-none">
+              <input type="checkbox" id="chkBatchRegex" class="rounded bg-gnome-sidebar border-gnome-border text-gnome-active focus:ring-0" />
+              <span>Usar Expresiones Regulares</span>
+            </label>
+          </div>
+        </div>
+        <div>
+          <label class="block text-gnome-textDim mb-1.5 text-xs font-medium">Reemplazar con:</label>
+          <input type="text" id="inputBatchReplace" class="w-full bg-gnome-sidebar border border-gnome-border rounded-md px-3 py-1.5 text-sm text-gnome-text focus:outline-none focus:border-gnome-active focus:ring-1 focus:ring-gnome-active" />
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-gnome-textDim mb-1.5 text-xs font-medium">Previsualización:</label>
+        <div class="bg-gnome-sidebar border border-gnome-border rounded-md max-h-48 overflow-y-auto text-xs p-2">
+          <table class="w-full text-left">
+            <thead>
+              <tr class="text-gnome-textDim border-b border-gnome-border/50">
+                <th class="py-1 px-2 font-medium">Original</th>
+                <th class="py-1 px-2 font-medium">Nuevo</th>
+              </tr>
+            </thead>
+            <tbody id="batchRenamePreviewBody" class="text-gnome-text">
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-2 border-t border-gnome-border">
+        <button id="btnCancelBatchRename" class="px-4 py-1.5 rounded-md hover:bg-gnome-hover text-gnome-text text-xs transition-colors">Cancelar</button>
+        <button id="btnConfirmBatchRename" class="px-4 py-1.5 rounded-md bg-gnome-active hover:bg-gnome-activeHover text-white text-xs font-medium transition-colors">Aplicar a <span id="batchRenameCount">0</span> elementos</button>
+      </div>
+    </div>
+  </div>
+
   <div id="modalRenameItem" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
     <div class="bg-gnome-surface border border-gnome-border rounded-xl shadow-2xl w-full max-w-sm p-5 flex flex-col gap-4">
       <div class="flex items-center justify-between border-b border-gnome-border pb-3">
@@ -1297,6 +1396,24 @@
   </div>
 
   <!-- Styled Modal: Buscador Avanzado Sherlock -->
+  <!-- Command Palette: Jump to Folder (Ctrl+P) -->
+  <div id="modalJumpToFolder" class="hidden fixed inset-0 z-50 flex items-start justify-center bg-black/60 backdrop-blur-sm pt-[15vh]">
+    <div class="bg-gnome-surface border border-gnome-border rounded-xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden">
+      <div class="flex items-center gap-2 px-4 py-3 border-b border-gnome-border bg-gnome-sidebar">
+        <span class="text-gnome-textDim">🔍</span>
+        <input type="text" id="inputJumpToFolder" class="flex-1 bg-transparent text-gnome-text text-sm focus:outline-none placeholder-gnome-textDim" placeholder="Ir a carpeta (escribe para filtrar...)" />
+      </div>
+      <div id="jumpToFolderList" class="flex-1 overflow-y-auto max-h-[40vh] p-1 select-none">
+        <!-- Rendered items here -->
+      </div>
+      <div class="px-4 py-2 bg-gnome-bg border-t border-gnome-border text-[10px] text-gnome-textDim flex justify-between">
+        <span><kbd class="px-1 py-0.5 rounded bg-gnome-surface border border-gnome-border">↑</kbd> <kbd class="px-1 py-0.5 rounded bg-gnome-surface border border-gnome-border">↓</kbd> Navegar</span>
+        <span><kbd class="px-1 py-0.5 rounded bg-gnome-surface border border-gnome-border">Enter</kbd> Abrir</span>
+        <span><kbd class="px-1 py-0.5 rounded bg-gnome-surface border border-gnome-border">Esc</kbd> Cerrar</span>
+      </div>
+    </div>
+  </div>
+
   <div id="modalSherlock" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
     <div class="bg-gnome-surface border border-indigo-500/30 rounded-xl shadow-2xl w-full max-w-2xl p-5 flex flex-col gap-4">
       <!-- Header -->
@@ -1677,6 +1794,16 @@
     </button>
     <button id="ctxMenuShowInExplorer" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
       <span>Mostrar en el Explorador</span>
+    </button>
+    <div class="my-1 border-t border-gnome-border/60"></div>
+    <button id="ctxMenuCopyPath" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+      <span>Copiar Ruta</span><span class="text-gnome-textDim text-[11px]">Ctrl+Shift+C</span>
+    </button>
+    <button id="ctxMenuCopyPosix" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+      <span>Copiar Ruta POSIX</span><span class="text-gnome-textDim text-[11px]">Ctrl+Alt+C</span>
+    </button>
+    <button id="ctxMenuCopyName" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+      <span>Copiar Nombre</span>
     </button>
     <div class="my-1 border-t border-gnome-border/60"></div>
     <!-- Archive specific actions -->

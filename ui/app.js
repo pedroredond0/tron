@@ -1,4 +1,11 @@
-// tronExplorer - Frontend Controller
+
+    if (e.ctrlKey && (e.key === 'p' || e.key === 'P')) {
+      e.preventDefault();
+      openJumpToFolder();
+      return;
+    }
+
+    // tronExplorer - Frontend Controller
 (function() {
   // Tauri IPC helper
   const invoke = window.__TAURI__?.core?.invoke || (async () => {
@@ -11,28 +18,25 @@
   });
 
   // State Management
+  const panels = [
+    { currentDirectory: '', items: [], filteredItems: [], selectedIndex: -1, selectionAnchor: -1, selectedItems: new Set(), history: [], historyIndex: -1, searchQuery: '', isSearchingRecursive: false, activeSherlockFilter: null, sherlockResults: null, searchItems: null, freeSpaceBytes: null, totalSpaceBytes: null, scrollTop: 0 },
+    { currentDirectory: '', items: [], filteredItems: [], selectedIndex: -1, selectionAnchor: -1, selectedItems: new Set(), history: [], historyIndex: -1, searchQuery: '', isSearchingRecursive: false, activeSherlockFilter: null, sherlockResults: null, searchItems: null, freeSpaceBytes: null, totalSpaceBytes: null, scrollTop: 0 }
+  ];
+  let activePanel = 0;
+  let isSplitView = false;
+
   const state = {
-    currentDirectory: '',
-    items: [],
-    filteredItems: [],
-    selectedIndex: -1,
-    selectionAnchor: -1,
-    selectedItems: new Set(),
-    history: [],
-    historyIndex: -1,
     quickViewOpen: false,
-    searchQuery: '',
-    isSearchingRecursive: false,
-    dirSizes: new Map(), // path -> { total_size, file_count, dir_count }
-    activeDirCalcId: null, // token to discard obsolete directory calculations
-    activeTransfers: new Map(), // op_id -> { id, action, items, targetDir, currentItem, currentIndex, totalItems, bytesCopied, totalBytes, startTime, speed, isDone, success, error }
+    dirSizes: new Map(),
+    activeDirCalcId: null,
+    activeTransfers: new Map(),
     drives: [],
     favorites: [],
-    clipboard: {
-      action: null, // 'copy' or 'cut'
-      paths: []
-    },
-    sortField: 'name', // 'name', 'type', 'size', 'date'
+
+    frequentLocations: JSON.parse(localStorage.getItem('tron_frequent_locations') || '{}'),
+
+    clipboard: { action: null, paths: [] },
+    sortField: 'name',
     sortAsc: true,
     contextTargetItem: null,
     showHiddenFiles: localStorage.getItem('tron_show_hidden') === 'true',
@@ -48,19 +52,76 @@
     iconPack: localStorage.getItem('tron_icon_pack') || 'default',
     externalAppsConfig: null,
     draggedInternalPaths: [],
-    activeSherlockFilter: null,
-    sherlockResults: null,
-    searchItems: null,
-    freeSpaceBytes: null,
-    totalSpaceBytes: null
+
+    get currentDirectory() { return panels[activePanel].currentDirectory; },
+    set currentDirectory(v) { panels[activePanel].currentDirectory = v; },
+    get items() { return panels[activePanel].items; },
+    set items(v) { panels[activePanel].items = v; },
+    get filteredItems() { return panels[activePanel].filteredItems; },
+    set filteredItems(v) { panels[activePanel].filteredItems = v; },
+    get selectedIndex() { return panels[activePanel].selectedIndex; },
+    set selectedIndex(v) { panels[activePanel].selectedIndex = v; },
+    get selectionAnchor() { return panels[activePanel].selectionAnchor; },
+    set selectionAnchor(v) { panels[activePanel].selectionAnchor = v; },
+    get selectedItems() { return panels[activePanel].selectedItems; },
+    set selectedItems(v) { panels[activePanel].selectedItems = v; },
+    get history() { return panels[activePanel].history; },
+    set history(v) { panels[activePanel].history = v; },
+    get historyIndex() { return panels[activePanel].historyIndex; },
+    set historyIndex(v) { panels[activePanel].historyIndex = v; },
+    get searchQuery() { return panels[activePanel].searchQuery; },
+    set searchQuery(v) { panels[activePanel].searchQuery = v; },
+    get isSearchingRecursive() { return panels[activePanel].isSearchingRecursive; },
+    set isSearchingRecursive(v) { panels[activePanel].isSearchingRecursive = v; },
+    get activeSherlockFilter() { return panels[activePanel].activeSherlockFilter; },
+    set activeSherlockFilter(v) { panels[activePanel].activeSherlockFilter = v; },
+    get sherlockResults() { return panels[activePanel].sherlockResults; },
+    set sherlockResults(v) { panels[activePanel].sherlockResults = v; },
+    get searchItems() { return panels[activePanel].searchItems; },
+    set searchItems(v) { panels[activePanel].searchItems = v; },
+    get freeSpaceBytes() { return panels[activePanel].freeSpaceBytes; },
+    set freeSpaceBytes(v) { panels[activePanel].freeSpaceBytes = v; },
+    get totalSpaceBytes() { return panels[activePanel].totalSpaceBytes; },
+    set totalSpaceBytes(v) { panels[activePanel].totalSpaceBytes = v; }
   };
 
   // DOM Elements
-  const el = {
-    fileList: document.getElementById('fileList'),
+  const elPanels = [
+    {
+      fileList: document.getElementById('fileList'),
+      sortHeaderName: document.getElementById('sortHeaderName'),
+      sortHeaderType: document.getElementById('sortHeaderType'),
+      sortHeaderSize: document.getElementById('sortHeaderSize'),
+      sortHeaderDate: document.getElementById('sortHeaderDate'),
+      sortIconName: document.getElementById('sortIconName'),
+      sortIconType: document.getElementById('sortIconType'),
+      sortIconSize: document.getElementById('sortIconSize'),
+      sortIconDate: document.getElementById('sortIconDate')
+    },
+    {
+      fileList: document.getElementById('fileListB'),
+      sortHeaderName: document.getElementById('sortHeaderNameB'),
+      sortHeaderType: document.getElementById('sortHeaderTypeB'),
+      sortHeaderSize: document.getElementById('sortHeaderSizeB'),
+      sortHeaderDate: document.getElementById('sortHeaderDateB'),
+      sortIconName: document.getElementById('sortIconNameB'),
+      sortIconType: document.getElementById('sortIconTypeB'),
+      sortIconSize: document.getElementById('sortIconSizeB'),
+      sortIconDate: document.getElementById('sortIconDateB')
+    }
+  ];
+
+  const baseEl = {
+    panelA: document.getElementById('panelA'),
+    panelB: document.getElementById('panelB'),
+    pathIndicatorA: document.getElementById('pathIndicatorA'),
+    pathIndicatorB: document.getElementById('pathIndicatorB'),
     breadcrumbs: document.getElementById('breadcrumbs'),
     quickLinks: document.getElementById('quickLinks'),
     favoriteLinks: document.getElementById('favoriteLinks'),
+
+    frequentLinks: document.getElementById('frequentLinks'),
+
     driveLinks: document.getElementById('driveLinks'),
     searchInput: document.getElementById('searchInput'),
     btnClearSearch: document.getElementById('btnClearSearch'),
@@ -83,16 +144,6 @@
     btnQvDelete: document.getElementById('btnQvDelete'),
     btnQvOpenDefault: document.getElementById('btnQvOpenDefault'),
     btnQvOpenEditor: document.getElementById('btnQvOpenEditor'),
-    // Sort Header Elements
-    sortHeaderName: document.getElementById('sortHeaderName'),
-    sortHeaderType: document.getElementById('sortHeaderType'),
-    sortHeaderSize: document.getElementById('sortHeaderSize'),
-    sortHeaderDate: document.getElementById('sortHeaderDate'),
-    sortIconName: document.getElementById('sortIconName'),
-    sortIconType: document.getElementById('sortIconType'),
-    sortIconSize: document.getElementById('sortIconSize'),
-    sortIconDate: document.getElementById('sortIconDate'),
-    // Action bar buttons
     btnActionTerminal: document.getElementById('btnActionTerminal'),
     btnActionEdit: document.getElementById('btnActionEdit'),
     btnActionNewFile: document.getElementById('btnActionNewFile'),
@@ -104,7 +155,6 @@
     btnActionQuickView: document.getElementById('btnActionQuickView'),
     btnActionCalcDirSizes: document.getElementById('btnActionCalcDirSizes'),
     btnOpenAppearance: document.getElementById('btnOpenAppearance'),
-    // Toolbar icon elements
     iconActionTerminal: document.getElementById('iconActionTerminal'),
     iconActionEdit: document.getElementById('iconActionEdit'),
     iconActionNewFile: document.getElementById('iconActionNewFile'),
@@ -132,7 +182,6 @@
     btnAddCurrentFav: document.getElementById('btnAddCurrentFav'),
     btnConnectNetwork: document.getElementById('btnConnectNetwork'),
     btnOpenNetworkDialog: document.getElementById('btnOpenNetworkDialog'),
-    // Modals
     modalNewFile: document.getElementById('modalNewFile'),
     inputNewFileName: document.getElementById('inputNewFileName'),
     chkOpenAfterCreate: document.getElementById('chkOpenAfterCreate'),
@@ -174,7 +223,17 @@
     btnCancelAppearance: document.getElementById('btnCancelAppearance'),
     btnConfirmAppearance: document.getElementById('btnConfirmAppearance'),
     btnCloseAppearanceModal: document.getElementById('btnCloseAppearanceModal'),
-    modalRenameItem: document.getElementById('modalRenameItem'),
+    
+    modalBatchRename: document.getElementById('modalBatchRename'),
+    btnCloseBatchRenameModal: document.getElementById('btnCloseBatchRenameModal'),
+    btnCancelBatchRename: document.getElementById('btnCancelBatchRename'),
+    btnConfirmBatchRename: document.getElementById('btnConfirmBatchRename'),
+    inputBatchSearch: document.getElementById('inputBatchSearch'),
+    inputBatchReplace: document.getElementById('inputBatchReplace'),
+    chkBatchRegex: document.getElementById('chkBatchRegex'),
+    batchRenamePreviewBody: document.getElementById('batchRenamePreviewBody'),
+    batchRenameCount: document.getElementById('batchRenameCount'),
+modalRenameItem: document.getElementById('modalRenameItem'),
     inputRenameItemName: document.getElementById('inputRenameItemName'),
     btnConfirmRenameItem: document.getElementById('btnConfirmRenameItem'),
     btnCancelRenameItem: document.getElementById('btnCancelRenameItem'),
@@ -195,7 +254,6 @@
     aboutBuildUnix: document.getElementById('aboutBuildUnix'),
     aboutBuildDate: document.getElementById('aboutBuildDate'),
     linkAboutGithub: document.getElementById('linkAboutGithub'),
-    // Menus
     menuNewFile: document.getElementById('menuNewFile'),
     menuNewFolder: document.getElementById('menuNewFolder'),
     menuRename: document.getElementById('menuRename'),
@@ -217,7 +275,6 @@
     menuAppearance: document.getElementById('menuAppearance'),
     menuShortcuts: document.getElementById('menuShortcuts'),
     menuAbout: document.getElementById('menuAbout'),
-    // File Context Menu
     fileContextMenu: document.getElementById('fileContextMenu'),
     ctxMenuOpen: document.getElementById('ctxMenuOpen'),
     ctxMenuOpenWith: document.getElementById('ctxMenuOpenWith'),
@@ -225,6 +282,9 @@
     ctxMenuOpenEditor: document.getElementById('ctxMenuOpenEditor'),
     ctxMenuOpenLocation: document.getElementById('ctxMenuOpenLocation'),
     ctxMenuShowInExplorer: document.getElementById('ctxMenuShowInExplorer'),
+    ctxMenuCopyPath: document.getElementById('ctxMenuCopyPath'),
+    ctxMenuCopyPosix: document.getElementById('ctxMenuCopyPosix'),
+    ctxMenuCopyName: document.getElementById('ctxMenuCopyName'),
     ctxMenuExtractHere: document.getElementById('ctxMenuExtractHere'),
     ctxMenuExtractToFolder: document.getElementById('ctxMenuExtractToFolder'),
     ctxMenuExtractToFolderText: document.getElementById('ctxMenuExtractToFolderText'),
@@ -237,7 +297,6 @@
     ctxMenuAddFavorite: document.getElementById('ctxMenuAddFavorite'),
     ctxMenuDelete: document.getElementById('ctxMenuDelete'),
     ctxMenuProperties: document.getElementById('ctxMenuProperties'),
-    // Modals: Open With, Compress, Archive View
     modalOpenWith: document.getElementById('modalOpenWith'),
     btnCloseOpenWithModal: document.getElementById('btnCloseOpenWithModal'),
     btnCancelOpenWith: document.getElementById('btnCancelOpenWith'),
@@ -260,7 +319,6 @@
     archiveTotalCount: document.getElementById('archiveTotalCount'),
     archiveTableBody: document.getElementById('archiveTableBody'),
     btnArchiveExtractAll: document.getElementById('btnArchiveExtractAll'),
-    // Sherlock Advanced Search Elements
     btnActionSherlock: document.getElementById('btnActionSherlock'),
     sherlockBanner: document.getElementById('sherlockBanner'),
     sherlockBannerTitle: document.getElementById('sherlockBannerTitle'),
@@ -268,7 +326,11 @@
     sherlockBannerCount: document.getElementById('sherlockBannerCount'),
     btnSherlockBannerEdit: document.getElementById('btnSherlockBannerEdit'),
     btnSherlockBannerClose: document.getElementById('btnSherlockBannerClose'),
-    modalSherlock: document.getElementById('modalSherlock'),
+    
+    modalJumpToFolder: document.getElementById('modalJumpToFolder'),
+    inputJumpToFolder: document.getElementById('inputJumpToFolder'),
+    jumpToFolderList: document.getElementById('jumpToFolderList'),
+modalSherlock: document.getElementById('modalSherlock'),
     btnCloseSherlockModal: document.getElementById('btnCloseSherlockModal'),
     btnCancelSherlock: document.getElementById('btnCancelSherlock'),
     sherlockCurrentPath: document.getElementById('sherlockCurrentPath'),
@@ -290,7 +352,6 @@
     btnResetSherlockFilters: document.getElementById('btnResetSherlockFilters'),
     btnExecuteSherlock: document.getElementById('btnExecuteSherlock'),
     txtExecuteSherlock: document.getElementById('txtExecuteSherlock'),
-    // Generador de Listados a Archivo
     btnActionExportList: document.getElementById('btnActionExportList'),
     menuExportList: document.getElementById('menuExportList'),
     ctxMenuExportList: document.getElementById('ctxMenuExportList'),
@@ -309,6 +370,15 @@
     chkExportListFullDepth: document.getElementById('chkExportListFullDepth'),
     chkExportListOpenAfter: document.getElementById('chkExportListOpenAfter')
   };
+
+  const el = new Proxy(baseEl, {
+    get(target, prop) {
+      if (prop in elPanels[activePanel]) {
+        return elPanels[activePanel][prop];
+      }
+      return target[prop];
+    }
+  });
 
   // Format Helpers
   function formatSize(bytes) {
@@ -597,6 +667,7 @@
       }
       renderFileList();
       updateStatusBar();
+      if (isSplitView) updatePanelHighlights();
       el.fileList.focus();
     } catch (err) {
       alert('Error al acceder al directorio: ' + err);
@@ -769,9 +840,21 @@
         }
       }
 
+      
+      let gitBadgeHtml = '';
+      if (item.git_status) {
+        if (item.git_status === 'clean') {
+          gitBadgeHtml = `<span class="shrink-0 w-1.5 h-1.5 rounded-full bg-green-500/80" title="Git: Limpio"></span>`;
+        } else if (item.git_status === 'dirty') {
+          gitBadgeHtml = `<span class="shrink-0 w-1.5 h-1.5 rounded-full bg-orange-500/80" title="Git: Cambios sin commitear"></span>`;
+        } else {
+          gitBadgeHtml = `<span class="shrink-0 w-1.5 h-1.5 rounded-full bg-blue-500/80" title="Repositorio Git"></span>`;
+        }
+      }
+
       colName.innerHTML = `
         <span class="shrink-0 select-none item-icon">${getFileIcon(item)}</span>
-        <span class="truncate select-none ${fontClass}">${escapeHtml(item.name)}</span>
+        <span class="truncate select-none ${fontClass}">${escapeHtml(item.name)}</span>\n        ${gitBadgeHtml}
         ${parentPathHtml}
       `;
 
@@ -1599,7 +1682,9 @@
         closeAppearanceModal();
         closeRenameFavoriteModal();
         closeRenameItemModal();
+        closeBatchRenameModal();
         closeConfirmExitModal();
+        closeJumpToFolder();
         closeSherlockModal();
         closeOpenWithModal();
         closeCompressModal();
@@ -1652,6 +1737,21 @@
       if (e.key === 'Escape') {
         e.preventDefault();
         closeQuickView();
+        return;
+      }
+
+      if ((e.key === 'h' || e.key === 'H') && !isInputActive && !e.ctrlKey && !e.altKey) {
+        e.preventDefault();
+        const item = state.filteredItems[state.selectedIndex];
+        if (item && !item.is_directory) {
+          el.qvContent.innerHTML = `<div class="text-xs text-gnome-textDim">Generando vista hexadecimal...</div>`;
+          invoke('read_file_hex', { path: item.path }).then(res => {
+            el.qvContent.innerHTML = `<div class="w-full h-full overflow-auto bg-gnome-surface p-4 rounded-lg shadow-inner text-left"><pre class="text-[11px] font-mono leading-tight text-gnome-text whitespace-pre">${escapeHtml(res)}</pre></div>`;
+            el.qvBadge.textContent = 'HEX VIEW';
+          }).catch(err => {
+            el.qvContent.innerHTML = `<div class="text-xs text-red-400">Error: ${escapeHtml(err)}</div>`;
+          });
+        }
         return;
       }
 
@@ -1748,6 +1848,12 @@
       openRenameItemModal();
       return;
     }
+    if (e.key === 'F2' && e.ctrlKey) {
+      e.preventDefault();
+      openBatchRenameModal();
+      return;
+    }
+
 
     if (e.altKey && e.key === 'Enter') {
       e.preventDefault();
@@ -1769,9 +1875,46 @@
 
     if (e.key === 'F5' || (e.ctrlKey && (e.key === 'r' || e.key === 'R'))) {
       e.preventDefault();
-      loadDirectory(state.currentDirectory, false);
+      if (e.key === 'F5' && isSplitView && !e.ctrlKey) {
+        const targetDir = panels[activePanel === 0 ? 1 : 0].currentDirectory;
+        if (state.currentDirectory && targetDir && state.currentDirectory !== targetDir && state.selectedItems.size > 0) {
+          startTransferOperation('copy', Array.from(state.selectedItems), targetDir);
+        }
+      } else {
+        loadDirectory(state.currentDirectory, false);
+      }
       return;
     }
+
+    if (e.key === 'F3' || (e.ctrlKey && e.key === '\\')) {
+      e.preventDefault();
+      toggleSplitView();
+      return;
+    }
+
+    if (e.key === 'Tab' && isSplitView && !isInputActive) {
+      e.preventDefault();
+      activePanel = activePanel === 0 ? 1 : 0;
+      updatePanelHighlights();
+      renderBreadcrumbs();
+      updateSortHeaderUI();
+      updateStatusBar();
+      el.fileList.focus();
+      return;
+    }
+    if (e.ctrlKey && e.shiftKey && (e.key === 'c' || e.key === 'C')) {
+      e.preventDefault();
+      const item = panels[activePanel].filteredItems[panels[activePanel].selectedIndex];
+      if (item) copyToClipboard('"' + item.path + '"');
+      return;
+    }
+    if (e.ctrlKey && e.altKey && (e.key === 'c' || e.key === 'C')) {
+      e.preventDefault();
+      const item = panels[activePanel].filteredItems[panels[activePanel].selectedIndex];
+      if (item) copyToClipboard('"' + getPosixPath(item.path) + '"');
+      return;
+    }
+
 
     if (e.key === 'F1') {
       e.preventDefault();
@@ -2037,7 +2180,16 @@
   }
 
   // --- Multi-Task Transfer Progress & Manager ---
-  async function startTransferOperation(action, sources, targetDir) {
+  
+  function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).catch(err => console.error('Error copying text:', err));
+  }
+  function getPosixPath(winPath) {
+    let p = winPath.replace(/\\/g, '/');
+    p = p.replace(/^([a-zA-Z]):/, (match, p1) => `/${p1.toLowerCase()}`);
+    return p;
+  }
+async function startTransferOperation(action, sources, targetDir) {
     try {
       const command = action === 'copy' ? 'copy_items' : 'move_items';
       await invoke(command, {
@@ -2260,6 +2412,51 @@
     } else {
       el.clipboardBadge.classList.add('hidden');
     }
+
+  function toggleSplitView() {
+    isSplitView = !isSplitView;
+    if (isSplitView) {
+      el.panelB.classList.remove('hidden');
+      el.pathIndicatorA.classList.remove('hidden');
+      if (!panels[1].currentDirectory) {
+        panels[1].currentDirectory = panels[0].currentDirectory;
+        const prev = activePanel;
+        activePanel = 1;
+        loadDirectory(panels[1].currentDirectory, true).then(() => {
+          activePanel = prev;
+          updatePanelHighlights();
+        });
+      }
+      updatePanelHighlights();
+    } else {
+      el.panelB.classList.add('hidden');
+      el.pathIndicatorA.classList.add('hidden');
+      if (activePanel === 1) {
+        activePanel = 0;
+        renderBreadcrumbs();
+        updateStatusBar();
+      }
+      updatePanelHighlights();
+      el.fileList.focus();
+    }
+  }
+
+  function updatePanelHighlights() {
+    if (!isSplitView) return;
+    if (activePanel === 0) {
+      el.panelA.classList.add('bg-gnome-hover', 'bg-opacity-10');
+      el.panelB.classList.remove('bg-gnome-hover', 'bg-opacity-10');
+      el.pathIndicatorA.classList.add('text-gnome-active');
+      el.pathIndicatorB.classList.remove('text-gnome-active');
+    } else {
+      el.panelB.classList.add('bg-gnome-hover', 'bg-opacity-10');
+      el.panelA.classList.remove('bg-gnome-hover', 'bg-opacity-10');
+      el.pathIndicatorB.classList.add('text-gnome-active');
+      el.pathIndicatorA.classList.remove('text-gnome-active');
+    }
+    el.pathIndicatorA.textContent = panels[0].currentDirectory || '';
+    el.pathIndicatorB.textContent = panels[1].currentDirectory || '';
+  }
   }
 
   async function duplicateSelectedItem(specificItem = null) {
@@ -3064,6 +3261,87 @@
   // --- Renombrar Elementos (Archivos / Carpetas) ---
   let itemToRename = null;
 
+  
+  let batchRenameItems = [];
+  let batchRenamePairs = [];
+
+  function openBatchRenameModal() {
+    batchRenameItems = Array.from(panels[activePanel].selectedItems).map(p => panels[activePanel].items.find(i => i.path === p)).filter(Boolean);
+    if (batchRenameItems.length === 0) return;
+    el.inputBatchSearch.value = '';
+    el.inputBatchReplace.value = '';
+    el.chkBatchRegex.checked = false;
+    updateBatchRenamePreview();
+    el.modalBatchRename.classList.remove('hidden');
+    el.inputBatchSearch.focus();
+  }
+
+  function closeBatchRenameModal() {
+    el.modalBatchRename.classList.add('hidden');
+    el.fileList.focus();
+  }
+
+  function updateBatchRenamePreview() {
+    const search = el.inputBatchSearch.value;
+    const replace = el.inputBatchReplace.value;
+    const useRegex = el.chkBatchRegex.checked;
+    
+    batchRenamePairs = [];
+    el.batchRenamePreviewBody.innerHTML = '';
+    
+    let regex = null;
+    if (useRegex && search) {
+      try {
+        regex = new RegExp(search, 'g');
+      } catch (e) {
+        el.batchRenamePreviewBody.innerHTML = '<tr><td colspan="2" class="text-red-400 p-2">Expresión regular inválida</td></tr>';
+        return;
+      }
+    }
+
+    batchRenameItems.forEach(item => {
+      let newName = item.name;
+      if (search) {
+        if (useRegex && regex) {
+          newName = newName.replace(regex, replace);
+        } else {
+          newName = newName.split(search).join(replace);
+        }
+      }
+      
+      const tr = document.createElement('tr');
+      tr.className = 'border-b border-gnome-border/30 hover:bg-gnome-hover/30';
+      const isChanged = newName !== item.name;
+      
+      if (isChanged) {
+        // Construct new path
+        const isWindows = /^[a-zA-Z]:[\\\/]/.test(item.path) || item.path.startsWith('\\\\');
+        const sep = isWindows ? '\\' : '/';
+        const lastSlash = item.path.lastIndexOf(sep);
+        const parentPath = item.path.substring(0, lastSlash + 1);
+        batchRenamePairs.push([item.path, parentPath + newName]);
+      }
+      
+      tr.innerHTML = `<td class="py-1 px-2 truncate max-w-[200px]" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</td>
+                      <td class="py-1 px-2 truncate max-w-[200px] ${isChanged ? 'text-green-400 font-semibold' : ''}" title="${escapeHtml(newName)}">${escapeHtml(newName)}</td>`;
+      el.batchRenamePreviewBody.appendChild(tr);
+    });
+    
+    el.batchRenameCount.textContent = batchRenamePairs.length;
+    el.btnConfirmBatchRename.disabled = batchRenamePairs.length === 0;
+  }
+
+  async function confirmBatchRename() {
+    if (batchRenamePairs.length === 0) return;
+    try {
+      await invoke('batch_rename', { renames: batchRenamePairs });
+      closeBatchRenameModal();
+      loadDirectory(panels[activePanel].currentDirectory, false);
+    } catch (err) {
+      alert("Error en renombrado por lotes:\n" + err);
+    }
+  }
+
   function openRenameItemModal(item = null) {
     if (!item) {
       if (state.selectedIndex >= 0 && state.selectedIndex < state.filteredItems.length) {
@@ -3645,6 +3923,23 @@
     }
 
     // Rename Item Modal Wiring
+    
+    if (el.btnCloseBatchRenameModal) el.btnCloseBatchRenameModal.onclick = closeBatchRenameModal;
+    if (el.btnCancelBatchRename) el.btnCancelBatchRename.onclick = closeBatchRenameModal;
+    if (el.btnConfirmBatchRename) el.btnConfirmBatchRename.onclick = confirmBatchRename;
+    if (el.inputBatchSearch) {
+      el.inputBatchSearch.addEventListener('input', updateBatchRenamePreview);
+      el.inputBatchReplace.addEventListener('input', updateBatchRenamePreview);
+      el.chkBatchRegex.addEventListener('change', updateBatchRenamePreview);
+      
+      [el.inputBatchSearch, el.inputBatchReplace].forEach(input => {
+        input.addEventListener('keydown', e => {
+          if (e.key === 'Enter') confirmBatchRename();
+          else if (e.key === 'Escape') closeBatchRenameModal();
+        });
+      });
+    }
+
     if (el.btnCloseRenameItemModal) el.btnCloseRenameItemModal.onclick = closeRenameItemModal;
     if (el.btnCancelRenameItem) el.btnCancelRenameItem.onclick = closeRenameItemModal;
     if (el.btnConfirmRenameItem) el.btnConfirmRenameItem.onclick = saveRenamedItem;
@@ -3846,6 +4141,27 @@
         showInSystemExplorer(item);
       };
     }
+    if (el.ctxMenuCopyPath) {
+      el.ctxMenuCopyPath.onclick = () => {
+        const item = state.contextTargetItem;
+        closeFileContextMenu();
+        if (item) copyToClipboard('"' + item.path + '"');
+      };
+    }
+    if (el.ctxMenuCopyPosix) {
+      el.ctxMenuCopyPosix.onclick = () => {
+        const item = state.contextTargetItem;
+        closeFileContextMenu();
+        if (item) copyToClipboard('"' + getPosixPath(item.path) + '"');
+      };
+    }
+    if (el.ctxMenuCopyName) {
+      el.ctxMenuCopyName.onclick = () => {
+        const item = state.contextTargetItem;
+        closeFileContextMenu();
+        if (item) copyToClipboard(item.name);
+      };
+    }
     if (el.ctxMenuExtractHere) {
       el.ctxMenuExtractHere.onclick = () => {
         const item = state.contextTargetItem;
@@ -3973,7 +4289,19 @@
       }
     });
     if (el.fileList) {
-      el.fileList.addEventListener('scroll', () => closeFileContextMenu());
+      elPanels.forEach(p => {
+      p.fileList.addEventListener('scroll', () => closeFileContextMenu());
+      p.fileList.addEventListener('mousedown', () => {
+        const idx = elPanels.indexOf(p);
+        if (isSplitView && activePanel !== idx) {
+          activePanel = idx;
+          updatePanelHighlights();
+          renderBreadcrumbs();
+          updateSortHeaderUI();
+          updateStatusBar();
+        }
+      });
+    });
     }
 
     // Directory Size Calculation
@@ -4461,6 +4789,49 @@
   }
 
   // --- Sherlock Advanced Search Controller ---
+  
+  let jumpFolderItems = [];
+  let jumpFolderSelectedIndex = 0;
+
+  function openJumpToFolder() {
+    // Only search directories in the current panel
+    jumpFolderItems = panels[activePanel].items.filter(i => i.is_directory);
+    if (jumpFolderItems.length === 0) return;
+    
+    el.inputJumpToFolder.value = '';
+    el.modalJumpToFolder.classList.remove('hidden');
+    el.inputJumpToFolder.focus();
+    renderJumpToFolder();
+  }
+
+  function closeJumpToFolder() {
+    el.modalJumpToFolder.classList.add('hidden');
+    el.fileList.focus();
+  }
+
+  function renderJumpToFolder() {
+    const q = el.inputJumpToFolder.value.toLowerCase();
+    const filtered = jumpFolderItems.filter(i => i.name.toLowerCase().includes(q)).slice(0, 50);
+    
+    if (jumpFolderSelectedIndex >= filtered.length) jumpFolderSelectedIndex = 0;
+    if (filtered.length === 0) jumpFolderSelectedIndex = -1;
+
+    el.jumpToFolderList.innerHTML = '';
+    filtered.forEach((item, idx) => {
+      const div = document.createElement('div');
+      div.className = `px-3 py-2 rounded-md text-sm cursor-pointer flex items-center gap-2 ${idx === jumpFolderSelectedIndex ? 'bg-gnome-active text-white' : 'text-gnome-text hover:bg-gnome-hover'}`;
+      div.innerHTML = `<span class="text-gnome-textDim">📁</span> <span class="truncate">${escapeHtml(item.name)}</span>`;
+      div.onmousedown = () => {
+        closeJumpToFolder();
+        loadDirectory(item.path, false);
+      };
+      el.jumpToFolderList.appendChild(div);
+    });
+    
+    // Store filtered to access on enter
+    el.inputJumpToFolder._filtered = filtered;
+  }
+
   function openSherlockModal() {
     if (!el.modalSherlock) return;
     if (el.sherlockCurrentPath) {
