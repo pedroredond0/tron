@@ -172,6 +172,10 @@
     menuNewFolder: document.getElementById('menuNewFolder'),
     menuRename: document.getElementById('menuRename'),
     menuOpenDefault: document.getElementById('menuOpenDefault'),
+    menuOpenWith: document.getElementById('menuOpenWith'),
+    menuShowInExplorer: document.getElementById('menuShowInExplorer'),
+    menuCompress: document.getElementById('menuCompress'),
+    menuProperties: document.getElementById('menuProperties'),
     menuDelete: document.getElementById('menuDelete'),
     menuAddFavorite: document.getElementById('menuAddFavorite'),
     menuCut: document.getElementById('menuCut'),
@@ -188,15 +192,46 @@
     // File Context Menu
     fileContextMenu: document.getElementById('fileContextMenu'),
     ctxMenuOpen: document.getElementById('ctxMenuOpen'),
+    ctxMenuOpenWith: document.getElementById('ctxMenuOpenWith'),
     ctxMenuQuickView: document.getElementById('ctxMenuQuickView'),
     ctxMenuOpenEditor: document.getElementById('ctxMenuOpenEditor'),
     ctxMenuOpenLocation: document.getElementById('ctxMenuOpenLocation'),
+    ctxMenuShowInExplorer: document.getElementById('ctxMenuShowInExplorer'),
+    ctxMenuExtractHere: document.getElementById('ctxMenuExtractHere'),
+    ctxMenuExtractToFolder: document.getElementById('ctxMenuExtractToFolder'),
+    ctxMenuExtractToFolderText: document.getElementById('ctxMenuExtractToFolderText'),
+    ctxMenuArchiveViewContent: document.getElementById('ctxMenuArchiveViewContent'),
+    ctxMenuCompress: document.getElementById('ctxMenuCompress'),
     ctxMenuRename: document.getElementById('ctxMenuRename'),
     ctxMenuCut: document.getElementById('ctxMenuCut'),
     ctxMenuCopy: document.getElementById('ctxMenuCopy'),
     ctxMenuDuplicate: document.getElementById('ctxMenuDuplicate'),
     ctxMenuAddFavorite: document.getElementById('ctxMenuAddFavorite'),
     ctxMenuDelete: document.getElementById('ctxMenuDelete'),
+    ctxMenuProperties: document.getElementById('ctxMenuProperties'),
+    // Modals: Open With, Compress, Archive View
+    modalOpenWith: document.getElementById('modalOpenWith'),
+    btnCloseOpenWithModal: document.getElementById('btnCloseOpenWithModal'),
+    btnCancelOpenWith: document.getElementById('btnCancelOpenWith'),
+    openWithFileName: document.getElementById('openWithFileName'),
+    openWithSuggestions: document.getElementById('openWithSuggestions'),
+    inputOpenWithApp: document.getElementById('inputOpenWithApp'),
+    btnLaunchCustomApp: document.getElementById('btnLaunchCustomApp'),
+    btnOpenWithSystemDialog: document.getElementById('btnOpenWithSystemDialog'),
+    modalCompress: document.getElementById('modalCompress'),
+    btnCloseCompressModal: document.getElementById('btnCloseCompressModal'),
+    btnCancelCompress: document.getElementById('btnCancelCompress'),
+    btnConfirmCompress: document.getElementById('btnConfirmCompress'),
+    inputCompressName: document.getElementById('inputCompressName'),
+    compressItemsCount: document.getElementById('compressItemsCount'),
+    modalArchiveView: document.getElementById('modalArchiveView'),
+    btnCloseArchiveViewModal: document.getElementById('btnCloseArchiveViewModal'),
+    btnArchiveClose: document.getElementById('btnArchiveClose'),
+    archiveViewFileName: document.getElementById('archiveViewFileName'),
+    inputArchiveFilter: document.getElementById('inputArchiveFilter'),
+    archiveTotalCount: document.getElementById('archiveTotalCount'),
+    archiveTableBody: document.getElementById('archiveTableBody'),
+    btnArchiveExtractAll: document.getElementById('btnArchiveExtractAll'),
     // Sherlock Advanced Search Elements
     btnActionSherlock: document.getElementById('btnActionSherlock'),
     sherlockBanner: document.getElementById('sherlockBanner'),
@@ -1563,6 +1598,12 @@
       return;
     }
 
+    if (e.altKey && e.key === 'Enter') {
+      e.preventDefault();
+      showItemProperties();
+      return;
+    }
+
     if (e.ctrlKey && (e.key === 'h' || e.key === 'H')) {
       e.preventDefault();
       toggleShowHiddenFiles();
@@ -2099,21 +2140,32 @@
 
     if (!el.fileContextMenu) return;
 
-    // Position menu within viewport bounds
-    const menuWidth = 210;
-    const menuHeight = 230;
-    let x = e.clientX;
-    let y = e.clientY;
+    const ext = (item.extension || '').toLowerCase();
+    const isZip = ext === 'zip' || (item.name || '').toLowerCase().endsWith('.zip');
 
-    if (x + menuWidth > window.innerWidth) {
-      x = window.innerWidth - menuWidth - 8;
+    if (el.ctxMenuExtractHere) {
+      if (isZip) el.ctxMenuExtractHere.classList.remove('hidden');
+      else el.ctxMenuExtractHere.classList.add('hidden');
     }
-    if (y + menuHeight > window.innerHeight) {
-      y = window.innerHeight - menuHeight - 8;
+
+    if (el.ctxMenuExtractToFolder) {
+      if (isZip) {
+        el.ctxMenuExtractToFolder.classList.remove('hidden');
+        const folderName = (item.name || 'archivo').replace(/\.zip$/i, '');
+        if (el.ctxMenuExtractToFolderText) {
+          el.ctxMenuExtractToFolderText.textContent = `📦 Extraer en ${folderName}/`;
+        }
+      } else {
+        el.ctxMenuExtractToFolder.classList.add('hidden');
+      }
+    }
+
+    if (el.ctxMenuArchiveViewContent) {
+      if (isZip) el.ctxMenuArchiveViewContent.classList.remove('hidden');
+      else el.ctxMenuArchiveViewContent.classList.add('hidden');
     }
 
     if (el.ctxMenuOpenEditor) {
-      const ext = (item.extension || '').toLowerCase();
       const isText = state.customTextExts.includes(ext) || item.file_type === 'text' || item.file_type === 'code' || !item.is_directory;
       if (isText && !item.is_directory) {
         el.ctxMenuOpenEditor.classList.remove('hidden');
@@ -2144,6 +2196,19 @@
       }
     }
 
+    // Position menu within viewport bounds
+    const menuWidth = 224;
+    const menuHeight = isZip ? 430 : 370;
+    let x = e.clientX;
+    let y = e.clientY;
+
+    if (x + menuWidth > window.innerWidth) {
+      x = window.innerWidth - menuWidth - 8;
+    }
+    if (y + menuHeight > window.innerHeight) {
+      y = window.innerHeight - menuHeight - 8;
+    }
+
     el.fileContextMenu.style.left = `${Math.max(5, x)}px`;
     el.fileContextMenu.style.top = `${Math.max(5, y)}px`;
     el.fileContextMenu.classList.remove('hidden');
@@ -2154,6 +2219,349 @@
       el.fileContextMenu.classList.add('hidden');
     }
     state.contextTargetItem = null;
+  }
+
+  // --- Explorer, Properties, Open With, Compress, and Archive Handlers ---
+  async function showInSystemExplorer(targetItem = null) {
+    const item = targetItem || state.contextTargetItem || (state.selectedIndex >= 0 ? state.filteredItems[state.selectedIndex] : null);
+    const path = item ? item.path : state.currentDirectory;
+    if (!path) return;
+    try {
+      await invoke('show_in_system_explorer', { path });
+    } catch (err) {
+      console.warn('Error al mostrar en el explorador:', err);
+    }
+  }
+
+  async function showItemProperties(targetItem = null) {
+    const item = targetItem || state.contextTargetItem || (state.selectedIndex >= 0 ? state.filteredItems[state.selectedIndex] : null);
+    const path = item ? item.path : state.currentDirectory;
+    if (!path) return;
+    try {
+      await invoke('show_item_properties', { path });
+    } catch (err) {
+      console.warn('Error al mostrar propiedades:', err);
+    }
+  }
+
+  let openWithTargetItem = null;
+
+  const APP_SUGGESTIONS = {
+    image: [
+      { name: 'Fotos (Windows)', cmd: 'ms-photos:' },
+      { name: 'Paint', cmd: 'mspaint' },
+      { name: 'GIMP', cmd: 'gimp' },
+      { name: 'Photoshop', cmd: 'photoshop' },
+      { name: 'Navegador Web', cmd: 'msedge' }
+    ],
+    text: [
+      { name: 'Bloc de notas', cmd: 'notepad' },
+      { name: 'Visual Studio Code', cmd: 'code' },
+      { name: 'VSCodium', cmd: 'codium' },
+      { name: 'Sublime Text', cmd: 'subl' },
+      { name: 'Notepad++', cmd: 'notepad++' },
+      { name: 'Neovim', cmd: 'nvim' }
+    ],
+    office: [
+      { name: 'Microsoft Word', cmd: 'winword' },
+      { name: 'Microsoft Excel', cmd: 'excel' },
+      { name: 'Microsoft PowerPoint', cmd: 'powerpnt' },
+      { name: 'LibreOffice Writer', cmd: 'soffice' },
+      { name: 'Acrobat Reader', cmd: 'AcroRd32' }
+    ],
+    media: [
+      { name: 'VLC Media Player', cmd: 'vlc' },
+      { name: 'Windows Media Player', cmd: 'wmplayer' },
+      { name: 'mpv', cmd: 'mpv' },
+      { name: 'Spotify', cmd: 'spotify' }
+    ],
+    archive: [
+      { name: 'Explorador de archivos', cmd: 'explorer' },
+      { name: '7-Zip', cmd: '7zFM' },
+      { name: 'WinRAR', cmd: 'winrar' }
+    ],
+    general: [
+      { name: 'Bloc de notas', cmd: 'notepad' },
+      { name: 'Visual Studio Code', cmd: 'code' },
+      { name: 'Explorador de archivos', cmd: 'explorer' }
+    ]
+  };
+
+  function getSuggestionsForExt(ext, fileType) {
+    const e = (ext || '').toLowerCase();
+    if (['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'svg', 'ico', 'dng', 'tiff', 'tif'].includes(e) || fileType === 'image') {
+      return APP_SUGGESTIONS.image;
+    }
+    if (['mp4', 'mkv', 'avi', 'mov', 'webm', 'mp3', 'wav', 'flac', 'ogg', 'm4a', 'aac'].includes(e) || fileType === 'video' || fileType === 'audio') {
+      return APP_SUGGESTIONS.media;
+    }
+    if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'odt', 'ods', 'odp', 'pdf'].includes(e) || fileType === 'office' || fileType === 'pdf') {
+      return APP_SUGGESTIONS.office;
+    }
+    if (['zip', 'rar', '7z', 'tar', 'gz', 'tgz', 'bz2'].includes(e) || fileType === 'archive') {
+      return APP_SUGGESTIONS.archive;
+    }
+    if (['txt', 'md', 'rs', 'js', 'ts', 'py', 'json', 'toml', 'yaml', 'yml', 'html', 'css', 'c', 'cpp', 'h', 'sh', 'bat', 'ps1', 'ini', 'log'].includes(e) || fileType === 'text' || fileType === 'code') {
+      return APP_SUGGESTIONS.text;
+    }
+    return APP_SUGGESTIONS.general;
+  }
+
+  function openOpenWithModal(targetItem = null) {
+    const item = targetItem || state.contextTargetItem || (state.selectedIndex >= 0 ? state.filteredItems[state.selectedIndex] : null);
+    if (!item) return;
+    openWithTargetItem = item;
+
+    if (el.openWithFileName) {
+      el.openWithFileName.textContent = `${item.name} (${item.path})`;
+    }
+    if (el.inputOpenWithApp) {
+      el.inputOpenWithApp.value = '';
+    }
+
+    if (el.openWithSuggestions) {
+      el.openWithSuggestions.innerHTML = '';
+      const suggestions = getSuggestionsForExt(item.extension, item.file_type);
+      suggestions.forEach(s => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'flex items-center gap-2 p-2 rounded-lg bg-gnome-sidebar hover:bg-gnome-hover border border-gnome-border text-left text-xs transition-colors group';
+        btn.innerHTML = `
+          <span class="text-sm select-none">⚡</span>
+          <div class="min-w-0">
+            <span class="font-medium text-gnome-text block truncate group-hover:text-white">${escapeHtml(s.name)}</span>
+            <span class="text-[10px] text-gnome-textDim font-mono block truncate">${escapeHtml(s.cmd)}</span>
+          </div>
+        `;
+        btn.onclick = async () => {
+          closeOpenWithModal();
+          try {
+            await invoke('launch_with_app', { path: item.path, appCommand: s.cmd });
+          } catch (err) {
+            alert('Error al abrir con la aplicación: ' + err);
+          }
+        };
+        el.openWithSuggestions.appendChild(btn);
+      });
+    }
+
+    if (el.modalOpenWith) {
+      el.modalOpenWith.classList.remove('hidden');
+      if (el.inputOpenWithApp) el.inputOpenWithApp.focus();
+    }
+  }
+
+  function closeOpenWithModal() {
+    if (el.modalOpenWith) {
+      el.modalOpenWith.classList.add('hidden');
+    }
+    openWithTargetItem = null;
+    el.fileList.focus();
+  }
+
+  async function launchCustomOpenWith() {
+    if (!openWithTargetItem || !el.inputOpenWithApp) return;
+    const cmd = el.inputOpenWithApp.value.trim();
+    if (!cmd) return;
+    const targetPath = openWithTargetItem.path;
+    closeOpenWithModal();
+    try {
+      await invoke('launch_with_app', { path: targetPath, appCommand: cmd });
+    } catch (err) {
+      alert('Error al abrir con el comando especificado: ' + err);
+    }
+  }
+
+  async function launchSystemOpenWithDialog() {
+    if (!openWithTargetItem) return;
+    const targetPath = openWithTargetItem.path;
+    closeOpenWithModal();
+    try {
+      await invoke('open_with_dialog', { path: targetPath });
+    } catch (err) {
+      console.warn('Error al abrir selector del sistema:', err);
+    }
+  }
+
+  let compressTargetPaths = [];
+
+  function openCompressModal(specificItem = null) {
+    if (specificItem) {
+      compressTargetPaths = [specificItem.path];
+    } else {
+      compressTargetPaths = getSelectedOrFocusedPaths();
+    }
+    if (compressTargetPaths.length === 0) return;
+
+    const firstPath = compressTargetPaths[0];
+    const isWindows = /^[a-zA-Z]:[\\\/]/.test(firstPath) || firstPath.startsWith('\\\\');
+    const sep = isWindows ? '\\' : '/';
+    const norm = isWindows ? firstPath.replace(/\//g, '\\') : firstPath.replace(/\\/g, '/');
+    const base = norm.split(sep).pop().replace(/\.[^/.]+$/, '');
+
+    const defaultName = compressTargetPaths.length === 1 ? (base || 'archivo') : 'archivo_comprimido';
+
+    if (el.inputCompressName) {
+      el.inputCompressName.value = defaultName;
+    }
+    if (el.compressItemsCount) {
+      el.compressItemsCount.textContent = `Se comprimirá ${compressTargetPaths.length} elemento${compressTargetPaths.length > 1 ? 's' : ''} en el directorio actual.`;
+    }
+
+    if (el.modalCompress) {
+      el.modalCompress.classList.remove('hidden');
+      if (el.inputCompressName) {
+        el.inputCompressName.focus();
+        el.inputCompressName.select();
+      }
+    }
+  }
+
+  function closeCompressModal() {
+    if (el.modalCompress) {
+      el.modalCompress.classList.add('hidden');
+    }
+    compressTargetPaths = [];
+    el.fileList.focus();
+  }
+
+  async function confirmCompress() {
+    if (compressTargetPaths.length === 0 || !el.inputCompressName || !state.currentDirectory) return;
+    let name = el.inputCompressName.value.trim();
+    if (!name) name = 'archivo_comprimido';
+    if (!name.toLowerCase().endsWith('.zip')) {
+      name += '.zip';
+    }
+
+    const isWindows = /^[a-zA-Z]:[\\\/]/.test(state.currentDirectory) || state.currentDirectory.startsWith('\\\\');
+    const sep = isWindows ? '\\' : '/';
+    const cleanDir = state.currentDirectory.replace(/[\\\/]+$/, '');
+    const outZipPath = `${cleanDir}${sep}${name}`;
+
+    const sources = [...compressTargetPaths];
+    closeCompressModal();
+
+    try {
+      await invoke('compress_to_zip', {
+        sourcePaths: sources,
+        outputZipPath: outZipPath
+      });
+      await loadDirectory(state.currentDirectory, false);
+      const idx = state.filteredItems.findIndex(i => i.path.toLowerCase() === outZipPath.toLowerCase());
+      if (idx >= 0) {
+        setSelectionIndex(idx);
+      }
+    } catch (err) {
+      alert('Error al comprimir en zip: ' + err);
+    }
+  }
+
+  async function extractArchiveHere(targetItem = null) {
+    const item = targetItem || state.contextTargetItem || (state.selectedIndex >= 0 ? state.filteredItems[state.selectedIndex] : null);
+    if (!item || !state.currentDirectory) return;
+    try {
+      await invoke('extract_zip_archive', {
+        zipPath: item.path,
+        targetDir: state.currentDirectory
+      });
+      await loadDirectory(state.currentDirectory, false);
+    } catch (err) {
+      alert('Error al extraer archivo: ' + err);
+    }
+  }
+
+  async function extractArchiveToSubfolder(targetItem = null) {
+    const item = targetItem || state.contextTargetItem || (state.selectedIndex >= 0 ? state.filteredItems[state.selectedIndex] : null);
+    if (!item || !state.currentDirectory) return;
+    const folderName = (item.name || 'archivo').replace(/\.zip$/i, '');
+    const isWindows = /^[a-zA-Z]:[\\\/]/.test(state.currentDirectory) || state.currentDirectory.startsWith('\\\\');
+    const sep = isWindows ? '\\' : '/';
+    const cleanDir = state.currentDirectory.replace(/[\\\/]+$/, '');
+    const targetDir = `${cleanDir}${sep}${folderName}`;
+
+    try {
+      await invoke('extract_zip_archive', {
+        zipPath: item.path,
+        targetDir
+      });
+      await loadDirectory(state.currentDirectory, false);
+    } catch (err) {
+      alert('Error al extraer en carpeta: ' + err);
+    }
+  }
+
+  let currentArchiveEntries = [];
+  let currentArchiveItem = null;
+
+  async function openArchiveViewModal(targetItem = null) {
+    const item = targetItem || state.contextTargetItem || (state.selectedIndex >= 0 ? state.filteredItems[state.selectedIndex] : null);
+    if (!item) return;
+    currentArchiveItem = item;
+
+    if (el.archiveViewFileName) {
+      el.archiveViewFileName.textContent = `${item.name} (${item.path})`;
+    }
+    if (el.inputArchiveFilter) {
+      el.inputArchiveFilter.value = '';
+    }
+
+    try {
+      const entries = await invoke('list_zip_contents', { zipPath: item.path });
+      currentArchiveEntries = entries || [];
+      renderArchiveEntries();
+      if (el.modalArchiveView) {
+        el.modalArchiveView.classList.remove('hidden');
+        if (el.inputArchiveFilter) el.inputArchiveFilter.focus();
+      }
+    } catch (err) {
+      alert('Error al leer contenido del zip: ' + err);
+    }
+  }
+
+  function renderArchiveEntries() {
+    if (!el.archiveTableBody) return;
+    const filter = (el.inputArchiveFilter ? el.inputArchiveFilter.value.trim().toLowerCase() : '');
+    const filtered = currentArchiveEntries.filter(e => !filter || (e.path && e.path.toLowerCase().includes(filter)) || (e.name && e.name.toLowerCase().includes(filter)));
+
+    if (el.archiveTotalCount) {
+      el.archiveTotalCount.textContent = `${filtered.length} de ${currentArchiveEntries.length} elementos`;
+    }
+
+    el.archiveTableBody.innerHTML = '';
+    if (filtered.length === 0) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td colspan="3" class="py-6 text-center text-gnome-textDim italic text-xs">No hay elementos que coincidan</td>`;
+      el.archiveTableBody.appendChild(tr);
+      return;
+    }
+
+    filtered.forEach(entry => {
+      const tr = document.createElement('tr');
+      tr.className = 'hover:bg-gnome-hover/70 transition-colors';
+      const icon = entry.is_directory ? '📁' : '📄';
+      tr.innerHTML = `
+        <td class="py-1.5 px-3 truncate max-w-[340px]" title="${escapeHtml(entry.path)}">
+          <span class="mr-1.5 select-none">${icon}</span>
+          <span class="text-gnome-text">${escapeHtml(entry.path)}</span>
+        </td>
+        <td class="py-1.5 px-3 text-right text-gnome-textDim whitespace-nowrap font-mono">
+          ${entry.is_directory ? '--' : formatSize(entry.uncompressed_size)}
+        </td>
+        <td class="py-1.5 px-3 text-right text-gnome-textDim whitespace-nowrap font-mono">
+          ${entry.is_directory ? '--' : formatSize(entry.compressed_size)}
+        </td>
+      `;
+      el.archiveTableBody.appendChild(tr);
+    });
+  }
+
+  function closeArchiveViewModal() {
+    if (el.modalArchiveView) {
+      el.modalArchiveView.classList.add('hidden');
+    }
+    currentArchiveEntries = [];
+    currentArchiveItem = null;
+    el.fileList.focus();
   }
 
   // Modals & New File / New Folder
@@ -2723,6 +3131,10 @@
         activateItem(state.filteredItems[state.selectedIndex]);
       }
     };
+    if (el.menuOpenWith) el.menuOpenWith.onclick = () => { closeAllMenus(); openOpenWithModal(); };
+    if (el.menuShowInExplorer) el.menuShowInExplorer.onclick = () => { closeAllMenus(); showInSystemExplorer(); };
+    if (el.menuCompress) el.menuCompress.onclick = () => { closeAllMenus(); openCompressModal(); };
+    if (el.menuProperties) el.menuProperties.onclick = () => { closeAllMenus(); showItemProperties(); };
     el.menuDelete.onclick = () => { closeAllMenus(); deleteCurrentItem(); };
     el.menuAddFavorite.onclick = () => { closeAllMenus(); addCurrentToFavorites(); };
     el.menuCut.onclick = () => { closeAllMenus(); cutSelectedItems(); };
@@ -2843,13 +3255,68 @@
     });
 
     // Close popup dialogs on backdrop click
-    [el.modalNewFile, el.modalNewFolder, el.modalNetwork, el.modalHelp, el.modalAppearance, el.modalRenameFavorite, el.modalRenameItem, el.modalConfirmExit, el.modalAbout].forEach(m => {
+    [el.modalNewFile, el.modalNewFolder, el.modalNetwork, el.modalHelp, el.modalAppearance, el.modalRenameFavorite, el.modalRenameItem, el.modalConfirmExit, el.modalAbout, el.modalOpenWith, el.modalCompress, el.modalArchiveView].forEach(m => {
       if (m) {
         m.addEventListener('click', (e) => {
           if (e.target === m) m.classList.add('hidden');
         });
       }
     });
+
+    // Open With Modal Wiring
+    if (el.btnCloseOpenWithModal) el.btnCloseOpenWithModal.onclick = closeOpenWithModal;
+    if (el.btnCancelOpenWith) el.btnCancelOpenWith.onclick = closeOpenWithModal;
+    if (el.btnLaunchCustomApp) el.btnLaunchCustomApp.onclick = launchCustomOpenWith;
+    if (el.btnOpenWithSystemDialog) el.btnOpenWithSystemDialog.onclick = launchSystemOpenWithDialog;
+    if (el.inputOpenWithApp) {
+      el.inputOpenWithApp.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          launchCustomOpenWith();
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          closeOpenWithModal();
+        }
+      });
+    }
+
+    // Compress Modal Wiring
+    if (el.btnCloseCompressModal) el.btnCloseCompressModal.onclick = closeCompressModal;
+    if (el.btnCancelCompress) el.btnCancelCompress.onclick = closeCompressModal;
+    if (el.btnConfirmCompress) el.btnConfirmCompress.onclick = confirmCompress;
+    if (el.inputCompressName) {
+      el.inputCompressName.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          confirmCompress();
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          closeCompressModal();
+        }
+      });
+    }
+
+    // Archive View Modal Wiring
+    if (el.btnCloseArchiveViewModal) el.btnCloseArchiveViewModal.onclick = closeArchiveViewModal;
+    if (el.btnArchiveClose) el.btnArchiveClose.onclick = closeArchiveViewModal;
+    if (el.inputArchiveFilter) {
+      el.inputArchiveFilter.addEventListener('input', renderArchiveEntries);
+      el.inputArchiveFilter.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          closeArchiveViewModal();
+        }
+      });
+    }
+    if (el.btnArchiveExtractAll) {
+      el.btnArchiveExtractAll.onclick = () => {
+        if (currentArchiveItem) {
+          const item = currentArchiveItem;
+          closeArchiveViewModal();
+          extractArchiveHere(item);
+        }
+      };
+    }
 
     // Rename Item Modal Wiring
     if (el.btnCloseRenameItemModal) el.btnCloseRenameItemModal.onclick = closeRenameItemModal;
@@ -2976,6 +3443,13 @@
         }
       };
     }
+    if (el.ctxMenuOpenWith) {
+      el.ctxMenuOpenWith.onclick = () => {
+        const item = state.contextTargetItem;
+        closeFileContextMenu();
+        openOpenWithModal(item);
+      };
+    }
     if (el.ctxMenuQuickView) {
       el.ctxMenuQuickView.onclick = () => {
         closeFileContextMenu();
@@ -2989,6 +3463,41 @@
         if (item) {
           openInTextEditor(item.path);
         }
+      };
+    }
+    if (el.ctxMenuShowInExplorer) {
+      el.ctxMenuShowInExplorer.onclick = () => {
+        const item = state.contextTargetItem;
+        closeFileContextMenu();
+        showInSystemExplorer(item);
+      };
+    }
+    if (el.ctxMenuExtractHere) {
+      el.ctxMenuExtractHere.onclick = () => {
+        const item = state.contextTargetItem;
+        closeFileContextMenu();
+        extractArchiveHere(item);
+      };
+    }
+    if (el.ctxMenuExtractToFolder) {
+      el.ctxMenuExtractToFolder.onclick = () => {
+        const item = state.contextTargetItem;
+        closeFileContextMenu();
+        extractArchiveToSubfolder(item);
+      };
+    }
+    if (el.ctxMenuArchiveViewContent) {
+      el.ctxMenuArchiveViewContent.onclick = () => {
+        const item = state.contextTargetItem;
+        closeFileContextMenu();
+        openArchiveViewModal(item);
+      };
+    }
+    if (el.ctxMenuCompress) {
+      el.ctxMenuCompress.onclick = () => {
+        const item = state.contextTargetItem;
+        closeFileContextMenu();
+        openCompressModal(item);
       };
     }
     if (el.ctxMenuRename) {
@@ -3038,6 +3547,13 @@
       el.ctxMenuDelete.onclick = () => {
         closeFileContextMenu();
         deleteCurrentItem();
+      };
+    }
+    if (el.ctxMenuProperties) {
+      el.ctxMenuProperties.onclick = () => {
+        const item = state.contextTargetItem;
+        closeFileContextMenu();
+        showItemProperties(item);
       };
     }
 

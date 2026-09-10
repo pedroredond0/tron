@@ -2207,6 +2207,336 @@ fn get_app_info() -> AppInfo {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ArchiveEntryItem {
+    pub name: String,
+    pub path: String,
+    pub is_directory: bool,
+    pub uncompressed_size: u64,
+    pub compressed_size: u64,
+}
+
+#[tauri::command]
+fn show_in_system_explorer(path: String) -> Result<(), String> {
+    let p = PathBuf::from(&path);
+    if !p.exists() {
+        return Err("El elemento no existe".into());
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        if p.is_dir() {
+            let _ = std::process::Command::new("explorer")
+                .arg(&path)
+                .spawn()
+                .map_err(|e| e.to_string())?;
+        } else {
+            let _ = std::process::Command::new("explorer")
+                .arg(format!("/select,{}", path))
+                .spawn()
+                .map_err(|e| e.to_string())?;
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let _ = std::process::Command::new("open")
+            .arg("-R")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let dir = if p.is_dir() { p } else { p.parent().unwrap_or(&p).to_path_buf() };
+        let _ = std::process::Command::new("xdg-open")
+            .arg(&dir)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+fn show_item_properties(path: String) -> Result<(), String> {
+    let p = PathBuf::from(&path);
+    if !p.exists() {
+        return Err("El elemento no existe".into());
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::ffi::OsStrExt;
+        let path_w: Vec<u16> = OsStr::new(&path).encode_wide().chain(std::iter::once(0)).collect();
+        let verb_w: Vec<u16> = OsStr::new("properties").encode_wide().chain(std::iter::once(0)).collect();
+
+        #[allow(non_snake_case)]
+        #[repr(C)]
+        struct SHELLEXECUTEINFOW {
+            cbSize: u32,
+            fMask: u32,
+            hwnd: *mut std::ffi::c_void,
+            lpVerb: *const u16,
+            lpFile: *const u16,
+            lpParameters: *const u16,
+            lpDirectory: *const u16,
+            nShow: i32,
+            hInstApp: *mut std::ffi::c_void,
+            lpIDList: *mut std::ffi::c_void,
+            lpClass: *const u16,
+            hkeyClass: *mut std::ffi::c_void,
+            dwHotKey: u32,
+            hIconOrMonitor: *mut std::ffi::c_void,
+            hProcess: *mut std::ffi::c_void,
+        }
+
+        const SEE_MASK_INVOKEIDLIST: u32 = 0x0000000C;
+        const SW_SHOW: i32 = 5;
+
+        extern "system" {
+            fn ShellExecuteExW(pExecInfo: *mut SHELLEXECUTEINFOW) -> i32;
+        }
+
+        std::thread::spawn(move || {
+            unsafe {
+                CoInitializeEx(ptr::null_mut(), 0x2);
+                let mut info: SHELLEXECUTEINFOW = std::mem::zeroed();
+                info.cbSize = std::mem::size_of::<SHELLEXECUTEINFOW>() as u32;
+                info.fMask = SEE_MASK_INVOKEIDLIST;
+                info.lpVerb = verb_w.as_ptr();
+                info.lpFile = path_w.as_ptr();
+                info.nShow = SW_SHOW;
+
+                let _ = ShellExecuteExW(&mut info as *mut _);
+                CoUninitialize();
+            }
+        });
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let script = format!(
+            "tell application \"Finder\"\nactivate\nopen information window of (POSIX file \"{}\" as alias)\nend tell",
+            path.replace("\"", "\\\"")
+        );
+        let _ = std::process::Command::new("osascript").arg("-e").arg(&script).spawn();
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let _ = std::process::Command::new("nautilus").arg("--properties").arg(&path).spawn();
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+fn open_with_dialog(path: String) -> Result<(), String> {
+    let p = PathBuf::from(&path);
+    if !p.exists() {
+        return Err("El elemento no existe".into());
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let _ = std::process::Command::new("rundll32.exe")
+            .arg("shell32.dll,OpenAs_RunDLL")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let _ = std::process::Command::new("open")
+            .arg("-a")
+            .arg("Finder")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let _ = std::process::Command::new("xdg-open").arg(&path).spawn().map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+fn launch_with_app(path: String, app_command: String) -> Result<(), String> {
+    let p = PathBuf::from(&path);
+    if !p.exists() {
+        return Err("El elemento no existe".into());
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let res = std::process::Command::new(&app_command)
+            .arg(&path)
+            .spawn();
+        if res.is_err() {
+            let _ = std::process::Command::new("cmd")
+                .arg("/C")
+                .arg("start")
+                .arg("")
+                .arg(&app_command)
+                .arg(&path)
+                .spawn()
+                .map_err(|e| format!("Error al iniciar {}: {}", app_command, e))?;
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = std::process::Command::new(&app_command)
+            .arg(&path)
+            .spawn()
+            .map_err(|e| format!("Error al iniciar {}: {}", app_command, e))?;
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+fn compress_to_zip(source_paths: Vec<String>, output_zip_path: String) -> Result<usize, String> {
+    let out_path = PathBuf::from(&output_zip_path);
+    if let Some(parent) = out_path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+
+    let file = File::create(&out_path).map_err(|e| format!("No se pudo crear el archivo zip: {}", e))?;
+    let mut zip = zip::ZipWriter::new(file);
+    let options = zip::write::SimpleFileOptions::default()
+        .compression_method(zip::CompressionMethod::Deflated);
+
+    let mut total_added = 0usize;
+
+    for src_str in source_paths {
+        let src = PathBuf::from(&src_str);
+        if !src.exists() {
+            continue;
+        }
+
+        let base_name = src.file_name().unwrap_or_default().to_string_lossy().to_string();
+
+        if src.is_dir() {
+            let mut stack = vec![(src.clone(), base_name.clone())];
+            while let Some((dir_path, zip_rel_path)) = stack.pop() {
+                let dir_entry_name = if zip_rel_path.ends_with('/') {
+                    zip_rel_path.clone()
+                } else {
+                    format!("{}/", zip_rel_path)
+                };
+                zip.add_directory(&dir_entry_name, options)
+                    .map_err(|e| format!("Error al añadir directorio: {}", e))?;
+
+                if let Ok(entries) = fs::read_dir(&dir_path) {
+                    for entry in entries.flatten() {
+                        let entry_p = entry.path();
+                        let entry_name = entry.file_name().to_string_lossy().to_string();
+                        let entry_zip_path = format!("{}/{}", zip_rel_path, entry_name);
+
+                        if entry_p.is_dir() {
+                            stack.push((entry_p, entry_zip_path));
+                        } else {
+                            zip.start_file(&entry_zip_path, options)
+                                .map_err(|e| format!("Error al iniciar archivo: {}", e))?;
+                            let mut f = File::open(&entry_p).map_err(|e| e.to_string())?;
+                            std::io::copy(&mut f, &mut zip).map_err(|e| e.to_string())?;
+                            total_added += 1;
+                        }
+                    }
+                }
+            }
+        } else {
+            zip.start_file(&base_name, options)
+                .map_err(|e| format!("Error al iniciar archivo: {}", e))?;
+            let mut f = File::open(&src).map_err(|e| e.to_string())?;
+            std::io::copy(&mut f, &mut zip).map_err(|e| e.to_string())?;
+            total_added += 1;
+        }
+    }
+
+    zip.finish().map_err(|e| format!("Error al finalizar zip: {}", e))?;
+    Ok(total_added)
+}
+
+#[tauri::command]
+fn extract_zip_archive(zip_path: String, target_dir: String) -> Result<usize, String> {
+    let zip_p = PathBuf::from(&zip_path);
+    if !zip_p.exists() {
+        return Err("El archivo zip no existe".into());
+    }
+
+    let target_p = PathBuf::from(&target_dir);
+    fs::create_dir_all(&target_p).map_err(|e| format!("No se pudo crear directorio destino: {}", e))?;
+
+    let file = File::open(&zip_p).map_err(|e| format!("Error al abrir zip: {}", e))?;
+    let mut archive = zip::ZipArchive::new(file).map_err(|e| format!("Archivo zip no válido: {}", e))?;
+
+    let mut extracted_count = 0usize;
+
+    for i in 0..archive.len() {
+        let mut file = archive.by_index(i).map_err(|e| e.to_string())?;
+        let enclosed = match file.enclosed_name() {
+            Some(path) => path.to_owned(),
+            None => continue,
+        };
+
+        let outpath = target_p.join(enclosed);
+
+        if file.is_dir() {
+            fs::create_dir_all(&outpath).map_err(|e| e.to_string())?;
+        } else {
+            if let Some(p) = outpath.parent() {
+                if !p.exists() {
+                    fs::create_dir_all(p).map_err(|e| e.to_string())?;
+                }
+            }
+            let mut outfile = File::create(&outpath).map_err(|e| e.to_string())?;
+            std::io::copy(&mut file, &mut outfile).map_err(|e| e.to_string())?;
+            extracted_count += 1;
+        }
+    }
+
+    Ok(extracted_count)
+}
+
+#[tauri::command]
+fn list_zip_contents(zip_path: String) -> Result<Vec<ArchiveEntryItem>, String> {
+    let zip_p = PathBuf::from(&zip_path);
+    if !zip_p.exists() {
+        return Err("El archivo zip no existe".into());
+    }
+
+    let file = File::open(&zip_p).map_err(|e| format!("Error al abrir zip: {}", e))?;
+    let mut archive = zip::ZipArchive::new(file).map_err(|e| format!("Archivo zip no válido: {}", e))?;
+
+    let mut list = Vec::new();
+    for i in 0..archive.len() {
+        if let Ok(entry) = archive.by_index(i) {
+            let name = entry.name().to_string();
+            let is_dir = entry.is_dir();
+            let uncompressed_size = entry.size();
+            let compressed_size = entry.compressed_size();
+
+            list.push(ArchiveEntryItem {
+                name: PathBuf::from(&name).file_name().unwrap_or_default().to_string_lossy().to_string(),
+                path: name,
+                is_directory: is_dir,
+                uncompressed_size,
+                compressed_size,
+            });
+        }
+    }
+
+    Ok(list)
+}
+
 #[tauri::command]
 fn force_exit_app() {
     std::process::exit(0);
@@ -2235,7 +2565,14 @@ fn main() {
             force_exit_app,
             open_terminal,
             open_in_editor,
-            get_app_info
+            get_app_info,
+            show_in_system_explorer,
+            show_item_properties,
+            open_with_dialog,
+            launch_with_app,
+            compress_to_zip,
+            extract_zip_archive,
+            list_zip_contents
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
