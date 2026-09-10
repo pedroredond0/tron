@@ -149,6 +149,13 @@
     btnCancelExit: document.getElementById('btnCancelExit'),
     btnForceExit: document.getElementById('btnForceExit'),
     btnCloseExitModal: document.getElementById('btnCloseExitModal'),
+    modalAbout: document.getElementById('modalAbout'),
+    btnCloseAboutModal: document.getElementById('btnCloseAboutModal'),
+    btnConfirmAbout: document.getElementById('btnConfirmAbout'),
+    aboutVersion: document.getElementById('aboutVersion'),
+    aboutBuildUnix: document.getElementById('aboutBuildUnix'),
+    aboutBuildDate: document.getElementById('aboutBuildDate'),
+    linkAboutGithub: document.getElementById('linkAboutGithub'),
     // Menus
     menuNewFile: document.getElementById('menuNewFile'),
     menuNewFolder: document.getElementById('menuNewFolder'),
@@ -410,36 +417,74 @@
   // Breadcrumbs
   function renderBreadcrumbs() {
     el.breadcrumbs.innerHTML = '';
-    const rawPath = state.currentDirectory.replace(/\//g, '\\');
-    const isUnc = rawPath.startsWith('\\\\');
-    const parts = rawPath.split('\\').filter(p => p.length > 0);
+    if (!state.currentDirectory) return;
 
-    let accumulated = isUnc ? '\\\\' : '';
-    parts.forEach((part, idx) => {
-      if (idx === 0 && part.endsWith(':')) {
-        accumulated = part + '\\';
-      } else if (isUnc && idx === 0) {
-        accumulated = '\\\\' + part;
-      } else {
-        accumulated += (accumulated.endsWith('\\') ? '' : '\\') + part;
-      }
-      const targetPath = accumulated;
+    const isWindows = /^[a-zA-Z]:[\\\/]/.test(state.currentDirectory) || state.currentDirectory.startsWith('\\\\');
 
-      const btn = document.createElement('button');
-      btn.className = 'px-1.5 py-0.5 rounded hover:bg-gnome-hover hover:text-white transition-colors ' +
-        (idx === parts.length - 1 ? 'font-semibold text-gnome-active' : 'text-gnome-textDim');
-      btn.textContent = part;
-      btn.title = targetPath;
-      btn.onclick = () => loadDirectory(targetPath);
-      el.breadcrumbs.appendChild(btn);
+    if (isWindows) {
+      const rawPath = state.currentDirectory.replace(/\//g, '\\');
+      const isUnc = rawPath.startsWith('\\\\');
+      const parts = rawPath.split('\\').filter(p => p.length > 0);
 
-      if (idx < parts.length - 1) {
+      let accumulated = isUnc ? '\\\\' : '';
+      parts.forEach((part, idx) => {
+        if (idx === 0 && part.endsWith(':')) {
+          accumulated = part + '\\';
+        } else if (isUnc && idx === 0) {
+          accumulated = '\\\\' + part;
+        } else {
+          accumulated += (accumulated.endsWith('\\') ? '' : '\\') + part;
+        }
+        const targetPath = accumulated;
+
+        const btn = document.createElement('button');
+        btn.className = 'px-1.5 py-0.5 rounded hover:bg-gnome-hover hover:text-white transition-colors ' +
+          (idx === parts.length - 1 ? 'font-semibold text-gnome-active' : 'text-gnome-textDim');
+        btn.textContent = part;
+        btn.title = targetPath;
+        btn.onclick = () => loadDirectory(targetPath);
+        el.breadcrumbs.appendChild(btn);
+
+        if (idx < parts.length - 1) {
+          const sep = document.createElement('span');
+          sep.className = 'text-gnome-border select-none';
+          sep.textContent = '/';
+          el.breadcrumbs.appendChild(sep);
+        }
+      });
+    } else {
+      // Unix / Linux / macOS
+      const norm = state.currentDirectory.replace(/\\/g, '/');
+      const parts = norm.split('/').filter(p => p.length > 0);
+
+      // Root button "/"
+      const rootBtn = document.createElement('button');
+      rootBtn.className = 'px-1.5 py-0.5 rounded hover:bg-gnome-hover hover:text-white transition-colors ' +
+        (parts.length === 0 ? 'font-semibold text-gnome-active' : 'text-gnome-textDim');
+      rootBtn.textContent = '/';
+      rootBtn.title = '/';
+      rootBtn.onclick = () => loadDirectory('/');
+      el.breadcrumbs.appendChild(rootBtn);
+
+      let accumulated = '';
+      parts.forEach((part, idx) => {
+        accumulated += '/' + part;
+        const targetPath = accumulated;
+
         const sep = document.createElement('span');
         sep.className = 'text-gnome-border select-none';
         sep.textContent = '/';
         el.breadcrumbs.appendChild(sep);
-      }
-    });
+
+        const btn = document.createElement('button');
+        btn.className = 'px-1.5 py-0.5 rounded hover:bg-gnome-hover hover:text-white transition-colors ' +
+          (idx === parts.length - 1 ? 'font-semibold text-gnome-active' : 'text-gnome-textDim');
+        btn.textContent = part;
+        btn.title = targetPath;
+        btn.onclick = () => loadDirectory(targetPath);
+        el.breadcrumbs.appendChild(btn);
+      });
+    }
     el.breadcrumbs.scrollLeft = el.breadcrumbs.scrollWidth;
   }
 
@@ -490,12 +535,12 @@
       
       let parentPathHtml = '';
       if (state.isSearchingRecursive && item.path) {
-        // Compute parent directory
-        const normalized = item.path.replace(/\//g, '\\');
-        const lastSlash = normalized.lastIndexOf('\\');
+        const isWindows = /^[a-zA-Z]:[\\\/]/.test(item.path) || item.path.startsWith('\\\\');
+        const sep = isWindows ? '\\' : '/';
+        const normalized = isWindows ? item.path.replace(/\//g, '\\') : item.path.replace(/\\/g, '/');
+        const lastSlash = normalized.lastIndexOf(sep);
         if (lastSlash > 0) {
           const parentDir = normalized.substring(0, lastSlash);
-          // Show relative or friendly path
           let displayParent = parentDir;
           if (state.currentDirectory && parentDir.toLowerCase().startsWith(state.currentDirectory.toLowerCase())) {
             displayParent = '.' + parentDir.substring(state.currentDirectory.length);
@@ -1304,8 +1349,10 @@
         closeNewFolderModal();
         closeNetworkModal();
         closeHelpModal();
+        closeAboutModal();
         closeAppearanceModal();
         closeRenameFavoriteModal();
+        closeConfirmExitModal();
         return;
       }
 
@@ -2082,6 +2129,31 @@
     el.fileList.focus();
   }
 
+  async function openAboutModal() {
+    try {
+      const info = await invoke('get_app_info');
+      if (info) {
+        if (el.aboutVersion) el.aboutVersion.textContent = info.version;
+        if (el.aboutBuildUnix) el.aboutBuildUnix.textContent = info.build_timestamp;
+        if (el.aboutBuildDate) {
+          const d = new Date(info.build_timestamp * 1000);
+          el.aboutBuildDate.textContent = d.toLocaleString('es-ES', {
+            dateStyle: 'medium',
+            timeStyle: 'medium'
+          });
+        }
+      }
+    } catch (err) {
+      console.warn('Could not fetch app info:', err);
+    }
+    if (el.modalAbout) el.modalAbout.classList.remove('hidden');
+  }
+
+  function closeAboutModal() {
+    if (el.modalAbout) el.modalAbout.classList.add('hidden');
+    el.fileList.focus();
+  }
+
   // Favorites Management
   function loadFavorites() {
     try {
@@ -2372,7 +2444,7 @@
     el.menuQuickView.onclick = () => { closeAllMenus(); openQuickView(); };
     el.menuRefresh.onclick = () => { closeAllMenus(); loadDirectory(state.currentDirectory, false); };
     el.menuShortcuts.onclick = () => { closeAllMenus(); openHelpModal(); };
-    el.menuAbout.onclick = () => { closeAllMenus(); openHelpModal(); };
+    el.menuAbout.onclick = () => { closeAllMenus(); openAboutModal(); };
 
     // Modals events
     el.btnCloseNewFileModal.onclick = closeNewFileModal;
@@ -2439,6 +2511,16 @@
 
     el.btnCloseHelpModal.onclick = closeHelpModal;
     el.btnConfirmHelp.onclick = closeHelpModal;
+
+    // About modal wiring
+    if (el.btnCloseAboutModal) el.btnCloseAboutModal.onclick = closeAboutModal;
+    if (el.btnConfirmAbout) el.btnConfirmAbout.onclick = closeAboutModal;
+    if (el.linkAboutGithub) {
+      el.linkAboutGithub.onclick = (e) => {
+        e.preventDefault();
+        invoke('open_file_default', { path: 'https://github.com/pedroredond0/tron' }).catch(console.error);
+      };
+    }
 
     // Search bar
     el.searchInput.addEventListener('input', (e) => {

@@ -1191,9 +1191,12 @@ fn delete_file_item(path: String) -> Result<bool, String> {
 
 #[tauri::command]
 fn open_file_default(path: String) -> Result<bool, String> {
-    let p = Path::new(&path);
-    if !p.exists() {
-        return Err("El archivo o ruta no existe".into());
+    let is_url = path.starts_with("http://") || path.starts_with("https://");
+    if !is_url {
+        let p = Path::new(&path);
+        if !p.exists() {
+            return Err("El archivo o ruta no existe".into());
+        }
     }
 
     #[cfg(target_os = "windows")]
@@ -1765,6 +1768,25 @@ fn open_in_editor(file_path: String, editor: String) -> Result<(), String> {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AppInfo {
+    pub name: String,
+    pub version: String,
+    pub build_timestamp: u64,
+    pub github_url: String,
+}
+
+#[tauri::command]
+fn get_app_info() -> AppInfo {
+    let ts: u64 = env!("BUILD_UNIX_TIMESTAMP").parse().unwrap_or(0);
+    AppInfo {
+        name: "Tron".into(),
+        version: env!("CARGO_PKG_VERSION").into(),
+        build_timestamp: ts,
+        github_url: "https://github.com/pedroredond0/tron".into(),
+    }
+}
+
 #[tauri::command]
 fn force_exit_app() {
     std::process::exit(0);
@@ -1790,7 +1812,8 @@ fn main() {
             search_directory_recursive,
             force_exit_app,
             open_terminal,
-            open_in_editor
+            open_in_editor,
+            get_app_info
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

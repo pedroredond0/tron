@@ -1,7 +1,7 @@
 [package]
-name = "tron-explorer"
+name = "tron"
 version = "0.1.0"
-description = "Gnome-style file manager for Windows"
+description = "Tron - Gestor de archivos moderno, ligero y multiplataforma"
 edition = "2021"
 
 [build-dependencies]
