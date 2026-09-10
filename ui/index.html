@@ -294,6 +294,9 @@
         <button id="menuCompress" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
           <span>Comprimir en .zip...</span>
         </button>
+        <button id="menuExportList" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+          <span>🔭 Generar listado a archivo...</span>
+        </button>
         <button id="menuDelete" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
           <span>Mover a Papelera</span><span class="text-gnome-textDim text-[11px]">Supr</span>
         </button>
@@ -462,6 +465,12 @@
       <button id="btnActionSherlock" class="p-1 px-2.5 rounded bg-gnome-surface hover:bg-gnome-hover border border-gnome-border text-gnome-text flex items-center gap-1.5 transition-colors font-medium shadow-sm" title="Buscador Avanzado Sherlock (Ctrl+Shift+F)">
         <span>🔍</span>
         <span>Sherlock</span>
+      </button>
+
+      <!-- Generador de listados a archivo (txt) -->
+      <button id="btnActionExportList" class="p-1 px-2.5 rounded bg-gnome-surface hover:bg-gnome-hover border border-gnome-border text-gnome-text flex items-center gap-1 transition-colors font-medium shadow-sm" title="Generar listado / árbol del directorio a archivo txt (ls/dir/tree)">
+        <span class="text-xs">🔭📄</span>
+        <span class="hidden sm:inline">Listado</span>
       </button>
     </div>
 
@@ -1330,6 +1339,107 @@
     </div>
   </div>
 
+  <!-- Modal: Generar listado a archivo (txt) -->
+  <div id="modalExportList" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div class="bg-gnome-surface border border-gnome-border rounded-xl shadow-2xl w-full max-w-lg p-5 flex flex-col gap-4">
+      <div class="flex items-center justify-between border-b border-gnome-border pb-3">
+        <h3 class="text-sm font-semibold text-gnome-text flex items-center gap-2">
+          <span class="text-base">🔭📄</span>
+          <span>Generar Listado a Archivo</span>
+        </h3>
+        <button id="btnCloseExportListModal" class="text-gnome-textDim hover:text-white text-xs">✕</button>
+      </div>
+
+      <div class="space-y-4 text-xs">
+        <!-- Target Directory Info -->
+        <div class="bg-gnome-sidebar/70 rounded-lg p-2.5 border border-gnome-border/70 text-[11px]">
+          <span class="text-gnome-textDim">Directorio a procesar: </span>
+          <span id="exportListTargetDir" class="font-mono font-medium text-gnome-text break-all">--</span>
+        </div>
+
+        <!-- Output Filename -->
+        <div>
+          <label class="block text-gnome-textDim font-medium mb-1">Nombre del archivo de salida:</label>
+          <div class="flex items-center">
+            <input id="inputExportListName" type="text" placeholder="listado_directorio" class="flex-1 bg-gnome-sidebar border border-gnome-border rounded-l-md px-3 py-1.5 text-xs text-gnome-text placeholder-gnome-textDim focus:outline-none focus:border-gnome-active" />
+            <span class="bg-gnome-bg border border-l-0 border-gnome-border px-2.5 py-1.5 text-xs text-gnome-textDim rounded-r-md font-mono">.txt</span>
+          </div>
+          <p class="text-[10px] text-gnome-textDim mt-1">Se guardará en la carpeta actual.</p>
+        </div>
+
+        <!-- Format Selector -->
+        <div>
+          <label class="block text-gnome-textDim font-medium mb-1.5">Formato de salida:</label>
+          <div class="grid grid-cols-2 gap-2">
+            <label class="flex items-center gap-2 p-2.5 rounded-lg border border-gnome-border bg-gnome-sidebar/50 cursor-pointer hover:border-gnome-active/60 transition-colors">
+              <input type="radio" name="exportListFormat" value="tree" checked class="text-gnome-active focus:ring-0" />
+              <div>
+                <div class="font-semibold text-gnome-text">Árbol (tree)</div>
+                <div class="text-[10px] text-gnome-textDim">Estructura jerárquica con ramas</div>
+              </div>
+            </label>
+            <label class="flex items-center gap-2 p-2.5 rounded-lg border border-gnome-border bg-gnome-sidebar/50 cursor-pointer hover:border-gnome-active/60 transition-colors">
+              <input type="radio" name="exportListFormat" value="flat" class="text-gnome-active focus:ring-0" />
+              <div>
+                <div class="font-semibold text-gnome-text">Lista (ls / dir)</div>
+                <div class="text-[10px] text-gnome-textDim">Filas tabulares detalladas</div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Options: Files and Depth -->
+        <div class="space-y-2 pt-1 border-t border-gnome-border/50">
+          <label class="flex items-center gap-2 text-gnome-text cursor-pointer select-none">
+            <input id="chkExportListRecursive" type="checkbox" checked class="rounded bg-gnome-sidebar border-gnome-border text-gnome-active focus:ring-0" />
+            <span class="font-medium">Modo recursivo (explorar subcarpetas)</span>
+          </label>
+
+          <label class="flex items-center gap-2 text-gnome-text cursor-pointer select-none">
+            <input id="chkExportListIncludeFiles" type="checkbox" checked class="rounded bg-gnome-sidebar border-gnome-border text-gnome-active focus:ring-0" />
+            <span>Incluir archivos en el listado <span class="text-gnome-textDim text-[11px]">(si se desmarca, lista solo carpetas)</span></span>
+          </label>
+
+          <label class="flex items-center gap-2 text-gnome-text cursor-pointer select-none">
+            <input id="chkExportListDetails" type="checkbox" checked class="rounded bg-gnome-sidebar border-gnome-border text-gnome-active focus:ring-0" />
+            <span>Incluir detalles (tamaños de archivos y fechas de modificación)</span>
+          </label>
+        </div>
+
+        <!-- Depth Configuration -->
+        <div id="exportListDepthContainer" class="bg-gnome-sidebar/50 rounded-lg p-3 border border-gnome-border/60 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="font-medium text-gnome-text">Límite de profundidad de subcarpetas:</span>
+            <span id="exportListDepthLabel" class="font-mono font-bold text-gnome-active bg-gnome-surface px-2 py-0.5 rounded border border-gnome-border">2 niveles</span>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <input id="rangeExportListDepth" type="range" min="1" max="10" value="2" class="flex-1 accent-gnome-active" />
+          </div>
+
+          <label class="flex items-center gap-2 text-gnome-text cursor-pointer select-none pt-1">
+            <input id="chkExportListFullDepth" type="checkbox" class="rounded bg-gnome-sidebar border-gnome-border text-gnome-active focus:ring-0" />
+            <span class="text-[11px] font-medium text-amber-400">Profundidad completa (sin límite)</span>
+          </label>
+        </div>
+
+        <!-- Post-Action: Open in Editor -->
+        <label class="flex items-center gap-2 text-gnome-text cursor-pointer select-none">
+          <input id="chkExportListOpenAfter" type="checkbox" checked class="rounded bg-gnome-sidebar border-gnome-border text-gnome-active focus:ring-0" />
+          <span>Abrir archivo generado al finalizar</span>
+        </label>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 border-t border-gnome-border pt-3">
+        <button id="btnCancelExportList" type="button" class="px-4 py-1.5 rounded-md hover:bg-gnome-hover text-gnome-text text-xs transition-colors">Cancelar</button>
+        <button id="btnConfirmExportList" type="button" class="px-4 py-1.5 rounded-md bg-gnome-active hover:bg-gnome-activeHover text-white font-medium text-xs transition-colors flex items-center gap-1.5 shadow-md">
+          <span>🔭📄</span>
+          <span>Generar Listado</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal: Ver contenido del archivo comprimido -->
   <div id="modalArchiveView" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
     <div class="bg-gnome-surface border border-gnome-border rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] p-5 flex flex-col gap-3">
@@ -1410,6 +1520,9 @@
     <!-- Compression action for standard files/folders -->
     <button id="ctxMenuCompress" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
       <span>🗜️ Comprimir en .zip...</span>
+    </button>
+    <button id="ctxMenuExportList" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+      <span>🔭📄 Generar listado a archivo...</span>
     </button>
     <div class="my-1 border-t border-gnome-border/60"></div>
     <button id="ctxMenuRename" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
