@@ -271,7 +271,7 @@
     <!-- Archivo -->
     <div class="relative menu-dropdown">
       <button class="menu-btn px-2 py-0.5 rounded hover:bg-gnome-hover hover:text-white transition-colors">Archivo</button>
-      <div class="menu-content hidden absolute left-0 top-full mt-0.5 w-52 bg-gnome-surface border border-gnome-border rounded-md shadow-xl py-1 z-50 text-xs">
+      <div class="menu-content hidden absolute left-0 top-full mt-0.5 w-60 bg-gnome-surface border border-gnome-border rounded-md shadow-xl py-1 z-50 text-xs">
         <button id="menuNewFile" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
           <span>Nuevo Archivo...</span><span class="text-gnome-textDim text-[11px]">Ctrl+N</span>
         </button>
@@ -283,10 +283,23 @@
           <span>Renombrar...</span><span class="text-gnome-textDim text-[11px]">F2</span>
         </button>
         <button id="menuOpenDefault" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
-          <span>Abrir con aplicación</span><span class="text-gnome-textDim text-[11px]">Enter</span>
+          <span>Abrir</span><span class="text-gnome-textDim text-[11px]">Enter</span>
+        </button>
+        <button id="menuOpenWith" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+          <span>Abrir con...</span>
+        </button>
+        <button id="menuShowInExplorer" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+          <span>Mostrar en el Explorador</span>
+        </button>
+        <button id="menuCompress" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+          <span>Comprimir en .zip...</span>
         </button>
         <button id="menuDelete" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
           <span>Mover a Papelera</span><span class="text-gnome-textDim text-[11px]">Supr</span>
+        </button>
+        <div class="my-1 border-t border-gnome-border/60"></div>
+        <button id="menuProperties" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+          <span>Propiedades</span><span class="text-gnome-textDim text-[11px]">Alt+Enter</span>
         </button>
         <div class="my-1 border-t border-gnome-border/60"></div>
         <button id="menuAddFavorite" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
@@ -1207,10 +1220,135 @@
     </div>
   </div>
 
-  <!-- Styled Context Menu for File Items (includes Duplicar y Renombrar) -->
-  <div id="fileContextMenu" class="hidden fixed z-50 w-52 bg-gnome-surface border border-gnome-border rounded-lg shadow-2xl py-1 text-xs text-gnome-text select-none">
+  <!-- Modal: Abrir con... -->
+  <div id="modalOpenWith" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div class="bg-gnome-surface border border-gnome-border rounded-xl shadow-2xl w-full max-w-lg p-5 flex flex-col gap-4">
+      <div class="flex items-center justify-between border-b border-gnome-border pb-3">
+        <h3 class="text-sm font-semibold text-gnome-text flex items-center gap-2">
+          <span>🚀</span> Abrir con...
+        </h3>
+        <button id="btnCloseOpenWithModal" class="text-gnome-textDim hover:text-white text-xs">✕</button>
+      </div>
+
+      <div class="text-xs text-gnome-text space-y-1">
+        <div class="text-gnome-textDim text-[11px]">Archivo seleccionado:</div>
+        <div id="openWithFileName" class="font-mono font-medium truncate bg-gnome-sidebar px-2.5 py-1.5 rounded border border-gnome-border">--</div>
+      </div>
+
+      <!-- Suggested Applications based on file extension -->
+      <div class="space-y-2">
+        <div class="text-xs font-semibold text-gnome-textDim uppercase tracking-wider">
+          Sugerencias para este tipo de archivo
+        </div>
+        <div id="openWithSuggestions" class="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
+          <!-- Populated dynamically via JS based on file extension -->
+        </div>
+      </div>
+
+      <!-- Custom Command or Application Path -->
+      <div class="space-y-1.5 border-t border-gnome-border pt-3">
+        <label class="block text-xs font-medium text-gnome-textDim">O indicar programa / comando:</label>
+        <div class="flex items-center gap-2">
+          <input id="inputOpenWithApp" type="text" placeholder="ej: code, nvim, notepad, vlc, o ruta completa a .exe" class="flex-1 bg-gnome-sidebar border border-gnome-border rounded-md px-3 py-1.5 text-xs text-gnome-text placeholder-gnome-textDim focus:outline-none focus:border-gnome-active" />
+          <button id="btnLaunchCustomApp" type="button" class="px-3 py-1.5 rounded-md bg-gnome-sidebar hover:bg-gnome-hover border border-gnome-border text-xs text-gnome-text font-medium transition-colors">
+            Abrir
+          </button>
+        </div>
+      </div>
+
+      <!-- Native OS Open With Dialog Button -->
+      <div class="border-t border-gnome-border pt-3 flex items-center justify-between">
+        <button id="btnOpenWithSystemDialog" type="button" class="text-xs text-indigo-400 hover:text-indigo-300 underline flex items-center gap-1">
+          <span>⚙️</span> Elegir otra aplicación del sistema...
+        </button>
+        <button id="btnCancelOpenWith" type="button" class="px-4 py-1.5 rounded-md hover:bg-gnome-hover text-gnome-text text-xs transition-colors">
+          Cerrar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Comprimir en .zip -->
+  <div id="modalCompress" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div class="bg-gnome-surface border border-gnome-border rounded-xl shadow-2xl w-full max-w-md p-5 flex flex-col gap-4">
+      <div class="flex items-center justify-between border-b border-gnome-border pb-3">
+        <h3 class="text-sm font-semibold text-gnome-text flex items-center gap-2">
+          <span>🗜️</span> Comprimir en archivo ZIP
+        </h3>
+        <button id="btnCloseCompressModal" class="text-gnome-textDim hover:text-white text-xs">✕</button>
+      </div>
+
+      <div class="space-y-1 text-xs">
+        <label class="block text-gnome-textDim font-medium">Nombre del archivo comprimido:</label>
+        <div class="flex items-center">
+          <input id="inputCompressName" type="text" class="flex-1 bg-gnome-sidebar border border-gnome-border rounded-l-md px-3 py-1.5 text-xs text-gnome-text focus:outline-none focus:border-gnome-active" />
+          <span class="bg-gnome-bg border border-l-0 border-gnome-border px-2.5 py-1.5 text-xs text-gnome-textDim rounded-r-md">.zip</span>
+        </div>
+        <p id="compressItemsCount" class="text-[11px] text-gnome-textDim mt-1">Se comprimirá 1 elemento.</p>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 border-t border-gnome-border pt-3">
+        <button id="btnCancelCompress" type="button" class="px-4 py-1.5 rounded-md hover:bg-gnome-hover text-gnome-text text-xs transition-colors">Cancelar</button>
+        <button id="btnConfirmCompress" type="button" class="px-4 py-1.5 rounded-md bg-gnome-active hover:bg-gnome-activeHover text-white font-medium text-xs transition-colors flex items-center gap-1.5">
+          <span>Comprimir</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Ver contenido del archivo comprimido -->
+  <div id="modalArchiveView" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div class="bg-gnome-surface border border-gnome-border rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] p-5 flex flex-col gap-3">
+      <div class="flex items-center justify-between border-b border-gnome-border pb-3 shrink-0">
+        <div class="min-w-0">
+          <h3 class="text-sm font-semibold text-gnome-text flex items-center gap-2">
+            <span>📦</span> Contenido del archivo comprimido
+          </h3>
+          <p id="archiveViewFileName" class="text-[11px] text-gnome-textDim font-mono truncate mt-0.5">--</p>
+        </div>
+        <button id="btnCloseArchiveViewModal" class="text-gnome-textDim hover:text-white text-xs shrink-0">✕</button>
+      </div>
+
+      <!-- Filter bar inside archive -->
+      <div class="flex items-center justify-between gap-2 shrink-0">
+        <input id="inputArchiveFilter" type="text" placeholder="Filtrar archivos en el zip..." class="flex-1 bg-gnome-sidebar border border-gnome-border rounded-md px-3 py-1 text-xs text-gnome-text placeholder-gnome-textDim focus:outline-none focus:border-gnome-active" />
+        <span id="archiveTotalCount" class="text-xs text-gnome-textDim shrink-0">0 archivos</span>
+      </div>
+
+      <!-- Table list -->
+      <div class="flex-1 overflow-y-auto min-h-[250px] max-h-[420px] bg-gnome-sidebar rounded-lg border border-gnome-border text-xs">
+        <table class="w-full text-left border-collapse">
+          <thead class="sticky top-0 bg-gnome-surface border-b border-gnome-border text-[11px] text-gnome-textDim">
+            <tr>
+              <th class="py-1.5 px-3">Nombre</th>
+              <th class="py-1.5 px-3 w-28 text-right">Tamaño</th>
+              <th class="py-1.5 px-3 w-28 text-right">Comprimido</th>
+            </tr>
+          </thead>
+          <tbody id="archiveTableBody" class="divide-y divide-gnome-border/40 font-mono text-[11px]">
+            <!-- Dynamic rows -->
+          </tbody>
+        </table>
+      </div>
+
+      <div class="flex items-center justify-between border-t border-gnome-border pt-3 shrink-0">
+        <button id="btnArchiveExtractAll" type="button" class="px-3.5 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs transition-colors flex items-center gap-1.5 shadow-md">
+          <span>📦</span> Extraer todo aquí
+        </button>
+        <button id="btnArchiveClose" type="button" class="px-4 py-1.5 rounded-md hover:bg-gnome-hover text-gnome-text text-xs transition-colors">
+          Cerrar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Styled Context Menu for File Items -->
+  <div id="fileContextMenu" class="hidden fixed z-50 w-56 bg-gnome-surface border border-gnome-border rounded-lg shadow-2xl py-1 text-xs text-gnome-text select-none">
     <button id="ctxMenuOpen" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
       <span>Abrir</span><span class="text-gnome-textDim text-[11px]">Enter</span>
+    </button>
+    <button id="ctxMenuOpenWith" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+      <span>Abrir con...</span>
     </button>
     <button id="ctxMenuQuickView" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
       <span>QuickView</span><span class="text-gnome-textDim text-[11px]">Espacio</span>
@@ -1220,6 +1358,24 @@
     </button>
     <button id="ctxMenuOpenLocation" class="hidden w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
       <span>📂 Abrir ubicación</span>
+    </button>
+    <button id="ctxMenuShowInExplorer" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+      <span>Mostrar en el Explorador</span>
+    </button>
+    <div class="my-1 border-t border-gnome-border/60"></div>
+    <!-- Archive specific actions -->
+    <button id="ctxMenuExtractHere" class="hidden w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between text-indigo-400">
+      <span>📦 Extraer aquí</span>
+    </button>
+    <button id="ctxMenuExtractToFolder" class="hidden w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between text-indigo-400">
+      <span id="ctxMenuExtractToFolderText">📦 Extraer en...</span>
+    </button>
+    <button id="ctxMenuArchiveViewContent" class="hidden w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+      <span>📋 Ver contenido</span>
+    </button>
+    <!-- Compression action for standard files/folders -->
+    <button id="ctxMenuCompress" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+      <span>🗜️ Comprimir en .zip...</span>
     </button>
     <div class="my-1 border-t border-gnome-border/60"></div>
     <button id="ctxMenuRename" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
@@ -1240,6 +1396,10 @@
     </button>
     <button id="ctxMenuDelete" class="w-full text-left px-3 py-1.5 hover:bg-red-600 hover:text-white text-red-400 flex items-center justify-between">
       <span>Mover a Papelera</span><span class="text-gnome-textDim text-[11px]">Supr</span>
+    </button>
+    <div class="my-1 border-t border-gnome-border/60"></div>
+    <button id="ctxMenuProperties" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+      <span>Propiedades</span><span class="text-gnome-textDim text-[11px]">Alt+Enter</span>
     </button>
   </div>
 
