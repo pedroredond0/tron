@@ -1773,7 +1773,15 @@ fn copy_items(
                     None => continue,
                 };
                 let mut dest_path = PathBuf::from(&target_directory).join(file_name);
-                if dest_path.exists() {
+
+                // Detect if destination is identical to source or already exists
+                let is_same_file = src_path == dest_path
+                    || match (src_path.canonicalize(), dest_path.canonicalize()) {
+                        (Ok(s), Ok(d)) => s == d,
+                        _ => false,
+                    };
+
+                if is_same_file || dest_path.exists() {
                     let stem = src_path.file_stem().and_then(|s| s.to_str()).unwrap_or("archivo");
                     let ext = src_path.extension().and_then(|s| s.to_str()).unwrap_or("");
                     let ext_suffix = if ext.is_empty() {
@@ -1790,12 +1798,22 @@ fn copy_items(
                             format!("{} (copia {}){}", stem, counter, ext_suffix)
                         };
                         let candidate = PathBuf::from(&target_directory).join(candidate_name);
-                        if !candidate.exists() {
+                        let candidate_exists = candidate.exists()
+                            || match (src_path.canonicalize(), candidate.canonicalize()) {
+                                (Ok(s), Ok(c)) => s == c,
+                                _ => false,
+                            };
+                        if !candidate_exists {
                             dest_path = candidate;
                             break;
                         }
                         counter += 1;
                     }
+                }
+
+                // Final safety check: never copy onto self
+                if src_path == dest_path {
+                    continue;
                 }
 
                 let res = if src_path.is_dir() {
@@ -3443,6 +3461,99 @@ fn force_exit_app() {
     std::process::exit(0);
 }
 
+fn build_app_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Result<tauri::menu::Menu<R>, Box<dyn std::error::Error>> {
+    use tauri::menu::*;
+
+    let menu = MenuBuilder::new(app);
+
+    // 1. App Submenu (Tron)
+    let app_submenu = SubmenuBuilder::new(app, "Tron")
+        .item(&MenuItemBuilder::with_id("about_tron", "Acerca de Tron").build(app)?)
+        .separator()
+        .item(&MenuItemBuilder::with_id("open_preferences", "Preferencias...").accelerator("CmdOrCtrl+,").build(app)?)
+        .separator()
+        .item(&PredefinedMenuItem::hide(app, Some("Ocultar Tron"))?)
+        .item(&PredefinedMenuItem::hide_others(app, Some("Ocultar otros"))?)
+        .item(&PredefinedMenuItem::show_all(app, Some("Mostrar todo"))?)
+        .separator()
+        .item(&PredefinedMenuItem::quit(app, Some("Salir de Tron"))?)
+        .build()?;
+
+    // 2. Archivo
+    let file_submenu = SubmenuBuilder::new(app, "Archivo")
+        .item(&MenuItemBuilder::with_id("new_file", "Nuevo Archivo...").accelerator("CmdOrCtrl+N").build(app)?)
+        .item(&MenuItemBuilder::with_id("new_folder", "Nueva Carpeta...").accelerator("CmdOrCtrl+Shift+N").build(app)?)
+        .separator()
+        .item(&MenuItemBuilder::with_id("new_tab", "Nueva Pestaña").accelerator("CmdOrCtrl+T").build(app)?)
+        .item(&MenuItemBuilder::with_id("close_tab", "Cerrar Pestaña").accelerator("CmdOrCtrl+W").build(app)?)
+        .separator()
+        .item(&MenuItemBuilder::with_id("rename_item", "Renombrar...").accelerator("F2").build(app)?)
+        .item(&MenuItemBuilder::with_id("duplicate_item", "Duplicar").accelerator("CmdOrCtrl+D").build(app)?)
+        .item(&MenuItemBuilder::with_id("compress_zip", "Comprimir en .zip...").build(app)?)
+        .item(&MenuItemBuilder::with_id("export_listing", "Generar listado a archivo...").build(app)?)
+        .separator()
+        .item(&MenuItemBuilder::with_id("delete_item", "Mover a Papelera").accelerator("Backspace").build(app)?)
+        .item(&MenuItemBuilder::with_id("show_properties", "Propiedades").accelerator("Alt+Enter").build(app)?)
+        .item(&MenuItemBuilder::with_id("add_favorite", "Añadir a Favoritos").accelerator("CmdOrCtrl+B").build(app)?)
+        .build()?;
+
+    // 3. Edición
+    let edit_submenu = SubmenuBuilder::new(app, "Edición")
+        .item(&PredefinedMenuItem::undo(app, Some("Deshacer"))?)
+        .item(&PredefinedMenuItem::redo(app, Some("Rehacer"))?)
+        .separator()
+        .item(&MenuItemBuilder::with_id("cut_items", "Cortar").accelerator("CmdOrCtrl+X").build(app)?)
+        .item(&MenuItemBuilder::with_id("copy_items", "Copiar").accelerator("CmdOrCtrl+C").build(app)?)
+        .item(&MenuItemBuilder::with_id("paste_items", "Pegar").accelerator("CmdOrCtrl+V").build(app)?)
+        .item(&MenuItemBuilder::with_id("select_all", "Seleccionar todo").accelerator("CmdOrCtrl+A").build(app)?)
+        .separator()
+        .item(&MenuItemBuilder::with_id("copy_path", "Copiar Ruta").accelerator("CmdOrCtrl+Shift+C").build(app)?)
+        .item(&MenuItemBuilder::with_id("copy_posix", "Copiar Ruta POSIX").accelerator("CmdOrCtrl+Alt+C").build(app)?)
+        .build()?;
+
+    // 4. Ver
+    let view_submenu = SubmenuBuilder::new(app, "Ver")
+        .item(&MenuItemBuilder::with_id("toggle_quickview", "QuickView").accelerator("Space").build(app)?)
+        .item(&MenuItemBuilder::with_id("toggle_split", "Vista Dividida (Panel Dual)").accelerator("CmdOrCtrl+\\").build(app)?)
+        .item(&MenuItemBuilder::with_id("refresh_dir", "Actualizar").accelerator("CmdOrCtrl+R").build(app)?)
+        .item(&MenuItemBuilder::with_id("toggle_hidden", "Mostrar Archivos Ocultos").accelerator("CmdOrCtrl+H").build(app)?)
+        .separator()
+        .item(&MenuItemBuilder::with_id("open_appearance", "Personalizar Aspecto...").build(app)?)
+        .build()?;
+
+    // 5. Herramientas
+    let tools_submenu = SubmenuBuilder::new(app, "Herramientas")
+        .item(&MenuItemBuilder::with_id("open_sherlock", "Sherlock - Búsqueda Avanzada").accelerator("CmdOrCtrl+Shift+F").build(app)?)
+        .item(&MenuItemBuilder::with_id("open_jump", "Ir a Carpeta...").accelerator("CmdOrCtrl+P").build(app)?)
+        .item(&MenuItemBuilder::with_id("open_terminal", "Abrir Terminal Aquí").accelerator("CmdOrCtrl+Shift+T").build(app)?)
+        .build()?;
+
+    // 6. Ventana
+    let window_submenu = SubmenuBuilder::new(app, "Ventana")
+        .item(&PredefinedMenuItem::minimize(app, Some("Minimizar"))?)
+        .item(&PredefinedMenuItem::fullscreen(app, Some("Pantalla Completa"))?)
+        .item(&PredefinedMenuItem::close_window(app, Some("Cerrar Ventana"))?)
+        .build()?;
+
+    // 7. Ayuda
+    let help_submenu = SubmenuBuilder::new(app, "Ayuda")
+        .item(&MenuItemBuilder::with_id("help_shortcuts", "Guía de Atajos de Teclado").accelerator("F1").build(app)?)
+        .item(&MenuItemBuilder::with_id("about_tron", "Acerca de Tron").build(app)?)
+        .build()?;
+
+    let final_menu = menu
+        .item(&app_submenu)
+        .item(&file_submenu)
+        .item(&edit_submenu)
+        .item(&view_submenu)
+        .item(&tools_submenu)
+        .item(&window_submenu)
+        .item(&help_submenu)
+        .build()?;
+
+    Ok(final_menu)
+}
+
 fn main() {
     std::panic::set_hook(Box::new(|info| {
         let msg = format!("PANIC: {:?}\n", info);
@@ -3454,6 +3565,16 @@ fn main() {
 
     let result = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .menu(|app| {
+            build_app_menu(app).map_err(|e| {
+                eprintln!("Error building menu: {}", e);
+                tauri::Error::UnknownPath
+            })
+        })
+        .on_menu_event(|app, event| {
+            let id = event.id().as_ref();
+            let _ = app.emit("menu-action", id);
+        })
         .invoke_handler(tauri::generate_handler![
             get_user_places,
             get_system_drives,
