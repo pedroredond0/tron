@@ -2718,8 +2718,8 @@
 
       const res = await invoke('generate_directory_listing', {
         options: {
-          target_path: exportListTargetDirectory,
-          output_file: outFilePath,
+          dir_path: exportListTargetDirectory,
+          output_path: outFilePath,
           format: format,
           recursive: recursive,
           include_files: includeFiles,
