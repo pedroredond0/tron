@@ -42,6 +42,7 @@
       .filter(Boolean),
     textEditor: localStorage.getItem('tron_text_editor') || 'notepad',
     textEditorCustomPath: localStorage.getItem('tron_text_editor_custom') || '',
+    monochromeIcons: localStorage.getItem('tron_monochrome_icons') === 'true',
     draggedInternalPaths: []
   };
 
@@ -57,6 +58,7 @@
     chkShowHidden: document.getElementById('chkShowHidden'),
     btnBack: document.getElementById('btnBack'),
     btnForward: document.getElementById('btnForward'),
+    btnParentDir: document.getElementById('btnParentDir'),
     btnRefresh: document.getElementById('btnRefresh'),
     statusItemCount: document.getElementById('statusItemCount'),
     statusSelection: document.getElementById('statusSelection'),
@@ -128,6 +130,7 @@
     rangeUiScale: document.getElementById('rangeUiScale'),
     lblUiScaleValue: document.getElementById('lblUiScaleValue'),
     selectTheme: document.getElementById('selectTheme'),
+    chkMonochromeIcons: document.getElementById('chkMonochromeIcons'),
     selectTextEditor: document.getElementById('selectTextEditor'),
     customEditorContainer: document.getElementById('customEditorContainer'),
     inputCustomEditor: document.getElementById('inputCustomEditor'),
@@ -398,6 +401,10 @@
   function updateHistoryButtons() {
     el.btnBack.disabled = state.historyIndex <= 0;
     el.btnForward.disabled = state.historyIndex >= state.history.length - 1;
+    if (el.btnParentDir) {
+      const p = state.currentDirectory ? state.currentDirectory.replace(/\\/g, '/').replace(/\/+$/, '') : '';
+      el.btnParentDir.disabled = !p || p === '/' || (p.length === 2 && p.endsWith(':'));
+    }
   }
 
   // Breadcrumbs
@@ -502,7 +509,7 @@
       }
 
       colName.innerHTML = `
-        <span class="shrink-0 text-sm select-none">${getFileIcon(item)}</span>
+        <span class="shrink-0 text-sm select-none item-icon">${getFileIcon(item)}</span>
         <span class="truncate select-none ${fontClass}">${escapeHtml(item.name)}</span>
         ${parentPathHtml}
       `;
@@ -1412,6 +1419,14 @@
       return;
     }
 
+    if ((e.ctrlKey || e.metaKey) && (e.key === 't' || e.key === 'T')) {
+      e.preventDefault();
+      if (state.currentDirectory) {
+        invoke('open_terminal', { path: state.currentDirectory }).catch(console.error);
+      }
+      return;
+    }
+
     if (e.key === 'F5' || (e.ctrlKey && (e.key === 'r' || e.key === 'R'))) {
       e.preventDefault();
       loadDirectory(state.currentDirectory, false);
@@ -1447,6 +1462,12 @@
     if (e.altKey && e.key === 'ArrowRight') {
       e.preventDefault();
       goForward();
+      return;
+    }
+
+    if (e.altKey && e.key === 'ArrowUp') {
+      e.preventDefault();
+      goUp();
       return;
     }
 
@@ -1612,6 +1633,22 @@
     if (state.historyIndex < state.history.length - 1) {
       state.historyIndex++;
       loadDirectory(state.history[state.historyIndex], false);
+    }
+  }
+
+  function goUp() {
+    if (!state.currentDirectory) return;
+    let norm = state.currentDirectory.replace(/\\/g, '/').replace(/\/+$/, '');
+    if (!norm) return;
+    const lastSlash = norm.lastIndexOf('/');
+    if (lastSlash > 0) {
+      let parent = norm.substring(0, lastSlash);
+      if (parent.length === 2 && parent.endsWith(':')) {
+        parent += '\\';
+      }
+      loadDirectory(parent);
+    } else if (lastSlash === 0) {
+      loadDirectory('/');
     }
   }
 
@@ -2267,6 +2304,7 @@
     // Navigation bar
     el.btnBack.onclick = goBack;
     el.btnForward.onclick = goForward;
+    if (el.btnParentDir) el.btnParentDir.onclick = goUp;
     el.btnRefresh.onclick = () => loadDirectory(state.currentDirectory, false);
 
     // QuickView
@@ -2484,6 +2522,16 @@
           } else {
             el.customEditorContainer.classList.add('hidden');
           }
+        }
+      });
+    }
+
+    if (el.chkMonochromeIcons) {
+      el.chkMonochromeIcons.addEventListener('change', (e) => {
+        if (e.target.checked) {
+          document.documentElement.setAttribute('data-monochrome-icons', 'true');
+        } else {
+          document.documentElement.removeAttribute('data-monochrome-icons');
         }
       });
     }
@@ -2718,8 +2766,10 @@
     const customExts = localStorage.getItem('tron_custom_text_exts') || 'sql, str, log, conf, env, bak';
     const textEditor = localStorage.getItem('tron_text_editor') || 'notepad';
     const customEditor = localStorage.getItem('tron_text_editor_custom') || '';
+    const monochromeIcons = localStorage.getItem('tron_monochrome_icons') === 'true';
 
     if (el.selectTheme) el.selectTheme.value = theme;
+    if (el.chkMonochromeIcons) el.chkMonochromeIcons.checked = monochromeIcons;
     if (el.selectTextEditor) {
       el.selectTextEditor.value = textEditor;
       if (el.customEditorContainer) {
@@ -2770,6 +2820,7 @@
     const customExts = el.inputCustomTextExts ? el.inputCustomTextExts.value.trim() : 'sql, str, log, conf, env, bak';
     const textEditor = el.selectTextEditor ? el.selectTextEditor.value : 'notepad';
     const customEditor = el.inputCustomEditor ? el.inputCustomEditor.value.trim() : '';
+    const monochromeIcons = el.chkMonochromeIcons ? el.chkMonochromeIcons.checked : false;
 
     let density = 'normal';
     const selectedDensity = document.querySelector('input[name="density"]:checked');
@@ -2783,16 +2834,18 @@
     localStorage.setItem('tron_custom_text_exts', customExts);
     localStorage.setItem('tron_text_editor', textEditor);
     localStorage.setItem('tron_text_editor_custom', customEditor);
+    localStorage.setItem('tron_monochrome_icons', monochromeIcons ? 'true' : 'false');
 
     state.textEditor = textEditor;
     state.textEditorCustomPath = customEditor;
+    state.monochromeIcons = monochromeIcons;
 
     state.customTextExts = customExts
       .split(',')
       .map(s => s.trim().toLowerCase().replace(/^\./, ''))
       .filter(Boolean);
 
-    applyAppearanceSettings(theme, density, fontSize, normalWeight, uiScale);
+    applyAppearanceSettings(theme, density, fontSize, normalWeight, uiScale, monochromeIcons);
     closeAppearanceModal();
   }
 
@@ -2803,18 +2856,26 @@
     const normalWeight = localStorage.getItem('tron_normal_weight') === 'true';
     const uiScale = localStorage.getItem('tron_ui_scale') || '14';
     const customExts = localStorage.getItem('tron_custom_text_exts') || 'sql, str, log, conf, env, bak';
+    const monochromeIcons = localStorage.getItem('tron_monochrome_icons') === 'true';
 
+    state.monochromeIcons = monochromeIcons;
     state.customTextExts = customExts
       .split(',')
       .map(s => s.trim().toLowerCase().replace(/^\./, ''))
       .filter(Boolean);
 
-    applyAppearanceSettings(theme, density, fontSize, normalWeight, uiScale);
+    applyAppearanceSettings(theme, density, fontSize, normalWeight, uiScale, monochromeIcons);
   }
 
-  function applyAppearanceSettings(theme, density, fontSize, normalWeight, uiScale = '14') {
+  function applyAppearanceSettings(theme, density, fontSize, normalWeight, uiScale = '14', monochromeIcons = false) {
     document.body.setAttribute('data-theme', theme);
     state.normalFontWeight = normalWeight;
+
+    if (monochromeIcons) {
+      document.documentElement.setAttribute('data-monochrome-icons', 'true');
+    } else {
+      document.documentElement.removeAttribute('data-monochrome-icons');
+    }
 
     // Apply UI scale CSS variables globally
     const scalePx = `${uiScale}px`;
