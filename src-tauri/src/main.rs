@@ -8,6 +8,8 @@ use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU16, AtomicU64, Ordering};
 use std::time::UNIX_EPOCH;
+use std::cmp::Reverse;
+use std::collections::BinaryHeap;
 use tauri::Emitter;
 #[cfg(target_os = "windows")]
 use std::os::windows::ffi::OsStrExt;
@@ -183,7 +185,7 @@ pub struct TransferFinishedPayload {
     pub target_directory: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileItem {
     pub name: String,
     pub path: String,
@@ -193,6 +195,47 @@ pub struct FileItem {
     pub extension: String,
     pub file_type: String, // "folder", "image", "audio", "video", "text", "binary"
     pub is_hidden: bool,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SherlockFilter {
+    pub base_path: String,
+    pub search_root: bool,
+    pub preset: Option<String>,
+    pub query: Option<String>,
+    pub size_mode: Option<String>,
+    pub size_bytes: Option<u64>,
+    pub min_date: Option<u64>,
+    pub max_date: Option<u64>,
+    pub max_results: Option<usize>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SherlockResult {
+    pub items: Vec<FileItem>,
+    pub dir_sizes: Vec<DirectorySizeResult>,
+}
+
+struct SizeItem {
+    size: u64,
+    item: FileItem,
+}
+
+impl PartialEq for SizeItem {
+    fn eq(&self, other: &Self) -> bool {
+        self.size == other.size
+    }
+}
+impl Eq for SizeItem {}
+impl PartialOrd for SizeItem {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl Ord for SizeItem {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.size.cmp(&other.size)
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -1571,22 +1614,23 @@ fn move_items(
     Ok(op_id_ret)
 }
 
-#[tauri::command]
-fn get_directory_size(path: String) -> Result<DirectorySizeResult, String> {
-    let root = PathBuf::from(&path);
-    if !root.exists() || !root.is_dir() {
-        return Err("Directorio no válido".into());
-    }
-
+fn compute_directory_size(root: &Path, max_entries: Option<usize>) -> (u64, usize, usize) {
     let mut total_size = 0u64;
     let mut file_count = 0usize;
     let mut dir_count = 0usize;
+    let mut total_scanned = 0usize;
 
-    let mut stack = vec![root.clone()];
+    let mut stack = vec![root.to_path_buf()];
     while let Some(current_dir) = stack.pop() {
         if let Ok(entries) = fs::read_dir(&current_dir) {
             for entry in entries.flatten() {
                 if let Ok(meta) = entry.metadata() {
+                    total_scanned += 1;
+                    if let Some(limit) = max_entries {
+                        if total_scanned >= limit {
+                            return (total_size, file_count, dir_count);
+                        }
+                    }
                     if meta.is_dir() {
                         dir_count += 1;
                         stack.push(entry.path());
@@ -1598,12 +1642,361 @@ fn get_directory_size(path: String) -> Result<DirectorySizeResult, String> {
             }
         }
     }
+    (total_size, file_count, dir_count)
+}
+
+fn build_file_item(entry_path: &Path, meta: &fs::Metadata) -> Option<FileItem> {
+    let file_name = entry_path.file_name()?.to_string_lossy().to_string();
+    let is_dir = meta.is_dir();
+    let ext = entry_path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    let file_type = if is_dir {
+        "folder".to_string()
+    } else {
+        classify_extension(&ext).to_string()
+    };
+    let modified = meta
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+
+    #[cfg(target_os = "windows")]
+    let is_hidden = {
+        use std::os::windows::fs::MetadataExt;
+        file_name.starts_with('.') || (meta.file_attributes() & 0x2 != 0)
+    };
+    #[cfg(not(target_os = "windows"))]
+    let is_hidden = file_name.starts_with('.');
+
+    Some(FileItem {
+        name: file_name,
+        path: entry_path.to_string_lossy().to_string(),
+        is_directory: is_dir,
+        size: if is_dir { 0 } else { meta.len() },
+        modified,
+        extension: ext,
+        file_type,
+        is_hidden,
+    })
+}
+
+#[tauri::command]
+fn get_directory_size(path: String) -> Result<DirectorySizeResult, String> {
+    let root = PathBuf::from(&path);
+    if !root.exists() || !root.is_dir() {
+        return Err("Directorio no válido".into());
+    }
+
+    let (total_size, file_count, dir_count) = compute_directory_size(&root, None);
 
     Ok(DirectorySizeResult {
         path,
         total_size,
         file_count,
         dir_count,
+    })
+}
+
+#[tauri::command]
+fn sherlock_search(filter: SherlockFilter) -> Result<SherlockResult, String> {
+    let mut root = PathBuf::from(&filter.base_path);
+    if filter.search_root {
+        #[cfg(target_os = "windows")]
+        {
+            if let Some(prefix) = root.components().next() {
+                root = PathBuf::from(format!("{}\\", prefix.as_os_str().to_string_lossy().trim_end_matches('\\')));
+            } else {
+                root = PathBuf::from("C:\\");
+            }
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            root = PathBuf::from("/");
+        }
+    }
+
+    if !root.exists() || !root.is_dir() {
+        return Err("Ruta de búsqueda no válida o inexistente".into());
+    }
+
+    let preset = filter.preset.as_deref().unwrap_or("");
+
+    // 1. Preset: Archivos Grandes (Top 25)
+    if preset == "largest_files" {
+        let mut min_heap: BinaryHeap<Reverse<SizeItem>> = BinaryHeap::with_capacity(26);
+        let mut stack = vec![root];
+        let mut scanned_count = 0usize;
+        const MAX_SCAN: usize = 75_000;
+
+        'scan_files: while let Some(current) = stack.pop() {
+            if let Ok(entries) = fs::read_dir(&current) {
+                for entry in entries.flatten() {
+                    scanned_count += 1;
+                    if scanned_count >= MAX_SCAN {
+                        break 'scan_files;
+                    }
+
+                    let p = entry.path();
+                    let meta = match entry.metadata() {
+                        Ok(m) => m,
+                        Err(_) => continue,
+                    };
+
+                    if meta.is_dir() {
+                        stack.push(p);
+                    } else {
+                        let size = meta.len();
+                        if let Some(item) = build_file_item(&p, &meta) {
+                            if min_heap.len() < 25 {
+                                min_heap.push(Reverse(SizeItem { size, item }));
+                            } else if let Some(smallest) = min_heap.peek() {
+                                if size > smallest.0.size {
+                                    min_heap.pop();
+                                    min_heap.push(Reverse(SizeItem { size, item }));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let mut items: Vec<FileItem> = min_heap.into_iter().map(|rev| rev.0.item).collect();
+        items.sort_by(|a, b| b.size.cmp(&a.size));
+
+        return Ok(SherlockResult {
+            items,
+            dir_sizes: Vec::new(),
+        });
+    }
+
+    // 2. Preset: Directorios Grandes (Top 25)
+    if preset == "largest_dirs" {
+        let mut candidate_dirs: Vec<PathBuf> = Vec::new();
+
+        // Collect subdirectories up to depth 2
+        if let Ok(entries) = fs::read_dir(&root) {
+            for entry in entries.flatten() {
+                let p = entry.path();
+                if let Ok(meta) = entry.metadata() {
+                    if meta.is_dir() {
+                        candidate_dirs.push(p.clone());
+                        if candidate_dirs.len() < 120 {
+                            if let Ok(sub_entries) = fs::read_dir(&p) {
+                                for sub_entry in sub_entries.flatten() {
+                                    let sub_p = sub_entry.path();
+                                    if let Ok(sub_meta) = sub_entry.metadata() {
+                                        if sub_meta.is_dir() {
+                                            candidate_dirs.push(sub_p);
+                                            if candidate_dirs.len() >= 120 {
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let mut min_heap: BinaryHeap<Reverse<SizeItem>> = BinaryHeap::with_capacity(26);
+        let mut dir_size_map: std::collections::HashMap<String, DirectorySizeResult> = std::collections::HashMap::new();
+
+        for dir_path in candidate_dirs {
+            let (total_size, file_count, dir_count) = compute_directory_size(&dir_path, Some(10_000));
+            if let Ok(meta) = fs::metadata(&dir_path) {
+                if let Some(mut item) = build_file_item(&dir_path, &meta) {
+                    item.size = total_size;
+                    let path_str = dir_path.to_string_lossy().to_string();
+                    dir_size_map.insert(
+                        path_str.clone(),
+                        DirectorySizeResult {
+                            path: path_str,
+                            total_size,
+                            file_count,
+                            dir_count,
+                        },
+                    );
+
+                    if min_heap.len() < 25 {
+                        min_heap.push(Reverse(SizeItem { size: total_size, item }));
+                    } else if let Some(smallest) = min_heap.peek() {
+                        if total_size > smallest.0.size {
+                            min_heap.pop();
+                            min_heap.push(Reverse(SizeItem { size: total_size, item }));
+                        }
+                    }
+                }
+            }
+        }
+
+        let mut items: Vec<FileItem> = min_heap.into_iter().map(|rev| rev.0.item).collect();
+        items.sort_by(|a, b| b.size.cmp(&a.size));
+
+        let dir_sizes: Vec<DirectorySizeResult> = items
+            .iter()
+            .filter_map(|it| dir_size_map.remove(&it.path))
+            .collect();
+
+        return Ok(SherlockResult {
+            items,
+            dir_sizes,
+        });
+    }
+
+    // 3. Preset: 24 Horas
+    if preset == "last_24h" {
+        let now_secs = std::time::SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        let min_time = now_secs.saturating_sub(86400);
+
+        let mut items = Vec::new();
+        let mut stack = vec![root];
+        let mut scanned_count = 0usize;
+        const MAX_SCAN: usize = 60_000;
+        let limit = filter.max_results.unwrap_or(300);
+
+        'scan_24h: while let Some(current) = stack.pop() {
+            if let Ok(entries) = fs::read_dir(&current) {
+                for entry in entries.flatten() {
+                    scanned_count += 1;
+                    if scanned_count >= MAX_SCAN {
+                        break 'scan_24h;
+                    }
+
+                    let p = entry.path();
+                    let meta = match entry.metadata() {
+                        Ok(m) => m,
+                        Err(_) => continue,
+                    };
+
+                    let is_dir = meta.is_dir();
+                    if is_dir {
+                        stack.push(p.clone());
+                    }
+
+                    let modified = meta
+                        .modified()
+                        .ok()
+                        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+                        .map(|d| d.as_secs())
+                        .unwrap_or(0);
+
+                    if modified >= min_time {
+                        if let Some(item) = build_file_item(&p, &meta) {
+                            items.push(item);
+                            if items.len() >= limit {
+                                break 'scan_24h;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Sort modified descending (newest to oldest)
+        items.sort_by(|a, b| b.modified.cmp(&a.modified));
+
+        return Ok(SherlockResult {
+            items,
+            dir_sizes: Vec::new(),
+        });
+    }
+
+    // 4. Custom Filters (Size, Date, Query)
+    let q = filter.query.unwrap_or_default().trim().to_lowercase();
+    let size_mode = filter.size_mode.as_deref().unwrap_or("all");
+    let size_threshold = filter.size_bytes.unwrap_or(0);
+    let min_date = filter.min_date;
+    let max_date = filter.max_date;
+    let limit = filter.max_results.unwrap_or(300);
+
+    let mut items = Vec::new();
+    let mut stack = vec![root];
+    let mut scanned_count = 0usize;
+    const MAX_SCAN: usize = 75_000;
+
+    'custom_scan: while let Some(current) = stack.pop() {
+        if let Ok(entries) = fs::read_dir(&current) {
+            for entry in entries.flatten() {
+                scanned_count += 1;
+                if scanned_count >= MAX_SCAN {
+                    break 'custom_scan;
+                }
+
+                let p = entry.path();
+                let meta = match entry.metadata() {
+                    Ok(m) => m,
+                    Err(_) => continue,
+                };
+
+                let is_dir = meta.is_dir();
+                if is_dir {
+                    stack.push(p.clone());
+                }
+
+                let file_name = match entry.file_name().into_string() {
+                    Ok(n) => n,
+                    Err(_) => continue,
+                };
+
+                // Query match
+                if !q.is_empty() && !file_name.to_lowercase().contains(&q) {
+                    continue;
+                }
+
+                // Size match
+                if !is_dir {
+                    let len = meta.len();
+                    if size_mode == "gt" && len < size_threshold {
+                        continue;
+                    }
+                    if size_mode == "lt" && len > size_threshold {
+                        continue;
+                    }
+                }
+
+                // Date match
+                let modified = meta
+                    .modified()
+                    .ok()
+                    .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0);
+
+                if let Some(min_d) = min_date {
+                    if modified < min_d {
+                        continue;
+                    }
+                }
+                if let Some(max_d) = max_date {
+                    if modified > max_d {
+                        continue;
+                    }
+                }
+
+                if let Some(item) = build_file_item(&p, &meta) {
+                    items.push(item);
+                    if items.len() >= limit {
+                        break 'custom_scan;
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(SherlockResult {
+        items,
+        dir_sizes: Vec::new(),
     })
 }
 
@@ -1838,6 +2231,7 @@ fn main() {
             move_items,
             get_directory_size,
             search_directory_recursive,
+            sherlock_search,
             force_exit_app,
             open_terminal,
             open_in_editor,

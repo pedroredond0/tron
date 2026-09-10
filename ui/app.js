@@ -43,7 +43,8 @@
     textEditor: localStorage.getItem('tron_text_editor') || 'notepad',
     textEditorCustomPath: localStorage.getItem('tron_text_editor_custom') || '',
     monochromeIcons: localStorage.getItem('tron_monochrome_icons') === 'true',
-    draggedInternalPaths: []
+    draggedInternalPaths: [],
+    activeSherlockFilter: null
   };
 
   // DOM Elements
@@ -187,12 +188,43 @@
     ctxMenuOpen: document.getElementById('ctxMenuOpen'),
     ctxMenuQuickView: document.getElementById('ctxMenuQuickView'),
     ctxMenuOpenEditor: document.getElementById('ctxMenuOpenEditor'),
+    ctxMenuOpenLocation: document.getElementById('ctxMenuOpenLocation'),
     ctxMenuRename: document.getElementById('ctxMenuRename'),
     ctxMenuCut: document.getElementById('ctxMenuCut'),
     ctxMenuCopy: document.getElementById('ctxMenuCopy'),
     ctxMenuDuplicate: document.getElementById('ctxMenuDuplicate'),
     ctxMenuAddFavorite: document.getElementById('ctxMenuAddFavorite'),
-    ctxMenuDelete: document.getElementById('ctxMenuDelete')
+    ctxMenuDelete: document.getElementById('ctxMenuDelete'),
+    // Sherlock Advanced Search Elements
+    btnActionSherlock: document.getElementById('btnActionSherlock'),
+    sherlockBanner: document.getElementById('sherlockBanner'),
+    sherlockBannerTitle: document.getElementById('sherlockBannerTitle'),
+    sherlockBannerScope: document.getElementById('sherlockBannerScope'),
+    sherlockBannerCount: document.getElementById('sherlockBannerCount'),
+    btnSherlockBannerEdit: document.getElementById('btnSherlockBannerEdit'),
+    btnSherlockBannerClose: document.getElementById('btnSherlockBannerClose'),
+    modalSherlock: document.getElementById('modalSherlock'),
+    btnCloseSherlockModal: document.getElementById('btnCloseSherlockModal'),
+    btnCancelSherlock: document.getElementById('btnCancelSherlock'),
+    sherlockCurrentPath: document.getElementById('sherlockCurrentPath'),
+    chkSherlockRoot: document.getElementById('chkSherlockRoot'),
+    btnPreset24h: document.getElementById('btnPreset24h'),
+    btnPresetLargeFiles: document.getElementById('btnPresetLargeFiles'),
+    btnPresetLargeDirs: document.getElementById('btnPresetLargeDirs'),
+    inputSherlockQuery: document.getElementById('inputSherlockQuery'),
+    selectSherlockSizeMode: document.getElementById('selectSherlockSizeMode'),
+    sherlockSizeControls: document.getElementById('sherlockSizeControls'),
+    sliderSherlockSize: document.getElementById('sliderSherlockSize'),
+    inputSherlockSizeNum: document.getElementById('inputSherlockSizeNum'),
+    selectSherlockSizeUnit: document.getElementById('selectSherlockSizeUnit'),
+    inputSherlockDateStart: document.getElementById('inputSherlockDateStart'),
+    inputSherlockDateEnd: document.getElementById('inputSherlockDateEnd'),
+    btnDateQuickWeek: document.getElementById('btnDateQuickWeek'),
+    btnDateQuickMonth: document.getElementById('btnDateQuickMonth'),
+    btnDateClear: document.getElementById('btnDateClear'),
+    btnResetSherlockFilters: document.getElementById('btnResetSherlockFilters'),
+    btnExecuteSherlock: document.getElementById('btnExecuteSherlock'),
+    txtExecuteSherlock: document.getElementById('txtExecuteSherlock')
   };
 
   // Format Helpers
@@ -389,6 +421,8 @@
       state.items = res.items || [];
       state.searchQuery = '';
       state.isSearchingRecursive = false;
+      if (el.sherlockBanner) el.sherlockBanner.classList.add('hidden');
+      state.activeSherlockFilter = null;
       el.searchInput.value = '';
       el.btnClearSearch.classList.add('hidden');
       applyFilter();
@@ -1364,6 +1398,7 @@
         closeRenameFavoriteModal();
         closeRenameItemModal();
         closeConfirmExitModal();
+        closeSherlockModal();
         return;
       }
 
@@ -1379,6 +1414,8 @@
           saveRenamedFavorite();
         } else if (activeEl === el.inputRenameItemName) {
           saveRenamedItem();
+        } else if (activeEl === el.inputSherlockQuery || activeEl === el.inputSherlockSizeNum) {
+          executeSherlockFromInputs();
         }
         return;
       }
@@ -1485,6 +1522,12 @@
         el.searchInput.focus();
         el.searchInput.select();
       }
+      return;
+    }
+
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'f' || e.key === 'F')) {
+      e.preventDefault();
+      openSherlockModal();
       return;
     }
 
@@ -2050,6 +2093,28 @@
         el.ctxMenuOpenEditor.classList.remove('hidden');
       } else {
         el.ctxMenuOpenEditor.classList.add('hidden');
+      }
+    }
+
+    if (el.ctxMenuOpenLocation) {
+      if (item && item.path) {
+        const isWindows = /^[a-zA-Z]:[\\\/]/.test(item.path) || item.path.startsWith('\\\\');
+        const sep = isWindows ? '\\' : '/';
+        const norm = isWindows ? item.path.replace(/\//g, '\\') : item.path.replace(/\\/g, '/');
+        const lastSlash = norm.lastIndexOf(sep);
+        if (lastSlash > 0) {
+          const itemParent = norm.substring(0, lastSlash);
+          const curNorm = isWindows ? (state.currentDirectory || '').replace(/\//g, '\\') : (state.currentDirectory || '').replace(/\\/g, '/');
+          if (state.isSearchingRecursive || itemParent.toLowerCase() !== curNorm.toLowerCase()) {
+            el.ctxMenuOpenLocation.classList.remove('hidden');
+          } else {
+            el.ctxMenuOpenLocation.classList.add('hidden');
+          }
+        } else {
+          el.ctxMenuOpenLocation.classList.add('hidden');
+        }
+      } else {
+        el.ctxMenuOpenLocation.classList.add('hidden');
       }
     }
 
@@ -3079,6 +3144,7 @@
       e.preventDefault();
     });
 
+    setupSherlockEvents();
     loadAppearanceSettings();
     loadSidebar();
     loadDirectory(null);
@@ -3359,6 +3425,328 @@
       applyFilter();
       renderFileList();
       updateStatusBar();
+    }
+  }
+
+  // --- Sherlock Advanced Search Controller ---
+  function openSherlockModal() {
+    if (!el.modalSherlock) return;
+    if (el.sherlockCurrentPath) {
+      el.sherlockCurrentPath.textContent = state.currentDirectory || '--';
+      el.sherlockCurrentPath.title = state.currentDirectory || '';
+    }
+    el.modalSherlock.classList.remove('hidden');
+    if (el.inputSherlockQuery) {
+      el.inputSherlockQuery.focus();
+      el.inputSherlockQuery.select();
+    }
+  }
+
+  function closeSherlockModal() {
+    if (!el.modalSherlock) return;
+    el.modalSherlock.classList.add('hidden');
+    el.fileList.focus();
+  }
+
+  function resetSherlockFilters() {
+    if (el.inputSherlockQuery) el.inputSherlockQuery.value = '';
+    if (el.selectSherlockSizeMode) el.selectSherlockSizeMode.value = 'all';
+    if (el.sliderSherlockSize) el.sliderSherlockSize.value = 50;
+    if (el.inputSherlockSizeNum) el.inputSherlockSizeNum.value = 50;
+    if (el.selectSherlockSizeUnit) el.selectSherlockSizeUnit.value = 'MB';
+    if (el.sherlockSizeControls) {
+      el.sherlockSizeControls.classList.add('opacity-50', 'pointer-events-none');
+    }
+    if (el.inputSherlockDateStart) el.inputSherlockDateStart.value = '';
+    if (el.inputSherlockDateEnd) el.inputSherlockDateEnd.value = '';
+    if (el.chkSherlockRoot) el.chkSherlockRoot.checked = false;
+  }
+
+  function formatSherlockDate(d) {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  function handleDateInputClick(input) {
+    if (typeof input.showPicker === 'function') {
+      try {
+        input.showPicker();
+      } catch (_) {}
+    }
+  }
+
+  async function runSherlock(config) {
+    const isRoot = !!config.search_root;
+    const filter = {
+      base_path: state.currentDirectory,
+      search_root: isRoot,
+      preset: config.preset || null,
+      query: config.query || null,
+      size_mode: config.size_mode || null,
+      size_bytes: config.size_bytes || null,
+      min_date: config.min_date || null,
+      max_date: config.max_date || null,
+      max_results: config.max_results || 300
+    };
+
+    if (el.txtExecuteSherlock) el.txtExecuteSherlock.textContent = 'Buscando...';
+    if (el.btnExecuteSherlock) el.btnExecuteSherlock.disabled = true;
+
+    el.fileList.innerHTML = `
+      <div class="p-12 text-center text-xs text-gnome-textDim flex flex-col items-center gap-3">
+        <span class="text-3xl animate-bounce">🔍</span>
+        <span class="font-medium text-gnome-text">Buscando con Sherlock...</span>
+        <span class="text-[11px] text-gnome-textDim">Explorando ${isRoot ? 'raíz del sistema' : 'directorio actual'}</span>
+      </div>
+    `;
+
+    try {
+      const res = await invoke('sherlock_search', { filter });
+      if (!res) throw new Error('Respuesta no válida del servidor');
+
+      // Cache directory sizes if returned (e.g. for largest_dirs preset)
+      if (res.dir_sizes && Array.isArray(res.dir_sizes)) {
+        res.dir_sizes.forEach(ds => {
+          state.dirSizes.set(ds.path, ds);
+        });
+      }
+
+      state.isSearchingRecursive = true;
+      state.filteredItems = res.items || [];
+      state.activeSherlockFilter = { ...config, filter };
+
+      // Update banner UI
+      if (el.sherlockBanner) {
+        el.sherlockBanner.classList.remove('hidden');
+        if (el.sherlockBannerTitle) el.sherlockBannerTitle.textContent = config.title || 'Filtro personalizado';
+        if (el.sherlockBannerScope) {
+          el.sherlockBannerScope.textContent = `En: ${isRoot ? 'Raíz del sistema' : state.currentDirectory}`;
+        }
+        if (el.sherlockBannerCount) {
+          el.sherlockBannerCount.textContent = `${state.filteredItems.length} resultado${state.filteredItems.length === 1 ? '' : 's'}`;
+        }
+      }
+
+      if (state.filteredItems.length > 0) {
+        setSelectionIndex(0);
+      } else {
+        state.selectedIndex = -1;
+        state.selectedItems.clear();
+        renderFileList();
+        updateStatusBar();
+      }
+
+      closeSherlockModal();
+    } catch (err) {
+      console.error('Error en búsqueda Sherlock:', err);
+      alert('Error en búsqueda Sherlock: ' + err);
+      state.isSearchingRecursive = false;
+      applyFilter();
+      renderFileList();
+      updateStatusBar();
+    } finally {
+      if (el.txtExecuteSherlock) el.txtExecuteSherlock.textContent = 'Buscar con Sherlock';
+      if (el.btnExecuteSherlock) el.btnExecuteSherlock.disabled = false;
+    }
+  }
+
+  function executeSherlockFromInputs() {
+    const q = el.inputSherlockQuery ? el.inputSherlockQuery.value.trim() : '';
+    const sizeMode = el.selectSherlockSizeMode ? el.selectSherlockSizeMode.value : 'all';
+    let sizeBytes = null;
+
+    if (sizeMode !== 'all') {
+      const rawNum = parseFloat(el.inputSherlockSizeNum?.value || '0');
+      const unit = el.selectSherlockSizeUnit?.value || 'MB';
+      let multiplier = 1024 * 1024;
+      if (unit === 'KB') multiplier = 1024;
+      if (unit === 'GB') multiplier = 1024 * 1024 * 1024;
+      sizeBytes = Math.round(rawNum * multiplier);
+    }
+
+    let minDate = null;
+    let maxDate = null;
+    if (el.inputSherlockDateStart && el.inputSherlockDateStart.value) {
+      const d = new Date(el.inputSherlockDateStart.value + 'T00:00:00');
+      if (!isNaN(d.getTime())) {
+        minDate = Math.floor(d.getTime() / 1000);
+      }
+    }
+    if (el.inputSherlockDateEnd && el.inputSherlockDateEnd.value) {
+      const d = new Date(el.inputSherlockDateEnd.value + 'T23:59:59');
+      if (!isNaN(d.getTime())) {
+        maxDate = Math.floor(d.getTime() / 1000);
+      }
+    }
+
+    const isRoot = el.chkSherlockRoot ? el.chkSherlockRoot.checked : false;
+
+    let titleParts = [];
+    if (q) titleParts.push(`"${q}"`);
+    if (sizeMode === 'gt') titleParts.push(`> ${el.inputSherlockSizeNum.value} ${el.selectSherlockSizeUnit.value}`);
+    if (sizeMode === 'lt') titleParts.push(`< ${el.inputSherlockSizeNum.value} ${el.selectSherlockSizeUnit.value}`);
+    if (el.inputSherlockDateStart?.value || el.inputSherlockDateEnd?.value) {
+      titleParts.push(`Fechas: ${el.inputSherlockDateStart?.value || '...'} a ${el.inputSherlockDateEnd?.value || '...'}`);
+    }
+
+    const title = titleParts.length > 0 ? `Filtro: ${titleParts.join(', ')}` : 'Búsqueda personalizada';
+
+    runSherlock({
+      search_root: isRoot,
+      query: q,
+      size_mode: sizeMode,
+      size_bytes: sizeBytes,
+      min_date: minDate,
+      max_date: maxDate,
+      title
+    });
+  }
+
+  function setupSherlockEvents() {
+    // Open / Close / Reset
+    if (el.btnActionSherlock) el.btnActionSherlock.onclick = openSherlockModal;
+    if (el.btnCloseSherlockModal) el.btnCloseSherlockModal.onclick = closeSherlockModal;
+    if (el.btnCancelSherlock) el.btnCancelSherlock.onclick = closeSherlockModal;
+    if (el.btnResetSherlockFilters) el.btnResetSherlockFilters.onclick = resetSherlockFilters;
+    if (el.modalSherlock) {
+      el.modalSherlock.addEventListener('click', (e) => {
+        if (e.target === el.modalSherlock) closeSherlockModal();
+      });
+    }
+
+    // Banner wiring
+    if (el.btnSherlockBannerEdit) el.btnSherlockBannerEdit.onclick = openSherlockModal;
+    if (el.btnSherlockBannerClose) {
+      el.btnSherlockBannerClose.onclick = () => {
+        if (el.sherlockBanner) el.sherlockBanner.classList.add('hidden');
+        state.activeSherlockFilter = null;
+        loadDirectory(state.currentDirectory, false);
+      };
+    }
+
+    // Presets
+    if (el.btnPreset24h) {
+      el.btnPreset24h.onclick = () => {
+        const isRoot = el.chkSherlockRoot ? el.chkSherlockRoot.checked : false;
+        runSherlock({
+          preset: 'last_24h',
+          search_root: isRoot,
+          title: 'Preset: Últimas 24 horas'
+        });
+      };
+    }
+
+    if (el.btnPresetLargeFiles) {
+      el.btnPresetLargeFiles.onclick = () => {
+        const isRoot = el.chkSherlockRoot ? el.chkSherlockRoot.checked : false;
+        runSherlock({
+          preset: 'largest_files',
+          search_root: isRoot,
+          title: 'Preset: 25 Archivos Grandes'
+        });
+      };
+    }
+
+    if (el.btnPresetLargeDirs) {
+      el.btnPresetLargeDirs.onclick = () => {
+        const isRoot = el.chkSherlockRoot ? el.chkSherlockRoot.checked : false;
+        runSherlock({
+          preset: 'largest_dirs',
+          search_root: isRoot,
+          title: 'Preset: 25 Directorios Grandes'
+        });
+      };
+    }
+
+    // Size filter controls
+    if (el.selectSherlockSizeMode) {
+      el.selectSherlockSizeMode.addEventListener('change', () => {
+        const isAll = el.selectSherlockSizeMode.value === 'all';
+        if (el.sherlockSizeControls) {
+          if (isAll) {
+            el.sherlockSizeControls.classList.add('opacity-50', 'pointer-events-none');
+          } else {
+            el.sherlockSizeControls.classList.remove('opacity-50', 'pointer-events-none');
+          }
+        }
+      });
+    }
+
+    if (el.sliderSherlockSize && el.inputSherlockSizeNum) {
+      el.sliderSherlockSize.addEventListener('input', () => {
+        el.inputSherlockSizeNum.value = el.sliderSherlockSize.value;
+      });
+      el.inputSherlockSizeNum.addEventListener('input', () => {
+        const val = Number(el.inputSherlockSizeNum.value) || 0;
+        el.sliderSherlockSize.value = Math.min(Number(el.sliderSherlockSize.max), Math.max(Number(el.sliderSherlockSize.min), val));
+      });
+    }
+
+    // Date inputs: Calendar on click
+    if (el.inputSherlockDateStart) {
+      el.inputSherlockDateStart.addEventListener('click', () => handleDateInputClick(el.inputSherlockDateStart));
+    }
+    if (el.inputSherlockDateEnd) {
+      el.inputSherlockDateEnd.addEventListener('click', () => handleDateInputClick(el.inputSherlockDateEnd));
+    }
+
+    // Quick date helpers
+    if (el.btnDateQuickWeek) {
+      el.btnDateQuickWeek.onclick = () => {
+        const today = new Date();
+        const weekAgo = new Date();
+        weekAgo.setDate(today.getDate() - 7);
+        if (el.inputSherlockDateStart) el.inputSherlockDateStart.value = formatSherlockDate(weekAgo);
+        if (el.inputSherlockDateEnd) el.inputSherlockDateEnd.value = formatSherlockDate(today);
+      };
+    }
+
+    if (el.btnDateQuickMonth) {
+      el.btnDateQuickMonth.onclick = () => {
+        const today = new Date();
+        const monthAgo = new Date();
+        monthAgo.setDate(today.getDate() - 30);
+        if (el.inputSherlockDateStart) el.inputSherlockDateStart.value = formatSherlockDate(monthAgo);
+        if (el.inputSherlockDateEnd) el.inputSherlockDateEnd.value = formatSherlockDate(today);
+      };
+    }
+
+    if (el.btnDateClear) {
+      el.btnDateClear.onclick = () => {
+        if (el.inputSherlockDateStart) el.inputSherlockDateStart.value = '';
+        if (el.inputSherlockDateEnd) el.inputSherlockDateEnd.value = '';
+      };
+    }
+
+    // Execute button
+    if (el.btnExecuteSherlock) {
+      el.btnExecuteSherlock.onclick = executeSherlockFromInputs;
+    }
+
+    // Context Menu: Abrir ubicación del archivo
+    if (el.ctxMenuOpenLocation) {
+      el.ctxMenuOpenLocation.onclick = async () => {
+        closeAllMenus();
+        closeFileContextMenu();
+        const item = state.contextTargetItem || (state.selectedIndex >= 0 ? state.filteredItems[state.selectedIndex] : null);
+        if (!item || !item.path) return;
+        const isWindows = /^[a-zA-Z]:[\\\/]/.test(item.path) || item.path.startsWith('\\\\');
+        const sep = isWindows ? '\\' : '/';
+        const norm = isWindows ? item.path.replace(/\//g, '\\') : item.path.replace(/\\/g, '/');
+        const lastSlash = norm.lastIndexOf(sep);
+        if (lastSlash > 0) {
+          const parentDir = norm.substring(0, lastSlash);
+          await loadDirectory(parentDir);
+          const targetName = item.name.toLowerCase();
+          const targetPath = item.path.toLowerCase();
+          const idx = state.filteredItems.findIndex(i => i.path.toLowerCase() === targetPath || i.name.toLowerCase() === targetName);
+          if (idx >= 0) {
+            setSelectionIndex(idx);
+          }
+        }
+      };
     }
   }
 
