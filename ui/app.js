@@ -42,6 +42,8 @@
       .filter(Boolean),
     textEditor: localStorage.getItem('tron_text_editor') || 'notepad',
     textEditorCustomPath: localStorage.getItem('tron_text_editor_custom') || '',
+    terminalApp: localStorage.getItem('tron_terminal_app') || 'default',
+    terminalCustomPath: localStorage.getItem('tron_terminal_custom') || '',
     monochromeIcons: localStorage.getItem('tron_monochrome_icons') === 'true',
     draggedInternalPaths: [],
     activeSherlockFilter: null,
@@ -138,6 +140,9 @@
     selectTextEditor: document.getElementById('selectTextEditor'),
     customEditorContainer: document.getElementById('customEditorContainer'),
     inputCustomEditor: document.getElementById('inputCustomEditor'),
+    selectTerminalApp: document.getElementById('selectTerminalApp'),
+    customTerminalContainer: document.getElementById('customTerminalContainer'),
+    inputCustomTerminal: document.getElementById('inputCustomTerminal'),
     selectFontSize: document.getElementById('selectFontSize'),
     chkNormalFontWeight: document.getElementById('chkNormalFontWeight'),
     chkPrefShowHidden: document.getElementById('chkPrefShowHidden'),
@@ -890,6 +895,18 @@
     });
   }
 
+  function openCurrentTerminal() {
+    if (!state.currentDirectory) return;
+    let term = state.terminalApp || 'default';
+    if (term === 'custom') {
+      term = state.terminalCustomPath || 'default';
+    }
+    invoke('open_terminal', { path: state.currentDirectory, terminal: term }).catch(err => {
+      console.error(err);
+      alert('Error al abrir la terminal: ' + err);
+    });
+  }
+
   function activateItem(item) {
     if (!item) return;
     if (item.is_directory) {
@@ -1447,7 +1464,7 @@
         return;
       }
 
-      // If in any modal input (New File, New Folder, Network UNC, Appearance, Rename Fav, Rename Item)
+      // If in any modal input (New File, New Folder, Network UNC, Appearance, Rename Fav, Rename Item, Compress, Open With)
       if (e.key === 'Escape') {
         e.preventDefault();
         closeNewFileModal();
@@ -1460,6 +1477,9 @@
         closeRenameItemModal();
         closeConfirmExitModal();
         closeSherlockModal();
+        closeOpenWithModal();
+        closeCompressModal();
+        closeArchiveViewModal();
         return;
       }
 
@@ -1475,6 +1495,10 @@
           saveRenamedFavorite();
         } else if (activeEl === el.inputRenameItemName) {
           saveRenamedItem();
+        } else if (activeEl === el.inputCompressName) {
+          confirmCompress();
+        } else if (activeEl === el.inputOpenWithApp) {
+          launchCustomOpenWith();
         } else if (activeEl === el.inputSherlockQuery || activeEl === el.inputSherlockSizeNum) {
           executeSherlockFromInputs();
         }
@@ -1612,9 +1636,7 @@
 
     if ((e.ctrlKey || e.metaKey) && (e.key === 't' || e.key === 'T')) {
       e.preventDefault();
-      if (state.currentDirectory) {
-        invoke('open_terminal', { path: state.currentDirectory }).catch(console.error);
-      }
+      openCurrentTerminal();
       return;
     }
 
@@ -2791,7 +2813,7 @@
       await loadDirectory(state.currentDirectory, false);
       const idx = state.filteredItems.findIndex(i => i.name.toLowerCase() === newName.toLowerCase());
       if (idx >= 0) {
-        selectItem(idx);
+        setSelectionIndex(idx);
       }
     } catch (err) {
       alert('Error al renombrar: ' + err);
@@ -3090,11 +3112,7 @@
 
     // Action Bar buttons
     if (el.btnActionTerminal) {
-      el.btnActionTerminal.onclick = () => {
-        if (state.currentDirectory) {
-          invoke('open_terminal', { path: state.currentDirectory }).catch(console.error);
-        }
-      };
+      el.btnActionTerminal.onclick = openCurrentTerminal;
     }
     if (el.btnActionEdit) {
       el.btnActionEdit.onclick = () => {
@@ -3373,7 +3391,8 @@
       tabThemes: document.getElementById('panelThemes'),
       tabTypography: document.getElementById('panelTypography'),
       tabFiles: document.getElementById('panelFiles'),
-      tabEditor: document.getElementById('panelEditor')
+      tabEditor: document.getElementById('panelEditor'),
+      tabTerminal: document.getElementById('panelTerminal')
     };
     prefTabButtons.forEach(btn => {
       btn.onclick = () => {
@@ -3411,6 +3430,18 @@
             el.customEditorContainer.classList.remove('hidden');
           } else {
             el.customEditorContainer.classList.add('hidden');
+          }
+        }
+      });
+    }
+
+    if (el.selectTerminalApp) {
+      el.selectTerminalApp.addEventListener('change', (e) => {
+        if (el.customTerminalContainer) {
+          if (e.target.value === 'custom') {
+            el.customTerminalContainer.classList.remove('hidden');
+          } else {
+            el.customTerminalContainer.classList.add('hidden');
           }
         }
       });
@@ -3727,6 +3758,8 @@
     const customExts = localStorage.getItem('tron_custom_text_exts') || 'sql, str, log, conf, env, bak';
     const textEditor = localStorage.getItem('tron_text_editor') || 'notepad';
     const customEditor = localStorage.getItem('tron_text_editor_custom') || '';
+    const terminalApp = localStorage.getItem('tron_terminal_app') || 'default';
+    const customTerminal = localStorage.getItem('tron_terminal_custom') || '';
     const monochromeIcons = localStorage.getItem('tron_monochrome_icons') === 'true';
     const recursiveSearch = localStorage.getItem('tron_recursive_search') !== 'false';
 
@@ -3743,6 +3776,15 @@
       }
     }
     if (el.inputCustomEditor) el.inputCustomEditor.value = customEditor;
+
+    if (el.selectTerminalApp) {
+      el.selectTerminalApp.value = terminalApp;
+      if (el.customTerminalContainer) {
+        if (terminalApp === 'custom') el.customTerminalContainer.classList.remove('hidden');
+        else el.customTerminalContainer.classList.add('hidden');
+      }
+    }
+    if (el.inputCustomTerminal) el.inputCustomTerminal.value = customTerminal;
 
     if (el.selectFontSize) el.selectFontSize.value = fontSize;
     if (el.chkNormalFontWeight) el.chkNormalFontWeight.checked = normalWeight;
@@ -3785,6 +3827,8 @@
     const customExts = el.inputCustomTextExts ? el.inputCustomTextExts.value.trim() : 'sql, str, log, conf, env, bak';
     const textEditor = el.selectTextEditor ? el.selectTextEditor.value : 'notepad';
     const customEditor = el.inputCustomEditor ? el.inputCustomEditor.value.trim() : '';
+    const terminalApp = el.selectTerminalApp ? el.selectTerminalApp.value : 'default';
+    const customTerminal = el.inputCustomTerminal ? el.inputCustomTerminal.value.trim() : '';
     const monochromeIcons = el.chkMonochromeIcons ? el.chkMonochromeIcons.checked : false;
     const showHidden = el.chkPrefShowHidden ? el.chkPrefShowHidden.checked : state.showHiddenFiles;
     const recursiveSearch = el.chkPrefRecursiveSearch ? el.chkPrefRecursiveSearch.checked : true;
@@ -3801,12 +3845,16 @@
     localStorage.setItem('tron_custom_text_exts', customExts);
     localStorage.setItem('tron_text_editor', textEditor);
     localStorage.setItem('tron_text_editor_custom', customEditor);
+    localStorage.setItem('tron_terminal_app', terminalApp);
+    localStorage.setItem('tron_terminal_custom', customTerminal);
     localStorage.setItem('tron_monochrome_icons', monochromeIcons ? 'true' : 'false');
     localStorage.setItem('tron_show_hidden', showHidden ? 'true' : 'false');
     localStorage.setItem('tron_recursive_search', recursiveSearch ? 'true' : 'false');
 
     state.textEditor = textEditor;
     state.textEditorCustomPath = customEditor;
+    state.terminalApp = terminalApp;
+    state.terminalCustomPath = customTerminal;
     state.monochromeIcons = monochromeIcons;
     state.showHiddenFiles = showHidden;
     if (el.chkShowHidden) el.chkShowHidden.checked = showHidden;
@@ -3836,6 +3884,8 @@
       el.chkRecursiveSearch.checked = savedRec !== 'false';
     }
 
+    state.terminalApp = localStorage.getItem('tron_terminal_app') || 'default';
+    state.terminalCustomPath = localStorage.getItem('tron_terminal_custom') || '';
     state.monochromeIcons = monochromeIcons;
     state.customTextExts = customExts
       .split(',')
