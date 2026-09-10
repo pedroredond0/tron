@@ -1,11 +1,5 @@
 
-    if (e.ctrlKey && (e.key === 'p' || e.key === 'P')) {
-      e.preventDefault();
-      openJumpToFolder();
-      return;
-    }
-
-    // tronExplorer - Frontend Controller
+// tronExplorer - Frontend Controller
 (function() {
   // Tauri IPC helper
   const invoke = window.__TAURI__?.core?.invoke || (async () => {
@@ -1912,6 +1906,12 @@ modalSherlock: document.getElementById('modalSherlock'),
       e.preventDefault();
       const item = panels[activePanel].filteredItems[panels[activePanel].selectedIndex];
       if (item) copyToClipboard('"' + getPosixPath(item.path) + '"');
+      return;
+    }
+
+    if (e.ctrlKey && (e.key === 'p' || e.key === 'P')) {
+      e.preventDefault();
+      openJumpToFolder();
       return;
     }
 
