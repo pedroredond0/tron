@@ -224,12 +224,23 @@
     btnCloseBatchRenameModal: document.getElementById('btnCloseBatchRenameModal'),
     btnCancelBatchRename: document.getElementById('btnCancelBatchRename'),
     btnConfirmBatchRename: document.getElementById('btnConfirmBatchRename'),
+    tabBatchSequence: document.getElementById('tabBatchSequence'),
+    tabBatchReplace: document.getElementById('tabBatchReplace'),
+    panelBatchSequence: document.getElementById('panelBatchSequence'),
+    panelBatchReplace: document.getElementById('panelBatchReplace'),
+    inputBatchBaseName: document.getElementById('inputBatchBaseName'),
+    chkBatchKeepOriginalName: document.getElementById('chkBatchKeepOriginalName'),
+    selectBatchSeparator: document.getElementById('selectBatchSeparator'),
+    inputBatchStartNum: document.getElementById('inputBatchStartNum'),
+    selectBatchDigits: document.getElementById('selectBatchDigits'),
+    chkBatchKeepExt: document.getElementById('chkBatchKeepExt'),
     inputBatchSearch: document.getElementById('inputBatchSearch'),
     inputBatchReplace: document.getElementById('inputBatchReplace'),
     chkBatchRegex: document.getElementById('chkBatchRegex'),
     batchRenamePreviewBody: document.getElementById('batchRenamePreviewBody'),
     batchRenameCount: document.getElementById('batchRenameCount'),
-modalRenameItem: document.getElementById('modalRenameItem'),
+    ctxMenuBatchRename: document.getElementById('ctxMenuBatchRename'),
+    modalRenameItem: document.getElementById('modalRenameItem'),
     inputRenameItemName: document.getElementById('inputRenameItemName'),
     btnConfirmRenameItem: document.getElementById('btnConfirmRenameItem'),
     btnCancelRenameItem: document.getElementById('btnCancelRenameItem'),
@@ -1830,12 +1841,11 @@ modalSherlock: document.getElementById('modalSherlock'),
 
     if (e.key === 'F2') {
       e.preventDefault();
-      openRenameItemModal();
-      return;
-    }
-    if (e.key === 'F2' && e.ctrlKey) {
-      e.preventDefault();
-      openBatchRenameModal();
+      if (state.selectedItems.size > 1 || e.ctrlKey) {
+        openBatchRenameModal();
+      } else {
+        openRenameItemModal();
+      }
       return;
     }
 
@@ -2588,6 +2598,16 @@ async function startTransferOperation(action, sources, targetDir) {
       }
     }
 
+    if (el.ctxMenuBatchRename && el.ctxMenuRename) {
+      if (state.selectedItems.size > 1) {
+        el.ctxMenuBatchRename.classList.remove('hidden');
+        el.ctxMenuRename.classList.add('hidden');
+      } else {
+        el.ctxMenuBatchRename.classList.add('hidden');
+        el.ctxMenuRename.classList.remove('hidden');
+      }
+    }
+
     // Position menu within viewport bounds
     const menuWidth = 224;
     const menuHeight = isZip ? 430 : 370;
@@ -3310,71 +3330,183 @@ async function startTransferOperation(action, sources, targetDir) {
   
   let batchRenameItems = [];
   let batchRenamePairs = [];
+  let batchRenameMode = 'sequence'; // 'sequence' | 'replace'
 
   function openBatchRenameModal() {
-    batchRenameItems = Array.from(panels[activePanel].selectedItems).map(p => panels[activePanel].items.find(i => i.path === p)).filter(Boolean);
+    if (state.selectedItems.size > 0) {
+      batchRenameItems = Array.from(state.selectedItems)
+        .map(p => state.items.find(i => i.path === p))
+        .filter(Boolean);
+    } else if (state.selectedIndex >= 0 && state.selectedIndex < state.filteredItems.length) {
+      batchRenameItems = [state.filteredItems[state.selectedIndex]];
+    } else {
+      batchRenameItems = [];
+    }
+
     if (batchRenameItems.length === 0) return;
-    el.inputBatchSearch.value = '';
-    el.inputBatchReplace.value = '';
-    el.chkBatchRegex.checked = false;
+
+    batchRenameMode = 'sequence';
+    switchBatchRenameTab('sequence');
+
+    const firstItem = batchRenameItems[0];
+    const dotIdx = firstItem.name.lastIndexOf('.');
+    const defaultBase = dotIdx > 0 && !firstItem.is_directory ? firstItem.name.substring(0, dotIdx) : firstItem.name;
+    if (el.inputBatchBaseName) {
+      el.inputBatchBaseName.value = defaultBase;
+    }
+    if (el.chkBatchKeepOriginalName) el.chkBatchKeepOriginalName.checked = false;
+    if (el.selectBatchSeparator) el.selectBatchSeparator.value = '_';
+    if (el.inputBatchStartNum) el.inputBatchStartNum.value = '1';
+    if (el.selectBatchDigits) el.selectBatchDigits.value = '2';
+    if (el.chkBatchKeepExt) el.chkBatchKeepExt.checked = true;
+
+    if (el.inputBatchSearch) el.inputBatchSearch.value = '';
+    if (el.inputBatchReplace) el.inputBatchReplace.value = '';
+    if (el.chkBatchRegex) el.chkBatchRegex.checked = false;
+
     updateBatchRenamePreview();
-    el.modalBatchRename.classList.remove('hidden');
-    el.inputBatchSearch.focus();
+    if (el.modalBatchRename) el.modalBatchRename.classList.remove('hidden');
+    if (el.inputBatchBaseName) {
+      el.inputBatchBaseName.focus();
+      el.inputBatchBaseName.select();
+    }
+  }
+
+  function switchBatchRenameTab(mode) {
+    batchRenameMode = mode;
+    if (mode === 'sequence') {
+      el.tabBatchSequence?.classList.add('border-gnome-active', 'text-white');
+      el.tabBatchSequence?.classList.remove('border-transparent', 'text-gnome-textDim');
+      el.tabBatchReplace?.classList.add('border-transparent', 'text-gnome-textDim');
+      el.tabBatchReplace?.classList.remove('border-gnome-active', 'text-white');
+      el.panelBatchSequence?.classList.remove('hidden');
+      el.panelBatchReplace?.classList.add('hidden');
+    } else {
+      el.tabBatchReplace?.classList.add('border-gnome-active', 'text-white');
+      el.tabBatchReplace?.classList.remove('border-transparent', 'text-gnome-textDim');
+      el.tabBatchSequence?.classList.add('border-transparent', 'text-gnome-textDim');
+      el.tabBatchSequence?.classList.remove('border-gnome-active', 'text-white');
+      el.panelBatchReplace?.classList.remove('hidden');
+      el.panelBatchSequence?.classList.add('hidden');
+    }
+    updateBatchRenamePreview();
   }
 
   function closeBatchRenameModal() {
-    el.modalBatchRename.classList.add('hidden');
+    if (el.modalBatchRename) el.modalBatchRename.classList.add('hidden');
     el.fileList.focus();
   }
 
   function updateBatchRenamePreview() {
-    const search = el.inputBatchSearch.value;
-    const replace = el.inputBatchReplace.value;
-    const useRegex = el.chkBatchRegex.checked;
-    
     batchRenamePairs = [];
+    if (!el.batchRenamePreviewBody) return;
     el.batchRenamePreviewBody.innerHTML = '';
-    
-    let regex = null;
-    if (useRegex && search) {
-      try {
-        regex = new RegExp(search, 'g');
-      } catch (e) {
-        el.batchRenamePreviewBody.innerHTML = '<tr><td colspan="2" class="text-red-400 p-2">Expresión regular inválida</td></tr>';
-        return;
-      }
+
+    if (batchRenameItems.length === 0) {
+      if (el.batchRenameCount) el.batchRenameCount.textContent = '0';
+      if (el.btnConfirmBatchRename) el.btnConfirmBatchRename.disabled = true;
+      return;
     }
 
-    batchRenameItems.forEach(item => {
-      let newName = item.name;
-      if (search) {
-        if (useRegex && regex) {
-          newName = newName.replace(regex, replace);
-        } else {
-          newName = newName.split(search).join(replace);
+    if (batchRenameMode === 'sequence') {
+      const baseNameInput = (el.inputBatchBaseName?.value || '').trim();
+      const keepOriginal = el.chkBatchKeepOriginalName?.checked;
+      const separator = el.selectBatchSeparator ? el.selectBatchSeparator.value : '_';
+      const startNum = parseInt(el.inputBatchStartNum?.value || '1', 10) || 1;
+      const digits = parseInt(el.selectBatchDigits?.value || '2', 10) || 2;
+      const keepExt = el.chkBatchKeepExt ? el.chkBatchKeepExt.checked : true;
+
+      batchRenameItems.forEach((item, idx) => {
+        const seqNum = startNum + idx;
+        const formattedSeq = String(seqNum).padStart(digits, '0');
+
+        let ext = '';
+        let origBase = item.name;
+        const lastDot = item.name.lastIndexOf('.');
+        if (lastDot > 0 && !item.is_directory) {
+          origBase = item.name.substring(0, lastDot);
+          ext = item.name.substring(lastDot + 1);
         }
-      }
-      
-      const tr = document.createElement('tr');
-      tr.className = 'border-b border-gnome-border/30 hover:bg-gnome-hover/30';
-      const isChanged = newName !== item.name;
-      
-      if (isChanged) {
-        // Construct new path
+
+        let newName = '';
+        if (keepOriginal) {
+          newName = `${origBase}${separator}${formattedSeq}`;
+        } else {
+          const base = baseNameInput || 'archivo';
+          newName = `${base}${separator}${formattedSeq}`;
+        }
+
+        if (keepExt && ext) {
+          newName += `.${ext}`;
+        }
+
         const isWindows = /^[a-zA-Z]:[\\\/]/.test(item.path) || item.path.startsWith('\\\\');
         const sep = isWindows ? '\\' : '/';
         const lastSlash = item.path.lastIndexOf(sep);
         const parentPath = item.path.substring(0, lastSlash + 1);
-        batchRenamePairs.push([item.path, parentPath + newName]);
+        const newPath = parentPath + newName;
+
+        const isChanged = newName !== item.name;
+        if (isChanged) {
+          batchRenamePairs.push([item.path, newPath]);
+        }
+
+        const tr = document.createElement('tr');
+        tr.className = 'border-b border-gnome-border/30 hover:bg-gnome-hover/30';
+        tr.innerHTML = `
+          <td class="py-1 px-2 truncate max-w-[240px]" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</td>
+          <td class="py-1 px-2 truncate max-w-[240px] font-mono ${isChanged ? 'text-green-400 font-semibold' : 'text-gnome-textDim'}" title="${escapeHtml(newName)}">${escapeHtml(newName)}</td>
+        `;
+        el.batchRenamePreviewBody.appendChild(tr);
+      });
+    } else {
+      const search = el.inputBatchSearch?.value || '';
+      const replace = el.inputBatchReplace?.value || '';
+      const useRegex = el.chkBatchRegex?.checked;
+
+      let regex = null;
+      if (useRegex && search) {
+        try {
+          regex = new RegExp(search, 'g');
+        } catch (e) {
+          el.batchRenamePreviewBody.innerHTML = '<tr><td colspan="2" class="text-red-400 p-2">Expresión regular inválida</td></tr>';
+          if (el.batchRenameCount) el.batchRenameCount.textContent = '0';
+          if (el.btnConfirmBatchRename) el.btnConfirmBatchRename.disabled = true;
+          return;
+        }
       }
-      
-      tr.innerHTML = `<td class="py-1 px-2 truncate max-w-[200px]" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</td>
-                      <td class="py-1 px-2 truncate max-w-[200px] ${isChanged ? 'text-green-400 font-semibold' : ''}" title="${escapeHtml(newName)}">${escapeHtml(newName)}</td>`;
-      el.batchRenamePreviewBody.appendChild(tr);
-    });
-    
-    el.batchRenameCount.textContent = batchRenamePairs.length;
-    el.btnConfirmBatchRename.disabled = batchRenamePairs.length === 0;
+
+      batchRenameItems.forEach(item => {
+        let newName = item.name;
+        if (search) {
+          if (useRegex && regex) {
+            newName = newName.replace(regex, replace);
+          } else {
+            newName = newName.split(search).join(replace);
+          }
+        }
+
+        const isChanged = newName !== item.name;
+        if (isChanged) {
+          const isWindows = /^[a-zA-Z]:[\\\/]/.test(item.path) || item.path.startsWith('\\\\');
+          const sep = isWindows ? '\\' : '/';
+          const lastSlash = item.path.lastIndexOf(sep);
+          const parentPath = item.path.substring(0, lastSlash + 1);
+          batchRenamePairs.push([item.path, parentPath + newName]);
+        }
+
+        const tr = document.createElement('tr');
+        tr.className = 'border-b border-gnome-border/30 hover:bg-gnome-hover/30';
+        tr.innerHTML = `
+          <td class="py-1 px-2 truncate max-w-[240px]" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</td>
+          <td class="py-1 px-2 truncate max-w-[240px] font-mono ${isChanged ? 'text-green-400 font-semibold' : 'text-gnome-textDim'}" title="${escapeHtml(newName)}">${escapeHtml(newName)}</td>
+        `;
+        el.batchRenamePreviewBody.appendChild(tr);
+      });
+    }
+
+    if (el.batchRenameCount) el.batchRenameCount.textContent = batchRenamePairs.length;
+    if (el.btnConfirmBatchRename) el.btnConfirmBatchRename.disabled = batchRenamePairs.length === 0;
   }
 
   async function confirmBatchRename() {
@@ -3382,13 +3514,17 @@ async function startTransferOperation(action, sources, targetDir) {
     try {
       await invoke('batch_rename', { renames: batchRenamePairs });
       closeBatchRenameModal();
-      loadDirectory(panels[activePanel].currentDirectory, false);
+      loadDirectory(state.currentDirectory, false);
     } catch (err) {
       alert("Error en renombrado por lotes:\n" + err);
     }
   }
 
   function openRenameItemModal(item = null) {
+    if (!item && state.selectedItems.size > 1) {
+      openBatchRenameModal();
+      return;
+    }
     if (!item) {
       if (state.selectedIndex >= 0 && state.selectedIndex < state.filteredItems.length) {
         item = state.filteredItems[state.selectedIndex];
@@ -3978,10 +4114,27 @@ async function startTransferOperation(action, sources, targetDir) {
     if (el.btnCloseBatchRenameModal) el.btnCloseBatchRenameModal.onclick = closeBatchRenameModal;
     if (el.btnCancelBatchRename) el.btnCancelBatchRename.onclick = closeBatchRenameModal;
     if (el.btnConfirmBatchRename) el.btnConfirmBatchRename.onclick = confirmBatchRename;
+
+    if (el.tabBatchSequence) el.tabBatchSequence.onclick = () => switchBatchRenameTab('sequence');
+    if (el.tabBatchReplace) el.tabBatchReplace.onclick = () => switchBatchRenameTab('replace');
+
+    if (el.inputBatchBaseName) {
+      el.inputBatchBaseName.addEventListener('input', updateBatchRenamePreview);
+      el.inputBatchBaseName.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') confirmBatchRename();
+        else if (e.key === 'Escape') closeBatchRenameModal();
+      });
+    }
+    if (el.chkBatchKeepOriginalName) el.chkBatchKeepOriginalName.addEventListener('change', updateBatchRenamePreview);
+    if (el.selectBatchSeparator) el.selectBatchSeparator.addEventListener('change', updateBatchRenamePreview);
+    if (el.inputBatchStartNum) el.inputBatchStartNum.addEventListener('input', updateBatchRenamePreview);
+    if (el.selectBatchDigits) el.selectBatchDigits.addEventListener('change', updateBatchRenamePreview);
+    if (el.chkBatchKeepExt) el.chkBatchKeepExt.addEventListener('change', updateBatchRenamePreview);
+
     if (el.inputBatchSearch) {
       el.inputBatchSearch.addEventListener('input', updateBatchRenamePreview);
       el.inputBatchReplace.addEventListener('input', updateBatchRenamePreview);
-      el.chkBatchRegex.addEventListener('change', updateBatchRenamePreview);
+      if (el.chkBatchRegex) el.chkBatchRegex.addEventListener('change', updateBatchRenamePreview);
       
       [el.inputBatchSearch, el.inputBatchReplace].forEach(input => {
         input.addEventListener('keydown', e => {
@@ -4245,9 +4398,17 @@ async function startTransferOperation(action, sources, targetDir) {
       el.ctxMenuRename.onclick = () => {
         const item = state.contextTargetItem || (state.selectedIndex >= 0 ? state.filteredItems[state.selectedIndex] : null);
         closeFileContextMenu();
-        if (item) {
+        if (state.selectedItems.size > 1) {
+          openBatchRenameModal();
+        } else if (item) {
           openRenameItemModal(item);
         }
+      };
+    }
+    if (el.ctxMenuBatchRename) {
+      el.ctxMenuBatchRename.onclick = () => {
+        closeFileContextMenu();
+        openBatchRenameModal();
       };
     }
     if (el.ctxMenuCut) {
