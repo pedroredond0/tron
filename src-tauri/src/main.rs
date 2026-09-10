@@ -1534,6 +1534,82 @@ fn search_directory_recursive(base_path: String, query: String, max_results: Opt
 }
 
 #[tauri::command]
+fn open_terminal(path: String) -> Result<(), String> {
+    let p = PathBuf::from(&path);
+    if !p.exists() {
+        return Err("Path does not exist".into());
+    }
+
+    let mut dir = p.clone();
+    if !p.is_dir() {
+        if let Some(parent) = p.parent() {
+            dir = parent.to_path_buf();
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        // Try Windows Terminal first, fallback to cmd
+        let res = std::process::Command::new("wt")
+            .arg("-d")
+            .arg(&dir)
+            .spawn();
+        
+        if res.is_err() {
+            let _ = std::process::Command::new("cmd")
+                .arg("/c")
+                .arg("start")
+                .arg("cmd")
+                .arg("/K")
+                .arg("cd /d")
+                .arg(&dir)
+                .current_dir(&dir)
+                .spawn();
+        }
+    }
+    
+    #[cfg(target_os = "macos")]
+    {
+        let _ = std::process::Command::new("open")
+            .arg("-a")
+            .arg("Terminal")
+            .arg(&dir)
+            .spawn();
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        // Simple fallback for linux
+        let _ = std::process::Command::new("x-terminal-emulator")
+            .arg("--working-directory")
+            .arg(&dir)
+            .spawn();
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+fn open_in_editor(file_path: String, editor: String) -> Result<(), String> {
+    if !PathBuf::from(&file_path).exists() {
+        return Err("File does not exist".into());
+    }
+
+    if editor.is_empty() {
+        return Err("Editor no especificado".into());
+    }
+
+    let res = std::process::Command::new(&editor)
+        .arg(&file_path)
+        .spawn();
+
+    match res {
+        Ok(_) => Ok(()),
+        Err(e) => Err(format!("No se pudo abrir {}: {}", editor, e)),
+    }
+}
+
+#[tauri::command]
 fn force_exit_app() {
     std::process::exit(0);
 }
@@ -1556,7 +1632,9 @@ fn main() {
             move_items,
             get_directory_size,
             search_directory_recursive,
-            force_exit_app
+            force_exit_app,
+            open_terminal,
+            open_in_editor
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

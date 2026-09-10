@@ -40,6 +40,8 @@
       .split(',')
       .map(s => s.trim().toLowerCase().replace(/^\./, ''))
       .filter(Boolean),
+    textEditor: localStorage.getItem('tron_text_editor') || 'notepad',
+    textEditorCustomPath: localStorage.getItem('tron_text_editor_custom') || '',
     draggedInternalPaths: []
   };
 
@@ -68,6 +70,7 @@
     btnQvClose: document.getElementById('btnQvClose'),
     btnQvDelete: document.getElementById('btnQvDelete'),
     btnQvOpenDefault: document.getElementById('btnQvOpenDefault'),
+    btnQvOpenEditor: document.getElementById('btnQvOpenEditor'),
     // Sort Header Elements
     sortHeaderName: document.getElementById('sortHeaderName'),
     sortHeaderType: document.getElementById('sortHeaderType'),
@@ -78,6 +81,7 @@
     sortIconSize: document.getElementById('sortIconSize'),
     sortIconDate: document.getElementById('sortIconDate'),
     // Action bar buttons
+    btnActionTerminal: document.getElementById('btnActionTerminal'),
     btnActionNewFile: document.getElementById('btnActionNewFile'),
     btnActionNewFolder: document.getElementById('btnActionNewFolder'),
     btnActionCut: document.getElementById('btnActionCut'),
@@ -124,6 +128,9 @@
     rangeUiScale: document.getElementById('rangeUiScale'),
     lblUiScaleValue: document.getElementById('lblUiScaleValue'),
     selectTheme: document.getElementById('selectTheme'),
+    selectTextEditor: document.getElementById('selectTextEditor'),
+    customEditorContainer: document.getElementById('customEditorContainer'),
+    inputCustomEditor: document.getElementById('inputCustomEditor'),
     selectFontSize: document.getElementById('selectFontSize'),
     chkNormalFontWeight: document.getElementById('chkNormalFontWeight'),
     inputCustomTextExts: document.getElementById('inputCustomTextExts'),
@@ -160,6 +167,7 @@
     fileContextMenu: document.getElementById('fileContextMenu'),
     ctxMenuOpen: document.getElementById('ctxMenuOpen'),
     ctxMenuQuickView: document.getElementById('ctxMenuQuickView'),
+    ctxMenuOpenEditor: document.getElementById('ctxMenuOpenEditor'),
     ctxMenuCut: document.getElementById('ctxMenuCut'),
     ctxMenuCopy: document.getElementById('ctxMenuCopy'),
     ctxMenuDuplicate: document.getElementById('ctxMenuDuplicate'),
@@ -716,6 +724,17 @@
     }
     renderFileList();
     updateStatusBar();
+  }
+
+  function openInTextEditor(filePath) {
+    let editor = state.textEditor || 'notepad';
+    if (editor === 'custom') {
+      editor = state.textEditorCustomPath || 'notepad';
+    }
+    invoke('open_in_editor', { filePath, editor }).catch(err => {
+      console.error(err);
+      alert('Error al abrir editor: ' + err);
+    });
   }
 
   function activateItem(item) {
@@ -1906,6 +1925,16 @@
       y = window.innerHeight - menuHeight - 8;
     }
 
+    if (el.ctxMenuOpenEditor) {
+      const ext = (item.extension || '').toLowerCase();
+      const isText = state.customTextExts.includes(ext) || item.file_type === 'text' || item.file_type === 'code' || !item.is_directory;
+      if (isText && !item.is_directory) {
+        el.ctxMenuOpenEditor.classList.remove('hidden');
+      } else {
+        el.ctxMenuOpenEditor.classList.add('hidden');
+      }
+    }
+
     el.fileContextMenu.style.left = `${Math.max(5, x)}px`;
     el.fileContextMenu.style.top = `${Math.max(5, y)}px`;
     el.fileContextMenu.classList.remove('hidden');
@@ -2250,8 +2279,23 @@
         }
       };
     }
+    if (el.btnQvOpenEditor) {
+      el.btnQvOpenEditor.onclick = () => {
+        if (state.selectedIndex >= 0 && state.selectedIndex < state.filteredItems.length) {
+          const item = state.filteredItems[state.selectedIndex];
+          openInTextEditor(item.path);
+        }
+      };
+    }
 
     // Action Bar buttons
+    if (el.btnActionTerminal) {
+      el.btnActionTerminal.onclick = () => {
+        if (state.currentDirectory) {
+          invoke('open_terminal', { path: state.currentDirectory }).catch(console.error);
+        }
+      };
+    }
     el.btnActionNewFile.onclick = openNewFileModal;
     el.btnActionNewFolder.onclick = openNewFolderModal;
     el.btnActionCut.onclick = cutSelectedItems;
@@ -2432,6 +2476,18 @@
       });
     }
 
+    if (el.selectTextEditor) {
+      el.selectTextEditor.addEventListener('change', (e) => {
+        if (el.customEditorContainer) {
+          if (e.target.value === 'custom') {
+            el.customEditorContainer.classList.remove('hidden');
+          } else {
+            el.customEditorContainer.classList.add('hidden');
+          }
+        }
+      });
+    }
+
     // Sort Column Headers Wiring
     if (el.sortHeaderName) el.sortHeaderName.onclick = () => setSort('name');
     if (el.sortHeaderType) el.sortHeaderType.onclick = () => setSort('type');
@@ -2453,6 +2509,15 @@
       el.ctxMenuQuickView.onclick = () => {
         closeFileContextMenu();
         openQuickView();
+      };
+    }
+    if (el.ctxMenuOpenEditor) {
+      el.ctxMenuOpenEditor.onclick = () => {
+        closeFileContextMenu();
+        const item = state.contextTargetItem || (state.selectedIndex >= 0 ? state.filteredItems[state.selectedIndex] : null);
+        if (item) {
+          openInTextEditor(item.path);
+        }
       };
     }
     if (el.ctxMenuCut) {
@@ -2651,8 +2716,19 @@
     const normalWeight = localStorage.getItem('tron_normal_weight') === 'true';
     const uiScale = localStorage.getItem('tron_ui_scale') || '14';
     const customExts = localStorage.getItem('tron_custom_text_exts') || 'sql, str, log, conf, env, bak';
+    const textEditor = localStorage.getItem('tron_text_editor') || 'notepad';
+    const customEditor = localStorage.getItem('tron_text_editor_custom') || '';
 
     if (el.selectTheme) el.selectTheme.value = theme;
+    if (el.selectTextEditor) {
+      el.selectTextEditor.value = textEditor;
+      if (el.customEditorContainer) {
+        if (textEditor === 'custom') el.customEditorContainer.classList.remove('hidden');
+        else el.customEditorContainer.classList.add('hidden');
+      }
+    }
+    if (el.inputCustomEditor) el.inputCustomEditor.value = customEditor;
+
     if (el.selectFontSize) el.selectFontSize.value = fontSize;
     if (el.chkNormalFontWeight) el.chkNormalFontWeight.checked = normalWeight;
     if (el.inputCustomTextExts) el.inputCustomTextExts.value = customExts;
@@ -2692,6 +2768,8 @@
     const normalWeight = el.chkNormalFontWeight ? el.chkNormalFontWeight.checked : false;
     const uiScale = el.rangeUiScale ? el.rangeUiScale.value : '14';
     const customExts = el.inputCustomTextExts ? el.inputCustomTextExts.value.trim() : 'sql, str, log, conf, env, bak';
+    const textEditor = el.selectTextEditor ? el.selectTextEditor.value : 'notepad';
+    const customEditor = el.inputCustomEditor ? el.inputCustomEditor.value.trim() : '';
 
     let density = 'normal';
     const selectedDensity = document.querySelector('input[name="density"]:checked');
@@ -2703,6 +2781,11 @@
     localStorage.setItem('tron_normal_weight', normalWeight ? 'true' : 'false');
     localStorage.setItem('tron_ui_scale', uiScale);
     localStorage.setItem('tron_custom_text_exts', customExts);
+    localStorage.setItem('tron_text_editor', textEditor);
+    localStorage.setItem('tron_text_editor_custom', customEditor);
+
+    state.textEditor = textEditor;
+    state.textEditorCustomPath = customEditor;
 
     state.customTextExts = customExts
       .split(',')

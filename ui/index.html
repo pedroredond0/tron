@@ -381,6 +381,11 @@
   <!-- Action Bar (Nuevo archivo, Nueva carpeta, Cortar, Copiar, Pegar, Papelera, Calcular tamaño) -->
   <div id="actionBar" class="h-9 bg-gnome-bg border-b border-gnome-border flex items-center justify-between px-3 shrink-0 text-xs text-gnome-text">
     <div class="flex items-center gap-1.5">
+      <button id="btnActionTerminal" class="px-2.5 py-1 rounded bg-gnome-surface hover:bg-gnome-hover border border-gnome-border flex items-center gap-1.5 text-xs transition-colors" title="Abrir terminal aquí (Ctrl+T)">
+        <span>&gt;_</span>
+        <span class="hidden sm:inline">Terminal</span>
+      </button>
+      <div class="h-4 border-r border-gnome-border/80 mx-1"></div>
       <button id="btnActionNewFile" class="px-2.5 py-1 rounded bg-gnome-surface hover:bg-gnome-hover border border-gnome-border flex items-center gap-1.5 text-xs transition-colors" title="Crear nuevo archivo (Ctrl+N)">
         <span>📄</span>
         <span>Nuevo Archivo</span>
@@ -544,6 +549,10 @@
         </div>
         <div class="flex items-center gap-2 shrink-0">
           <span id="qvBadge" class="text-[10px] px-2 py-0.5 bg-gnome-surface rounded border border-gnome-border text-gnome-textDim uppercase">TIPO</span>
+          <button id="btnQvOpenEditor" title="Abrir con editor de texto" class="hidden px-2.5 py-1 rounded bg-gnome-surface hover:bg-gnome-hover border border-gnome-border text-gnome-text text-xs flex items-center gap-1.5 transition-colors font-medium">
+            <span>✍️</span>
+            <span>Editar</span>
+          </button>
           <button id="btnQvOpenDefault" title="Abrir con la aplicación por defecto de Windows (Enter)" class="px-2.5 py-1 rounded bg-gnome-active hover:bg-gnome-activeHover text-white text-xs flex items-center gap-1.5 transition-colors font-medium">
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
             <span>Abrir</span>
@@ -698,13 +707,31 @@
   <div id="modalAppearance" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
     <div class="bg-gnome-surface border border-gnome-border rounded-xl shadow-2xl w-full max-w-md p-5 flex flex-col gap-4">
       <div class="flex items-center justify-between border-b border-gnome-border pb-3">
-        <h3 class="text-sm font-semibold text-gnome-text flex items-center gap-2">
-          <span>🎨</span> Personalizar Aspecto
-        </h3>
-        <button id="btnCloseAppearanceModal" class="text-gnome-textDim hover:text-white text-xs">✕</button>
-      </div>
+          <h3 class="text-sm font-semibold text-gnome-text flex items-center gap-2">
+            <span>⚙️</span> Preferencias
+          </h3>
+          <button id="btnCloseAppearanceModal" class="text-gnome-textDim hover:text-white text-xs">✖</button>
+        </div>
 
-      <div class="space-y-4 text-xs">
+        <div class="space-y-4 text-xs max-h-[70vh] overflow-y-auto pr-2 scrollbar-thin">
+          <!-- Editor de texto (New) -->
+          <div class="p-3 bg-gnome-sidebar/50 rounded-lg border border-gnome-border space-y-2">
+            <label class="block text-gnome-text font-medium text-sm border-b border-gnome-border/50 pb-1 mb-2">Editor de Texto</label>
+            <select id="selectTextEditor" class="w-full bg-gnome-surface border border-gnome-border rounded-md px-3 py-2 text-xs text-gnome-text focus:outline-none focus:border-gnome-active">
+              <option value="notepad">Bloc de Notas (Windows)</option>
+              <option value="TextEdit">TextEdit (macOS)</option>
+              <option value="code">VSCode (code)</option>
+              <option value="codium">VSCodium (codium)</option>
+              <option value="nvim">Neovim (nvim)</option>
+              <option value="vim">Vim (vim)</option>
+              <option value="nano">Nano (nano)</option>
+              <option value="custom">Personalizado / Ruta exacta...</option>
+            </select>
+            <div id="customEditorContainer" class="hidden mt-2">
+              <input id="inputCustomEditor" type="text" placeholder="Ej: C:\Program Files\MiEditor\editor.exe" class="w-full bg-gnome-surface border border-gnome-border rounded-md px-3 py-1.5 text-xs text-gnome-text placeholder-gnome-textDim focus:outline-none focus:border-gnome-active" />
+              <p class="text-[10px] text-gnome-textDim mt-1">Introduce el nombre del ejecutable (si está en el PATH) o la ruta completa.</p>
+            </div>
+          </div>
         <!-- Tema -->
         <div>
           <label class="block text-gnome-textDim mb-1.5 font-medium">Tema Visual:</label>
@@ -844,6 +871,9 @@
     </button>
     <button id="ctxMenuQuickView" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
       <span>QuickView</span><span class="text-gnome-textDim text-[11px]">Espacio</span>
+    </button>
+    <button id="ctxMenuOpenEditor" class="hidden w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between text-gnome-active">
+      <span>Abrir con Editor</span>
     </button>
     <div class="my-1 border-t border-gnome-border/60"></div>
     <button id="ctxMenuCut" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
