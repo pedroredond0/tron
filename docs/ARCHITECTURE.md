@@ -214,16 +214,33 @@ const state = {
 };
 ```
 
-### 5.2. Máquina de Estados de Navegación por Teclado
+### 5.2. Pestañas de Navegación y Modelo de Paneles
+La aplicación soporta un modelo jerárquico de paneles y pestañas (`panels[activePanel].tabs[activeTab]`):
+- **Aislamiento Total**: Cada pestaña preserva de forma independiente su ruta actual, historial de navegación hacia adelante/atrás, selección activa, término de búsqueda y subcarpetas desplegadas.
+- **Rendimiento Óptimo**: Solo la pestaña visible mantiene elementos montados en el DOM; cambiar de pestaña es instantáneo y no satura la memoria.
+- **Atajos Integrados**: `Ctrl + T` (nueva pestaña), `Ctrl + W` (cerrar pestaña), `Ctrl + 1..9` (saltar a pestaña directa), y clic central para cerrar.
+
+### 5.3. Sistema de Etiquetas por Colores y Metadatos (Finder / Dolphin)
+- **Persistencia Ligera en LocalStorage**: Mapea rutas normalizadas (`{ [path]: ['red', 'blue'] }`) sin alterar atributos extendidos del sistema de archivos, garantizando compatibilidad total con NTFS, ext4, Btrfs, APFS, FAT32 y unidades de red compartidas (UNC).
+- **Indicadores en Tiempo Real**: Inyecta puntos de color SVG/CSS en el listado junto al nombre del fichero.
+- **Filtrado Reactivo**: El panel lateral calcula contadores en vivo para los 7 colores (`red`, `orange`, `yellow`, `green`, `blue`, `purple`, `gray`) y permite filtrar la vista del directorio con un solo clic.
+
+### 5.4. Vista en Árbol Plegable en el Listado
+- **Estructura Dinámica In-Place**: En la vista de lista detallada, las carpetas disponen de un botón interactivo (`▶` / `▼`).
+- **Inyección Aplanada con Sangría Proporcional**: Al hacer clic en la flecha, el frontend consulta `read_directory` para esa subcarpeta específica y almacena los resultados en `state.expandedDirs`. El renderizador aplana la jerarquía inyectando los elementos hijos con desplazamiento visual `(depth * 18px)` sin alterar la ruta base de trabajo.
+
+### 5.5. Máquina de Estados de Navegación por Teclado
 El controlador `handleGlobalKeyDown` intercepta y gestiona los eventos de teclado de manera inteligente:
 1. **Trampa de Modales y Campos de Texto**: Si el foco se encuentra en un `<input>` o `<textarea>`, las teclas alfanuméricas escriben normalmente y `Enter`/`Escape` confirman o cancelan el modal actual.
 2. **Salto Rápido a Carpeta (`Ctrl + P`)**: Abre el buscador difuso recursivo para escanear y saltar a cualquier subdirectorio hasta 5 niveles de profundidad de forma asíncrona.
-3. **Panel Dual Dividido (`F3` / `Ctrl + \`)**: Conmuta entre vista simple y panel dual, permitiendo copiar archivos entre paneles con `F5` y alternar el foco con `Tab`.
-4. **Selección por Rango Continuo (`Shift + Flechas`)**: Calcula el rango comprendido entre `selectionAnchor` y el nuevo índice, seleccionando todos los elementos intermedios como en los exploradores de escritorio nativos.
-5. **Navegación Alfanumérica Instantánea (Type-Ahead)**: Al presionar cualquier letra o número (`A-Z`, `0-9`), el cursor salta cíclicamente al siguiente archivo o carpeta cuyo nombre comience por dicho carácter.
-6. **Modo QuickView Activo**: El espacio o escape cierran el visor, `H` genera volcado hexadecimal en tiempo real, las flechas navegan por los archivos del directorio cargando la nueva vista previa al instante y `Delete` envía el archivo a la papelera avanzando automáticamente al siguiente sin cerrar el visor.
+3. **Pestañas de Navegación (`Ctrl + T` / `Ctrl + W` / `Ctrl + 1..9`)**: Gestión de pestañas sin levantar las manos del teclado.
+4. **Terminal Dedicada (`Ctrl + Shift + T`)**: Lanza la terminal configurada en la ruta de trabajo actual.
+5. **Panel Dual Dividido (`F3` / `Ctrl + \`)**: Conmuta entre vista simple y panel dual, permitiendo copiar archivos entre paneles con `F5` y alternar el foco con `Tab`.
+6. **Selección por Rango Continuo (`Shift + Flechas`)**: Calcula el rango comprendido entre `selectionAnchor` y el nuevo índice, seleccionando todos los elementos intermedios como en los exploradores de escritorio nativos.
+7. **Navegación Alfanumérica Instantánea (Type-Ahead)**: Al presionar cualquier letra o número (`A-Z`, `0-9`), el cursor salta cíclicamente al siguiente archivo o carpeta cuyo nombre comience por dicho carácter.
+8. **Modo QuickView Activo**: El espacio o escape cierran el visor, `H` genera volcado hexadecimal en tiempo real, las flechas navegan por los archivos del directorio cargando la nueva vista previa al instante y `Delete` envía el archivo a la papelera avanzando automáticamente al siguiente sin cerrar el visor.
 
-### 5.3. Sistema de Iconografía Dinámica Multi-Pack (`ui/packs.js`)
+### 5.6. Sistema de Iconografía Dinámica Multi-Pack (`ui/packs.js`)
 El motor de iconos desacopla completamente el diseño visual de la lógica del explorador:
 - **6 Packs Integrados**:
   1. `default`: Emojis modernos de alta legibilidad.
@@ -239,7 +256,7 @@ El motor de iconos desacopla completamente el diseño visual de la lógica del e
   - *Normal*: Iconos de 28px, filas de 32px.
   - *Espacioso*: Iconos de 40px, filas de 44px.
 
-### 5.4. Motor de Temas Visuales (14 Temas Claro/Oscuro)
+### 5.7. Motor de Temas Visuales (14 Temas Claro/Oscuro)
 El sistema implementa 7 temas oscuros y sus 7 contrapartes claras mediante variables CSS nativas:
 - **Temas**: Adwaita, Windows 10, Ubuntu, Manjaro, NvChad, TokyoNight, MatteBlack (+ versiones `-light`).
 - **Variables dinámicas**:
@@ -256,7 +273,7 @@ El sistema implementa 7 temas oscuros y sus 7 contrapartes claras mediante varia
   ```
 - **Escalado Tipográfico en Tiempo Real**: Un control deslizante en Preferencias permite ajustar la fuente global de la aplicación entre 12px y 20px, recalculando las proporciones de texto sin desajustar el diseño.
 
-### 5.5. Arquitectura de QuickView (`Space`)
+### 5.8. Arquitectura de QuickView (`Space`)
 Al presionar la barra espaciadora sobre un elemento seleccionado, se activa el contenedor modal flotante:
 - **Detección de Formato**:
   - *Imágenes*: Renderizadas a través del visor optimizado con zoom y auto-escalado.
