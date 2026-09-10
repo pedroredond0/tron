@@ -480,6 +480,9 @@
         <button id="menuRefresh" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
           <span>Actualizar</span><span class="text-gnome-textDim text-[11px]">F5</span>
         </button>
+        <button id="menuToggleSplitView" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+          <span>Vista dividida (Panel dual)</span><span class="text-gnome-textDim text-[11px]">F3</span>
+        </button>
         <button id="menuToggleHidden" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
           <span>Mostrar archivos ocultos</span><span class="text-gnome-textDim text-[11px]">Ctrl+H</span>
         </button>
@@ -637,6 +640,16 @@
       <!-- Preferencias (antes Tema) -->
       <button id="btnOpenAppearance" class="p-1 px-2 rounded hover:bg-gnome-surface text-gnome-text flex items-center justify-center transition-colors" title="Preferencias (Temas, iconos, tamaños, archivos, editor, apps externas)">
         <span id="iconOpenAppearance" class="ui-icon-box">⚙️</span>
+      </button>
+
+      <!-- Botón Vista Dividida (Panel Dual) -->
+      <button id="btnToggleSplitView" class="p-1 px-2 rounded hover:bg-gnome-surface text-gnome-text flex items-center justify-center transition-colors" title="Vista Dividida / Panel Dual (F3)">
+        <span id="iconToggleSplitView" class="ui-icon-box">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="12" y1="3" x2="12" y2="21"></line>
+          </svg>
+        </span>
       </button>
 
       <!-- QuickView solo con el ojo -->

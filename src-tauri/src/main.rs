@@ -195,7 +195,6 @@ pub struct FileItem {
     pub extension: String,
     pub file_type: String, // "folder", "image", "audio", "video", "text", "binary"
     pub is_hidden: bool,
-    pub git_status: Option<String>, // e.g., "clean", "dirty"
 }
 
 #[derive(Debug, Deserialize)]
@@ -1078,7 +1077,6 @@ fn read_directory(path: Option<String>) -> Result<DirectoryResult, String> {
                 extension,
                 file_type,
                 is_hidden,
-            git_status: if is_dir { check_git_status(&p) } else { None },
             });
         }
     }
@@ -1857,7 +1855,6 @@ fn build_file_item(entry_path: &Path, meta: &fs::Metadata) -> Option<FileItem> {
         extension: ext,
         file_type,
         is_hidden,
-    git_status: if is_dir { check_git_status(&entry_path) } else { None },
     })
 }
 
@@ -2248,7 +2245,6 @@ fn search_directory_recursive(base_path: String, query: String, max_results: Opt
                         extension: ext,
                         file_type,
                         is_hidden,
-                    git_status: if is_dir { check_git_status(&p) } else { None },
                     });
 
                     if results.len() >= limit {
@@ -3256,28 +3252,6 @@ fn force_exit_app() {
     std::process::exit(0);
 }
 
-
-fn check_git_status(p: &std::path::Path) -> Option<String> {
-    if p.is_dir() && p.join(".git").exists() {
-        match std::process::Command::new("git")
-            .args(["status", "--porcelain"])
-            .current_dir(p)
-            .output()
-        {
-            Ok(output) => {
-                if output.stdout.is_empty() {
-                    return Some("clean".to_string());
-                } else {
-                    return Some("dirty".to_string());
-                }
-            }
-            Err(_) => {
-                return Some("git-repo".to_string());
-            }
-        }
-    }
-    None
-}
 fn main() {
     std::panic::set_hook(Box::new(|info| {
         let msg = format!("PANIC: {:?}\n", info);
