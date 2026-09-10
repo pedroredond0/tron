@@ -9,10 +9,13 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU16, AtomicU64, Ordering};
 use std::time::UNIX_EPOCH;
 use tauri::Emitter;
+#[cfg(target_os = "windows")]
 use std::os::windows::ffi::OsStrExt;
 use std::ffi::OsStr;
 use std::ptr;
 
+#[cfg(target_os = "windows")]
+#[allow(non_snake_case)]
 #[repr(C)]
 pub struct SHFILEOPSTRUCTW {
     pub hwnd: *mut std::ffi::c_void,
@@ -25,12 +28,14 @@ pub struct SHFILEOPSTRUCTW {
     pub lpszProgressTitle: *const u16,
 }
 
+#[cfg(target_os = "windows")]
 #[repr(C)]
 struct SIZE {
     cx: i32,
     cy: i32,
 }
 
+#[cfg(target_os = "windows")]
 #[repr(C)]
 struct GUID {
     data1: u32,
@@ -39,6 +44,7 @@ struct GUID {
     data4: [u8; 8],
 }
 
+#[cfg(target_os = "windows")]
 const IID_ISHELL_ITEM_IMAGE_FACTORY: GUID = GUID {
     data1: 0xbcc18b79,
     data2: 0xba16,
@@ -46,6 +52,7 @@ const IID_ISHELL_ITEM_IMAGE_FACTORY: GUID = GUID {
     data4: [0x80, 0xc4, 0x8a, 0x59, 0xc3, 0x0c, 0x46, 0x3b],
 };
 
+#[cfg(target_os = "windows")]
 #[repr(C)]
 struct IShellItemImageFactoryVtbl {
     pub query_interface: unsafe extern "system" fn(this: *mut std::ffi::c_void, riid: *const GUID, ppv: *mut *mut std::ffi::c_void) -> i32,
@@ -54,11 +61,13 @@ struct IShellItemImageFactoryVtbl {
     pub get_image: unsafe extern "system" fn(this: *mut std::ffi::c_void, size: SIZE, flags: u32, phbm: *mut *mut std::ffi::c_void) -> i32,
 }
 
+#[cfg(target_os = "windows")]
 #[repr(C)]
 struct IShellItemImageFactory {
     pub lp_vtbl: *const IShellItemImageFactoryVtbl,
 }
 
+#[cfg(target_os = "windows")]
 #[repr(C)]
 struct BITMAP {
     bm_type: i32,
@@ -70,6 +79,7 @@ struct BITMAP {
     bm_bits: *mut std::ffi::c_void,
 }
 
+#[cfg(target_os = "windows")]
 #[repr(C, packed)]
 struct BITMAPFILEHEADER {
     bf_type: u16,
@@ -79,6 +89,7 @@ struct BITMAPFILEHEADER {
     bf_off_bits: u32,
 }
 
+#[cfg(target_os = "windows")]
 #[repr(C)]
 struct BITMAPINFOHEADER {
     bi_size: u32,
@@ -94,6 +105,7 @@ struct BITMAPINFOHEADER {
     bi_clr_important: u32,
 }
 
+#[cfg(target_os = "windows")]
 #[link(name = "shell32")]
 extern "system" {
     pub fn SHFileOperationW(lpFileOp: *mut SHFILEOPSTRUCTW) -> i32;
@@ -105,18 +117,21 @@ extern "system" {
     ) -> i32;
 }
 
+#[cfg(target_os = "windows")]
 #[link(name = "ole32")]
 extern "system" {
     fn CoInitializeEx(pv_reserved: *mut std::ffi::c_void, dw_co_init: u32) -> i32;
     fn CoUninitialize();
 }
 
+#[cfg(target_os = "windows")]
 #[link(name = "user32")]
 extern "system" {
     fn GetDC(h_wnd: *mut std::ffi::c_void) -> *mut std::ffi::c_void;
     fn ReleaseDC(h_wnd: *mut std::ffi::c_void, h_dc: *mut std::ffi::c_void) -> i32;
 }
 
+#[cfg(target_os = "windows")]
 #[link(name = "gdi32")]
 extern "system" {
     fn GetObjectW(h: *mut std::ffi::c_void, c: i32, pv: *mut std::ffi::c_void) -> i32;
@@ -132,8 +147,11 @@ extern "system" {
     fn DeleteObject(ho: *mut std::ffi::c_void) -> i32;
 }
 
+#[cfg(target_os = "windows")]
 const FO_MOVE: u32 = 0x0001;
+#[cfg(target_os = "windows")]
 const FO_COPY: u32 = 0x0002;
+#[cfg(target_os = "windows")]
 const FOF_ALLOWUNDO: u16 = 0x0040; // Send to recycle bin if deleting, but for copy/move allows undo
 
 static OPERATION_COUNTER: AtomicU64 = AtomicU64::new(1);
@@ -227,6 +245,7 @@ const MAX_PREVIEW_TEXT_SIZE: u64 = 5 * 1024 * 1024; // 5 MB
 const MAX_PREVIEW_VIDEO_SIZE: u64 = 80 * 1024 * 1024; // 80 MB limit for video
 const MAX_PREVIEW_BINARY_SIZE: u64 = 100 * 1024 * 1024; // 100 MB for images, pdf, audio
 
+#[cfg(target_os = "windows")]
 fn get_shell_preview_data_url(file_path: &Path, max_dimension: i32) -> Result<String, String> {
     unsafe {
         CoInitializeEx(ptr::null_mut(), 0x2);
@@ -296,6 +315,11 @@ fn get_shell_preview_data_url(file_path: &Path, max_dimension: i32) -> Result<St
         let b64 = BASE64_STANDARD.encode(&bmp_bytes);
         Ok(format!("data:image/bmp;base64,{}", b64))
     }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn get_shell_preview_data_url(_file_path: &Path, _max_dimension: i32) -> Result<String, String> {
+    Err("Shell thumbnail extraction is only supported on Windows".into())
 }
 
 fn url_encode(s: &str) -> String {
@@ -719,7 +743,10 @@ fn get_user_places() -> Vec<UserPlace> {
     let mut places = Vec::new();
     let user_profile = match std::env::var("USERPROFILE") {
         Ok(p) => PathBuf::from(p),
-        Err(_) => PathBuf::from("C:\\Users\\Default"),
+        Err(_) => match std::env::var("HOME") {
+            Ok(p) => PathBuf::from(p),
+            Err(_) => PathBuf::from("/"),
+        },
     };
 
     places.push(UserPlace {
@@ -756,16 +783,61 @@ fn get_user_places() -> Vec<UserPlace> {
 #[tauri::command]
 fn get_system_drives() -> Vec<DriveItem> {
     let mut drives = Vec::new();
-    for letter in b'A'..=b'Z' {
-        let drive_root = format!("{}:\\", letter as char);
-        let path = Path::new(&drive_root);
-        if path.exists() {
-            drives.push(DriveItem {
-                name: format!("Unidad ({}:)", letter as char),
-                path: drive_root,
-            });
+
+    #[cfg(target_os = "windows")]
+    {
+        for letter in b'A'..=b'Z' {
+            let drive_root = format!("{}:\\", letter as char);
+            let path = Path::new(&drive_root);
+            if path.exists() {
+                drives.push(DriveItem {
+                    name: format!("Unidad ({}:)", letter as char),
+                    path: drive_root,
+                });
+            }
         }
     }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        drives.push(DriveItem {
+            name: "Sistema (/)".into(),
+            path: "/".into(),
+        });
+
+        #[cfg(target_os = "macos")]
+        {
+            if let Ok(entries) = fs::read_dir("/Volumes") {
+                for entry in entries.flatten() {
+                    let p = entry.path();
+                    if p.is_dir() {
+                        drives.push(DriveItem {
+                            name: entry.file_name().to_string_lossy().to_string(),
+                            path: p.to_string_lossy().to_string(),
+                        });
+                    }
+                }
+            }
+        }
+
+        #[cfg(target_os = "linux")]
+        {
+            for mount_root in &["/media", "/mnt"] {
+                if let Ok(entries) = fs::read_dir(mount_root) {
+                    for entry in entries.flatten() {
+                        let p = entry.path();
+                        if p.is_dir() {
+                            drives.push(DriveItem {
+                                name: entry.file_name().to_string_lossy().to_string(),
+                                path: p.to_string_lossy().to_string(),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     drives
 }
 
@@ -868,7 +940,13 @@ fn dirs_or_fallback() -> PathBuf {
             return p;
         }
     }
-    PathBuf::from("C:\\")
+    if let Ok(home) = std::env::var("HOME") {
+        let p = PathBuf::from(home);
+        if p.exists() {
+            return p;
+        }
+    }
+    PathBuf::from("/")
 }
 
 #[tauri::command]
@@ -1155,9 +1233,16 @@ fn open_file_default(path: String) -> Result<bool, String> {
         }
     }
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "macos")]
     {
-        Err("No soportado en este sistema operativo".into())
+        let res = std::process::Command::new("open").arg(&path).spawn();
+        res.map(|_| true).map_err(|e| format!("Error al abrir con 'open': {}", e))
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let res = std::process::Command::new("xdg-open").arg(&path).spawn();
+        res.map(|_| true).map_err(|e| format!("Error al abrir con 'xdg-open': {}", e))
     }
 }
 
@@ -1209,6 +1294,7 @@ fn create_new_directory(dir_path: String, folder_name: String) -> Result<String,
     Ok(target_folder.to_string_lossy().to_string())
 }
 
+#[allow(dead_code)]
 fn get_path_total_size(p: &Path) -> u64 {
     if p.is_file() {
         p.metadata().map(|m| m.len()).unwrap_or(0)
@@ -1233,6 +1319,7 @@ fn get_path_total_size(p: &Path) -> u64 {
     }
 }
 
+#[allow(dead_code)]
 fn copy_file_chunked<F>(src: &Path, dst: &Path, on_bytes: &mut F) -> std::io::Result<u64>
 where
     F: FnMut(u64),
@@ -1255,6 +1342,7 @@ where
     Ok(total_copied)
 }
 
+#[allow(dead_code)]
 fn copy_dir_recursive_with_progress<F>(src: &Path, dst: &Path, on_bytes: &mut F) -> std::io::Result<()>
 where
     F: FnMut(u64),
@@ -1291,40 +1379,72 @@ fn copy_items(
     let target_dir_str = target_directory.clone();
 
     std::thread::spawn(move || {
-        let mut p_from = Vec::new();
-        let mut valid_sources = 0;
-        for src in sources {
-            let path = PathBuf::from(&src);
-            if path.exists() {
-                let mut wstr: Vec<u16> = OsStr::new(&src).encode_wide().collect();
-                p_from.append(&mut wstr);
-                p_from.push(0);
+        #[cfg(target_os = "windows")]
+        let (valid_sources, err_msg) = {
+            let mut p_from = Vec::new();
+            let mut valid_sources = 0;
+            for src in sources {
+                let path = PathBuf::from(&src);
+                if path.exists() {
+                    let mut wstr: Vec<u16> = OsStr::new(&src).encode_wide().collect();
+                    p_from.append(&mut wstr);
+                    p_from.push(0);
+                    valid_sources += 1;
+                }
+            }
+            p_from.push(0);
+
+            let mut p_to: Vec<u16> = OsStr::new(&target_directory).encode_wide().collect();
+            p_to.push(0);
+            p_to.push(0);
+
+            let mut err_msg = None;
+            if valid_sources > 0 {
+                let mut op = SHFILEOPSTRUCTW {
+                    hwnd: ptr::null_mut(),
+                    wFunc: FO_COPY,
+                    pFrom: p_from.as_ptr(),
+                    pTo: p_to.as_ptr(),
+                    fFlags: FOF_ALLOWUNDO,
+                    fAnyOperationsAborted: 0,
+                    hNameMappings: ptr::null_mut(),
+                    lpszProgressTitle: ptr::null(),
+                };
+                let res = unsafe { SHFileOperationW(&mut op) };
+                if res != 0 {
+                    err_msg = Some(format!("Error de Windows Shell: {}", res));
+                }
+            }
+            (valid_sources, err_msg)
+        };
+
+        #[cfg(not(target_os = "windows"))]
+        let (valid_sources, err_msg) = {
+            let mut valid_sources = 0;
+            let mut err_msg = None;
+            for src in sources {
+                let src_path = PathBuf::from(&src);
+                if !src_path.exists() {
+                    continue;
+                }
+                let file_name = match src_path.file_name() {
+                    Some(n) => n,
+                    None => continue,
+                };
+                let dest_path = PathBuf::from(&target_directory).join(file_name);
+                let res = if src_path.is_dir() {
+                    copy_dir_recursive_with_progress(&src_path, &dest_path, &mut |_| {})
+                } else {
+                    copy_file_chunked(&src_path, &dest_path, &mut |_| {}).map(|_| ())
+                };
+                if let Err(e) = res {
+                    err_msg = Some(format!("Error al copiar: {}", e));
+                    break;
+                }
                 valid_sources += 1;
             }
-        }
-        p_from.push(0);
-
-        let mut p_to: Vec<u16> = OsStr::new(&target_directory).encode_wide().collect();
-        p_to.push(0);
-        p_to.push(0);
-
-        let mut err_msg = None;
-        if valid_sources > 0 {
-            let mut op = SHFILEOPSTRUCTW {
-                hwnd: ptr::null_mut(),
-                wFunc: FO_COPY,
-                pFrom: p_from.as_ptr(),
-                pTo: p_to.as_ptr(),
-                fFlags: FOF_ALLOWUNDO,
-                fAnyOperationsAborted: 0,
-                hNameMappings: ptr::null_mut(),
-                lpszProgressTitle: ptr::null(),
-            };
-            let res = unsafe { SHFileOperationW(&mut op) };
-            if res != 0 {
-                err_msg = Some(format!("Error de Windows Shell: {}", res));
-            }
-        }
+            (valid_sources, err_msg)
+        };
 
         let _ = app_handle.emit(
             "transfer-finished",
@@ -1360,40 +1480,76 @@ fn move_items(
     let target_dir_str = target_directory.clone();
 
     std::thread::spawn(move || {
-        let mut p_from = Vec::new();
-        let mut valid_sources = 0;
-        for src in sources {
-            let path = PathBuf::from(&src);
-            if path.exists() {
-                let mut wstr: Vec<u16> = OsStr::new(&src).encode_wide().collect();
-                p_from.append(&mut wstr);
-                p_from.push(0);
+        #[cfg(target_os = "windows")]
+        let (valid_sources, err_msg) = {
+            let mut p_from = Vec::new();
+            let mut valid_sources = 0;
+            for src in sources {
+                let path = PathBuf::from(&src);
+                if path.exists() {
+                    let mut wstr: Vec<u16> = OsStr::new(&src).encode_wide().collect();
+                    p_from.append(&mut wstr);
+                    p_from.push(0);
+                    valid_sources += 1;
+                }
+            }
+            p_from.push(0);
+
+            let mut p_to: Vec<u16> = OsStr::new(&target_directory).encode_wide().collect();
+            p_to.push(0);
+            p_to.push(0);
+
+            let mut err_msg = None;
+            if valid_sources > 0 {
+                let mut op = SHFILEOPSTRUCTW {
+                    hwnd: ptr::null_mut(),
+                    wFunc: FO_MOVE,
+                    pFrom: p_from.as_ptr(),
+                    pTo: p_to.as_ptr(),
+                    fFlags: FOF_ALLOWUNDO,
+                    fAnyOperationsAborted: 0,
+                    hNameMappings: ptr::null_mut(),
+                    lpszProgressTitle: ptr::null(),
+                };
+                let res = unsafe { SHFileOperationW(&mut op) };
+                if res != 0 {
+                    err_msg = Some(format!("Error de Windows Shell: {}", res));
+                }
+            }
+            (valid_sources, err_msg)
+        };
+
+        #[cfg(not(target_os = "windows"))]
+        let (valid_sources, err_msg) = {
+            let mut valid_sources = 0;
+            let mut err_msg = None;
+            for src in sources {
+                let src_path = PathBuf::from(&src);
+                if !src_path.exists() {
+                    continue;
+                }
+                let file_name = match src_path.file_name() {
+                    Some(n) => n,
+                    None => continue,
+                };
+                let dest_path = PathBuf::from(&target_directory).join(file_name);
+                let res = fs::rename(&src_path, &dest_path).or_else(|_| {
+                    if src_path.is_dir() {
+                        copy_dir_recursive_with_progress(&src_path, &dest_path, &mut |_| {})?;
+                        fs::remove_dir_all(&src_path)
+                    } else {
+                        copy_file_chunked(&src_path, &dest_path, &mut |_| {})?;
+                        fs::remove_file(&src_path)
+                    }
+                });
+                if let Err(e) = res {
+                    err_msg = Some(format!("Error al mover: {}", e));
+                    break;
+                }
                 valid_sources += 1;
             }
-        }
-        p_from.push(0);
-
-        let mut p_to: Vec<u16> = OsStr::new(&target_directory).encode_wide().collect();
-        p_to.push(0);
-        p_to.push(0);
-
-        let mut err_msg = None;
-        if valid_sources > 0 {
-            let mut op = SHFILEOPSTRUCTW {
-                hwnd: ptr::null_mut(),
-                wFunc: FO_MOVE,
-                pFrom: p_from.as_ptr(),
-                pTo: p_to.as_ptr(),
-                fFlags: FOF_ALLOWUNDO,
-                fAnyOperationsAborted: 0,
-                hNameMappings: ptr::null_mut(),
-                lpszProgressTitle: ptr::null(),
-            };
-            let res = unsafe { SHFileOperationW(&mut op) };
-            if res != 0 {
-                err_msg = Some(format!("Error de Windows Shell: {}", res));
-            }
-        }
+            (valid_sources, err_msg)
+        };
 
         let _ = app_handle.emit(
             "transfer-finished",
