@@ -45,6 +45,8 @@
     terminalApp: localStorage.getItem('tron_terminal_app') || 'default',
     terminalCustomPath: localStorage.getItem('tron_terminal_custom') || '',
     monochromeIcons: localStorage.getItem('tron_monochrome_icons') === 'true',
+    iconPack: localStorage.getItem('tron_icon_pack') || 'default',
+    externalAppsConfig: null,
     draggedInternalPaths: [],
     activeSherlockFilter: null,
     sherlockResults: null,
@@ -136,7 +138,10 @@
     rangeUiScale: document.getElementById('rangeUiScale'),
     lblUiScaleValue: document.getElementById('lblUiScaleValue'),
     selectTheme: document.getElementById('selectTheme'),
+    selectIconPack: document.getElementById('selectIconPack'),
     chkMonochromeIcons: document.getElementById('chkMonochromeIcons'),
+    externalAppsListContainer: document.getElementById('externalAppsListContainer'),
+    btnResetExternalApps: document.getElementById('btnResetExternalApps'),
     selectTextEditor: document.getElementById('selectTextEditor'),
     customEditorContainer: document.getElementById('customEditorContainer'),
     inputCustomEditor: document.getElementById('inputCustomEditor'),
@@ -308,20 +313,55 @@
     });
   }
 
-  function getFileIcon(item) {
-    if (item.is_directory) return '📁';
+  function getFileIconKey(item) {
+    if (item.is_directory) return 'folder';
     const ext = (item.extension || '').toLowerCase();
-    if (state.customTextExts.includes(ext)) return '📄';
-    if (['docx', 'doc', 'docm', 'dotx', 'dot', 'odt', 'rtf'].includes(ext)) return '📘';
-    if (['xlsx', 'xls', 'xlsm', 'xlsb', 'xltx', 'xlt', 'ods'].includes(ext)) return '📊';
-    if (['pptx', 'ppt', 'pptm', 'potx', 'pot', 'odp'].includes(ext)) return '📙';
+    if (ext === 'pdf') return 'pdf';
+    if (['docx', 'doc', 'docm', 'dotx', 'dot', 'odt', 'rtf'].includes(ext)) return 'document';
+    if (['xlsx', 'xls', 'xlsm', 'xlsb', 'xltx', 'xlt', 'ods'].includes(ext)) return 'spreadsheet';
+    if (['pptx', 'ppt', 'pptm', 'potx', 'pot', 'odp'].includes(ext)) return 'presentation';
+    if (['zip', 'rar', '7z', 'tar', 'gz', 'tgz', 'bz2', 'xz', 'iso', 'cab'].includes(ext)) return 'archive';
+    if (['rs', 'py', 'js', 'ts', 'jsx', 'tsx', 'html', 'css', 'c', 'cpp', 'h', 'hpp', 'sh', 'bat', 'ps1', 'json', 'toml', 'yaml', 'yml', 'xml'].includes(ext)) return 'code';
+    if (['exe', 'msi', 'bin', 'dll', 'sys', 'appimage', 'deb', 'rpm'].includes(ext)) return 'binary';
+    if (state.customTextExts.includes(ext) || ext === 'txt' || ext === 'md' || ext === 'log') return 'text';
+
     switch (item.file_type) {
+      case 'image': return 'image';
+      case 'audio': return 'audio';
+      case 'video': return 'video';
+      case 'text': return 'text';
+      case 'office': return 'document';
+      case 'archive': return 'archive';
+      default: return 'text';
+    }
+  }
+
+  function getFileIcon(item) {
+    const key = getFileIconKey(item);
+    const pack = state.iconPack || 'default';
+
+    if (pack !== 'default') {
+      return `<img src="icons/${pack}/${key}.svg" class="w-4 h-4 object-contain inline-block align-middle pointer-events-none" alt="" onerror="this.outerHTML='${getDefaultEmojiForIconKey(key)}'" />`;
+    }
+
+    return getDefaultEmojiForIconKey(key);
+  }
+
+  function getDefaultEmojiForIconKey(key) {
+    switch (key) {
+      case 'folder': return '📁';
+      case 'pdf': return '📕';
+      case 'document': return '📘';
+      case 'spreadsheet': return '📊';
+      case 'presentation': return '📙';
+      case 'archive': return '🗜️';
+      case 'code': return '💻';
+      case 'binary': return '⚙️';
       case 'image': return '🖼️';
       case 'audio': return '🎵';
       case 'video': return '🎬';
       case 'text': return '📄';
-      case 'office': return '📑';
-      default: return '📦';
+      default: return '📄';
     }
   }
 
@@ -983,7 +1023,7 @@
     const currentCalcId = state.activeDirCalcId;
 
     el.qvTitle.textContent = item.name;
-    el.qvIcon.textContent = getFileIcon(item);
+    el.qvIcon.innerHTML = getFileIcon(item);
     el.qvBadge.textContent = item.is_directory ? 'CARPETA' : (item.extension || item.file_type || 'archivo').toUpperCase();
     if (el.qvDetails) {
       el.qvDetails.textContent = item.is_directory
@@ -2289,65 +2329,101 @@
 
   let openWithTargetItem = null;
 
-  const APP_SUGGESTIONS = {
+  const DEFAULT_APP_SUGGESTIONS = {
     image: [
-      { name: 'Fotos (Windows)', cmd: 'ms-photos:' },
-      { name: 'Paint', cmd: 'mspaint' },
-      { name: 'GIMP', cmd: 'gimp' },
-      { name: 'Photoshop', cmd: 'photoshop' },
-      { name: 'Navegador Web', cmd: 'msedge' }
+      { id: 'img_photos', name: 'Fotos (Windows)', cmd: 'ms-photos:' },
+      { id: 'img_paint', name: 'Paint', cmd: 'mspaint' },
+      { id: 'img_gimp', name: 'GIMP', cmd: 'gimp' },
+      { id: 'img_photoshop', name: 'Photoshop', cmd: 'photoshop' },
+      { id: 'img_edge', name: 'Navegador Web (Edge)', cmd: 'msedge' }
     ],
     text: [
-      { name: 'Bloc de notas', cmd: 'notepad' },
-      { name: 'Visual Studio Code', cmd: 'code' },
-      { name: 'VSCodium', cmd: 'codium' },
-      { name: 'Sublime Text', cmd: 'subl' },
-      { name: 'Notepad++', cmd: 'notepad++' },
-      { name: 'Neovim', cmd: 'nvim' }
+      { id: 'txt_notepad', name: 'Bloc de notas', cmd: 'notepad' },
+      { id: 'txt_code', name: 'Visual Studio Code', cmd: 'code' },
+      { id: 'txt_codium', name: 'VSCodium', cmd: 'codium' },
+      { id: 'txt_subl', name: 'Sublime Text', cmd: 'subl' },
+      { id: 'txt_npp', name: 'Notepad++', cmd: 'notepad++' },
+      { id: 'txt_nvim', name: 'Neovim', cmd: 'nvim' }
     ],
     office: [
-      { name: 'Microsoft Word', cmd: 'winword' },
-      { name: 'Microsoft Excel', cmd: 'excel' },
-      { name: 'Microsoft PowerPoint', cmd: 'powerpnt' },
-      { name: 'LibreOffice Writer', cmd: 'soffice' },
-      { name: 'Acrobat Reader', cmd: 'AcroRd32' }
+      { id: 'off_word', name: 'Microsoft Word', cmd: 'winword' },
+      { id: 'off_excel', name: 'Microsoft Excel', cmd: 'excel' },
+      { id: 'off_powerpnt', name: 'Microsoft PowerPoint', cmd: 'powerpnt' },
+      { id: 'off_soffice', name: 'LibreOffice', cmd: 'soffice' },
+      { id: 'off_acrobat', name: 'Acrobat Reader', cmd: 'AcroRd32' }
     ],
     media: [
-      { name: 'VLC Media Player', cmd: 'vlc' },
-      { name: 'Windows Media Player', cmd: 'wmplayer' },
-      { name: 'mpv', cmd: 'mpv' },
-      { name: 'Spotify', cmd: 'spotify' }
+      { id: 'med_vlc', name: 'VLC Media Player', cmd: 'vlc' },
+      { id: 'med_wmplayer', name: 'Windows Media Player', cmd: 'wmplayer' },
+      { id: 'med_mpv', name: 'mpv', cmd: 'mpv' },
+      { id: 'med_spotify', name: 'Spotify', cmd: 'spotify' }
     ],
     archive: [
-      { name: 'Explorador de archivos', cmd: 'explorer' },
-      { name: '7-Zip', cmd: '7zFM' },
-      { name: 'WinRAR', cmd: 'winrar' }
+      { id: 'arc_explorer', name: 'Explorador de archivos', cmd: 'explorer' },
+      { id: 'arc_7zip', name: '7-Zip', cmd: '7zFM' },
+      { id: 'arc_winrar', name: 'WinRAR', cmd: 'winrar' }
     ],
     general: [
-      { name: 'Bloc de notas', cmd: 'notepad' },
-      { name: 'Visual Studio Code', cmd: 'code' },
-      { name: 'Explorador de archivos', cmd: 'explorer' }
+      { id: 'gen_notepad', name: 'Bloc de notas', cmd: 'notepad' },
+      { id: 'gen_code', name: 'Visual Studio Code', cmd: 'code' },
+      { id: 'gen_explorer', name: 'Explorador de archivos', cmd: 'explorer' }
     ]
   };
 
+  function getExternalAppsConfig() {
+    if (state.externalAppsConfig) return state.externalAppsConfig;
+    try {
+      const raw = localStorage.getItem('tron_external_apps_config');
+      if (raw) {
+        state.externalAppsConfig = JSON.parse(raw);
+        return state.externalAppsConfig;
+      }
+    } catch (e) {
+      console.warn('Error reading tron_external_apps_config:', e);
+    }
+    // Default initial config: all enabled, no custom path
+    const conf = {};
+    Object.keys(DEFAULT_APP_SUGGESTIONS).forEach(cat => {
+      DEFAULT_APP_SUGGESTIONS[cat].forEach(app => {
+        conf[app.id] = { enabled: true, customPath: '' };
+      });
+    });
+    state.externalAppsConfig = conf;
+    return conf;
+  }
+
+  function saveExternalAppsConfig(conf) {
+    state.externalAppsConfig = conf;
+    localStorage.setItem('tron_external_apps_config', JSON.stringify(conf));
+  }
+
   function getSuggestionsForExt(ext, fileType) {
     const e = (ext || '').toLowerCase();
+    let rawList = DEFAULT_APP_SUGGESTIONS.general;
     if (['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'svg', 'ico', 'dng', 'tiff', 'tif'].includes(e) || fileType === 'image') {
-      return APP_SUGGESTIONS.image;
+      rawList = DEFAULT_APP_SUGGESTIONS.image;
+    } else if (['mp4', 'mkv', 'avi', 'mov', 'webm', 'mp3', 'wav', 'flac', 'ogg', 'm4a', 'aac'].includes(e) || fileType === 'video' || fileType === 'audio') {
+      rawList = DEFAULT_APP_SUGGESTIONS.media;
+    } else if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'odt', 'ods', 'odp', 'pdf'].includes(e) || fileType === 'office' || fileType === 'pdf') {
+      rawList = DEFAULT_APP_SUGGESTIONS.office;
+    } else if (['zip', 'rar', '7z', 'tar', 'gz', 'tgz', 'bz2', 'xz'].includes(e) || fileType === 'archive') {
+      rawList = DEFAULT_APP_SUGGESTIONS.archive;
+    } else if (['txt', 'md', 'rs', 'js', 'ts', 'py', 'json', 'toml', 'yaml', 'yml', 'html', 'css', 'c', 'cpp', 'h', 'sh', 'bat', 'ps1', 'ini', 'log'].includes(e) || fileType === 'text' || fileType === 'code') {
+      rawList = DEFAULT_APP_SUGGESTIONS.text;
     }
-    if (['mp4', 'mkv', 'avi', 'mov', 'webm', 'mp3', 'wav', 'flac', 'ogg', 'm4a', 'aac'].includes(e) || fileType === 'video' || fileType === 'audio') {
-      return APP_SUGGESTIONS.media;
-    }
-    if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'odt', 'ods', 'odp', 'pdf'].includes(e) || fileType === 'office' || fileType === 'pdf') {
-      return APP_SUGGESTIONS.office;
-    }
-    if (['zip', 'rar', '7z', 'tar', 'gz', 'tgz', 'bz2'].includes(e) || fileType === 'archive') {
-      return APP_SUGGESTIONS.archive;
-    }
-    if (['txt', 'md', 'rs', 'js', 'ts', 'py', 'json', 'toml', 'yaml', 'yml', 'html', 'css', 'c', 'cpp', 'h', 'sh', 'bat', 'ps1', 'ini', 'log'].includes(e) || fileType === 'text' || fileType === 'code') {
-      return APP_SUGGESTIONS.text;
-    }
-    return APP_SUGGESTIONS.general;
+
+    const conf = getExternalAppsConfig();
+    return rawList
+      .filter(app => !conf[app.id] || conf[app.id].enabled !== false)
+      .map(app => {
+        const custom = conf[app.id] && conf[app.id].customPath ? conf[app.id].customPath.trim() : '';
+        return {
+          id: app.id,
+          name: app.name,
+          cmd: custom || app.cmd,
+          isCustom: !!custom
+        };
+      });
   }
 
   function openOpenWithModal(targetItem = null) {
@@ -3555,7 +3631,8 @@
       tabTypography: document.getElementById('panelTypography'),
       tabFiles: document.getElementById('panelFiles'),
       tabEditor: document.getElementById('panelEditor'),
-      tabTerminal: document.getElementById('panelTerminal')
+      tabTerminal: document.getElementById('panelTerminal'),
+      tabExternalApps: document.getElementById('panelExternalApps')
     };
     prefTabButtons.forEach(btn => {
       btn.onclick = () => {
@@ -3575,6 +3652,14 @@
         });
       };
     });
+
+    if (el.btnResetExternalApps) {
+      el.btnResetExternalApps.onclick = () => {
+        localStorage.removeItem('tron_external_apps_config');
+        state.externalAppsConfig = null;
+        renderExternalAppsConfigUI();
+      };
+    }
 
     if (el.rangeUiScale) {
       el.rangeUiScale.addEventListener('input', (e) => {
@@ -3911,9 +3996,80 @@
     }
   }
 
+  function renderExternalAppsConfigUI() {
+    if (!el.externalAppsListContainer) return;
+    const conf = getExternalAppsConfig();
+    el.externalAppsListContainer.innerHTML = '';
+
+    const categoryNames = {
+      image: '🖼️ Imágenes (Fotos, Paint, GIMP, Photoshop...)',
+      text: '📄 Archivos de Texto y Código (Notepad, VS Code, Sublime...)',
+      office: '📑 Documentos y Office (Word, Excel, PowerPoint, PDF...)',
+      media: '🎬 Audio y Vídeo (VLC, Media Player, mpv...)',
+      archive: '🗜️ Archivos Comprimidos (Explorador, 7-Zip, WinRAR...)',
+      general: '⚙️ General (Otros tipos de archivo)'
+    };
+
+    Object.keys(DEFAULT_APP_SUGGESTIONS).forEach(cat => {
+      const catBox = document.createElement('div');
+      catBox.className = 'p-3 bg-gnome-sidebar/40 rounded-lg border border-gnome-border space-y-3';
+
+      const catHeader = document.createElement('div');
+      catHeader.className = 'font-semibold text-xs text-gnome-text pb-1 border-b border-gnome-border/50';
+      catHeader.textContent = categoryNames[cat] || cat;
+      catBox.appendChild(catHeader);
+
+      const appsGrid = document.createElement('div');
+      appsGrid.className = 'space-y-2.5';
+
+      DEFAULT_APP_SUGGESTIONS[cat].forEach(app => {
+        const itemConf = conf[app.id] || { enabled: true, customPath: '' };
+        const isChecked = itemConf.enabled !== false;
+        const customPath = itemConf.customPath || '';
+
+        const row = document.createElement('div');
+        row.className = 'p-2 rounded bg-gnome-surface/60 border border-gnome-border/60 space-y-1.5';
+        row.innerHTML = `
+          <div class="flex items-center justify-between">
+            <label class="flex items-center gap-2 cursor-pointer select-none">
+              <input type="checkbox" data-app-id="${escapeHtml(app.id)}" class="chk-external-app w-4 h-4 rounded bg-gnome-sidebar border-gnome-border text-gnome-active focus:ring-0" ${isChecked ? 'checked' : ''}>
+              <span class="font-medium text-gnome-text">${escapeHtml(app.name)}</span>
+            </label>
+            <span class="text-[10px] text-gnome-textDim font-mono">Por defecto: ${escapeHtml(app.cmd)}</span>
+          </div>
+          <div>
+            <input type="text" data-app-custom-id="${escapeHtml(app.id)}" value="${escapeHtml(customPath)}" placeholder="Ruta personalizada (ej: C:\\Program Files\\...\\app.exe) si no abre por defecto" class="input-external-custom-path w-full bg-gnome-sidebar border border-gnome-border rounded px-2 py-1 text-[11px] text-gnome-text placeholder-gnome-textDim focus:outline-none focus:border-gnome-active" />
+          </div>
+        `;
+        appsGrid.appendChild(row);
+      });
+
+      catBox.appendChild(appsGrid);
+      el.externalAppsListContainer.appendChild(catBox);
+    });
+  }
+
+  function readExternalAppsFromUI() {
+    if (!el.externalAppsListContainer) return null;
+    const conf = {};
+    const checkInputs = el.externalAppsListContainer.querySelectorAll('.chk-external-app');
+    checkInputs.forEach(chk => {
+      const id = chk.dataset.appId;
+      if (id) {
+        const customInput = el.externalAppsListContainer.querySelector(`.input-external-custom-path[data-app-custom-id="${id}"]`);
+        conf[id] = {
+          enabled: chk.checked,
+          customPath: customInput ? customInput.value.trim() : ''
+        };
+      }
+    });
+    return conf;
+  }
+
   // --- Appearance & Preferences Settings ---
   function openAppearanceModal() {
     const theme = localStorage.getItem('tron_theme') || 'adwaita';
+    const iconPack = localStorage.getItem('tron_icon_pack') || 'default';
     const density = localStorage.getItem('tron_density') || 'normal';
     const fontSize = localStorage.getItem('tron_fontsize') || 'text-sm';
     const normalWeight = localStorage.getItem('tron_normal_weight') === 'true';
@@ -3927,6 +4083,7 @@
     const recursiveSearch = localStorage.getItem('tron_recursive_search') !== 'false';
 
     if (el.selectTheme) el.selectTheme.value = theme;
+    if (el.selectIconPack) el.selectIconPack.value = iconPack;
     if (el.chkMonochromeIcons) el.chkMonochromeIcons.checked = monochromeIcons;
     if (el.chkPrefShowHidden) el.chkPrefShowHidden.checked = state.showHiddenFiles;
     if (el.chkPrefRecursiveSearch) el.chkPrefRecursiveSearch.checked = recursiveSearch;
@@ -3962,6 +4119,8 @@
       r.checked = (r.value === density);
     });
 
+    renderExternalAppsConfigUI();
+
     el.modalAppearance.classList.remove('hidden');
   }
 
@@ -3984,6 +4143,7 @@
 
   function saveAppearanceSettings() {
     const theme = el.selectTheme ? el.selectTheme.value : 'adwaita';
+    const iconPack = el.selectIconPack ? el.selectIconPack.value : 'default';
     const fontSize = el.selectFontSize ? el.selectFontSize.value : 'text-sm';
     const normalWeight = el.chkNormalFontWeight ? el.chkNormalFontWeight.checked : false;
     const uiScale = el.rangeUiScale ? el.rangeUiScale.value : '14';
@@ -4000,7 +4160,13 @@
     const selectedDensity = document.querySelector('input[name="density"]:checked');
     if (selectedDensity) density = selectedDensity.value;
 
+    const extAppsConf = readExternalAppsFromUI();
+    if (extAppsConf) {
+      saveExternalAppsConfig(extAppsConf);
+    }
+
     localStorage.setItem('tron_theme', theme);
+    localStorage.setItem('tron_icon_pack', iconPack);
     localStorage.setItem('tron_density', density);
     localStorage.setItem('tron_fontsize', fontSize);
     localStorage.setItem('tron_normal_weight', normalWeight ? 'true' : 'false');
@@ -4014,6 +4180,7 @@
     localStorage.setItem('tron_show_hidden', showHidden ? 'true' : 'false');
     localStorage.setItem('tron_recursive_search', recursiveSearch ? 'true' : 'false');
 
+    state.iconPack = iconPack;
     state.textEditor = textEditor;
     state.textEditorCustomPath = customEditor;
     state.terminalApp = terminalApp;
@@ -4028,7 +4195,7 @@
       .map(s => s.trim().toLowerCase().replace(/^\./, ''))
       .filter(Boolean);
 
-    applyAppearanceSettings(theme, density, fontSize, normalWeight, uiScale, monochromeIcons);
+    applyAppearanceSettings(theme, density, fontSize, normalWeight, uiScale, monochromeIcons, iconPack);
     closeAppearanceModal();
     applyFilter();
     renderFileList();
@@ -4036,6 +4203,7 @@
 
   function loadAppearanceSettings() {
     const theme = localStorage.getItem('tron_theme') || 'adwaita';
+    const iconPack = localStorage.getItem('tron_icon_pack') || 'default';
     const density = localStorage.getItem('tron_density') || 'normal';
     const fontSize = localStorage.getItem('tron_fontsize') || 'text-sm';
     const normalWeight = localStorage.getItem('tron_normal_weight') === 'true';
@@ -4047,6 +4215,7 @@
       el.chkRecursiveSearch.checked = savedRec !== 'false';
     }
 
+    state.iconPack = iconPack;
     state.terminalApp = localStorage.getItem('tron_terminal_app') || 'default';
     state.terminalCustomPath = localStorage.getItem('tron_terminal_custom') || '';
     state.monochromeIcons = monochromeIcons;
@@ -4055,12 +4224,13 @@
       .map(s => s.trim().toLowerCase().replace(/^\./, ''))
       .filter(Boolean);
 
-    applyAppearanceSettings(theme, density, fontSize, normalWeight, uiScale, monochromeIcons);
+    applyAppearanceSettings(theme, density, fontSize, normalWeight, uiScale, monochromeIcons, iconPack);
   }
 
-  function applyAppearanceSettings(theme, density, fontSize, normalWeight, uiScale = '14', monochromeIcons = false) {
+  function applyAppearanceSettings(theme, density, fontSize, normalWeight, uiScale = '14', monochromeIcons = false, iconPack = 'default') {
     document.body.setAttribute('data-theme', theme);
     state.normalFontWeight = normalWeight;
+    state.iconPack = iconPack;
 
     if (monochromeIcons) {
       document.documentElement.setAttribute('data-monochrome-icons', 'true');

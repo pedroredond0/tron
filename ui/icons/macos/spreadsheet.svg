@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="100%" height="100%">
+    <rect x="5" y="3" width="22" height="26" rx="4" fill="#30B0C7"/>
+    <path d="M20 3v6h7" fill="#1C8699"/>
+    <text x="16" y="20" fill="#FFFFFF" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-weight="bold" font-size="7" text-anchor="middle">XLS</text>
+  </svg>
