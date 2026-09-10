@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full select-none">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>tronExplorer</title>
+  <link rel="icon" type="image/x-icon" href="favicon.ico" />
+  <link rel="icon" type="image/png" href="icon.png" />
+  <!-- Tailwind CSS standalone build -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            gnome: {
+              bg: 'var(--app-bg)',
+              surface: 'var(--app-surface)',
+              sidebar: 'var(--app-sidebar)',
+              border: 'var(--app-border)',
+              hover: 'var(--app-hover)',
+              active: 'var(--app-active)',
+              activeHover: 'var(--app-active-hover)',
+              text: 'var(--app-text)',
+              textDim: 'var(--app-text-dim)'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* CSS Variables for Themes */
+    :root {
+      --app-bg: #242424;
+      --app-surface: #303030;
+      --app-sidebar: #1e1e1e;
+      --app-border: #3c3c3c;
+      --app-hover: #383838;
+      --app-active: #3584e4;
+      --app-active-hover: #1c71d8;
+      --app-text: #deddda;
+      --app-text-dim: #9a9996;
+      --app-font-size: 13px;
+      --app-font-weight: 400;
+      --app-row-padding: 6px;
+    }
+
+    [data-theme="windows10"] {
+      --app-bg: #1f1f1f;
+      --app-surface: #2b2b2b;
+      --app-sidebar: #181818;
+      --app-border: #383838;
+      --app-hover: #333333;
+      --app-active: #0078d7;
+      --app-active-hover: #0063b1;
+      --app-text: #ffffff;
+      --app-text-dim: #a0a0a0;
+    }
+
+    [data-theme="ubuntu"] {
+      --app-bg: #2c001e;
+      --app-surface: #380c2a;
+      --app-sidebar: #200015;
+      --app-border: #4d1c3e;
+      --app-hover: #481436;
+      --app-active: #E95420;
+      --app-active-hover: #cf4313;
+      --app-text: #f7f7f7;
+      --app-text-dim: #aea79f;
+    }
+
+    [data-theme="manjaro"] {
+      --app-bg: #21282b;
+      --app-surface: #2c3539;
+      --app-sidebar: #1b2022;
+      --app-border: #3d494f;
+      --app-hover: #364146;
+      --app-active: #16a085;
+      --app-active-hover: #138a72;
+      --app-text: #e2e8f0;
+      --app-text-dim: #94a3b8;
+    }
+
+    [data-theme="nvchad"] {
+      --app-bg: #1e222a;
+      --app-surface: #252931;
+      --app-sidebar: #181b21;
+      --app-border: #2d313b;
+      --app-hover: #303540;
+      --app-active: #7aa2f7;
+      --app-active-hover: #5d87e0;
+      --app-text: #abb2bf;
+      --app-text-dim: #5c6370;
+    }
+
+    [data-theme="tokyonight"] {
+      --app-bg: #1a1b26;
+      --app-surface: #24283b;
+      --app-sidebar: #16161e;
+      --app-border: #2f354f;
+      --app-hover: #2e3450;
+      --app-active: #7aa2f7;
+      --app-active-hover: #bb9af7;
+      --app-text: #c0caf5;
+      --app-text-dim: #787c99;
+    }
+
+    [data-theme="matteblack"] {
+      --app-bg: #0f0f0f;
+      --app-surface: #1a1a1a;
+      --app-sidebar: #0a0a0a;
+      --app-border: #262626;
+      --app-hover: #242424;
+      --app-active: #3b82f6;
+      --app-active-hover: #2563eb;
+      --app-active-text: #ffffff;
+      --app-text: #f3f4f6;
+      --app-text-dim: #9ca3af;
+    }
+
+    [data-theme="light"] {
+      --app-bg: #f6f6f6;
+      --app-surface: #ffffff;
+      --app-sidebar: #ebebeb;
+      --app-border: #d0d0d0;
+      --app-hover: #e2e2e2;
+      --app-active: #3584e4;
+      --app-active-hover: #1c71d8;
+      --app-active-text: #ffffff;
+      --app-text: #2e3436;
+      --app-text-dim: #777777;
+    }
+
+    .theme-app-bg { background-color: var(--app-bg) !important; }
+    .theme-app-surface { background-color: var(--app-surface) !important; }
+    .theme-app-sidebar { background-color: var(--app-sidebar) !important; }
+    .theme-app-border { border-color: var(--app-border) !important; }
+    .theme-app-hover:hover { background-color: var(--app-hover) !important; }
+    .theme-app-active { background-color: var(--app-active) !important; }
+    .theme-app-text { color: var(--app-text) !important; }
+    .theme-app-text-dim { color: var(--app-text-dim) !important; }
+
+    .file-row {
+      padding-top: var(--app-row-padding, 6px);
+      padding-bottom: var(--app-row-padding, 6px);
+    }
+
+    /* Dynamic UI scale properties */
+    header {
+      font-size: var(--app-ui-scale, 14px) !important;
+    }
+    header input, header button, header nav {
+      font-size: var(--app-ui-scale, 14px) !important;
+    }
+    #menuBar {
+      font-size: max(11px, calc(var(--app-ui-scale, 14px) - 2px)) !important;
+    }
+    aside {
+      font-size: var(--app-ui-scale, 14px) !important;
+      width: calc(15rem * (var(--app-ui-scale-num, 14) / 14)) !important;
+    }
+    aside button, aside span, aside div, aside p {
+      font-size: inherit;
+    }
+    aside .text-\[11px\] {
+      font-size: max(10px, calc(var(--app-ui-scale, 14px) - 2px)) !important;
+    }
+    aside .text-xs {
+      font-size: var(--app-ui-scale, 14px) !important;
+    }
+    aside .text-sm {
+      font-size: calc(var(--app-ui-scale, 14px) + 2px) !important;
+    }
+    aside button {
+      padding-top: calc(var(--app-ui-scale-num, 14) * 0.35px) !important;
+      padding-bottom: calc(var(--app-ui-scale-num, 14) * 0.35px) !important;
+    }
+    #favoriteLinks, #quickLinks, #driveLinks, #networkLinks {
+      font-size: var(--app-ui-scale, 14px) !important;
+    }
+    #favoriteLinks button, #quickLinks button, #driveLinks button, #networkLinks button, #favoriteLinks .group {
+      font-size: var(--app-ui-scale, 14px) !important;
+    }
+    #actionBar, #actionBar button, #actionBar span {
+      font-size: var(--app-ui-scale, 14px) !important;
+    }
+    #actionBar {
+      height: calc(2.4rem * (var(--app-ui-scale-num, 14) / 14)) !important;
+    }
+    #actionBar button {
+      padding-top: calc(var(--app-ui-scale-num, 14) * 0.25px) !important;
+      padding-bottom: calc(var(--app-ui-scale-num, 14) * 0.25px) !important;
+    }
+    .action-bar-btn {
+      font-size: var(--app-ui-scale, 14px) !important;
+      padding-top: calc(var(--app-ui-scale-num, 14) * 0.25px) !important;
+      padding-bottom: calc(var(--app-ui-scale-num, 14) * 0.25px) !important;
+    }
+
+    /* Column sort headers */
+    .sort-header {
+      cursor: pointer;
+      user-select: none;
+      transition: color 0.15s ease;
+    }
+    .sort-header:hover {
+      color: var(--app-text) !important;
+    }
+
+    /* Syntax Highlighting in QuickView */
+    .syn-keyword { color: #f472b6; font-weight: 600; }
+    .syn-string { color: #a7f3d0; }
+    .syn-number { color: #fcd34d; }
+    .syn-boolean { color: #60a5fa; font-weight: 600; }
+    .syn-comment { color: #9ca3af; font-style: italic; }
+    .syn-function { color: #93c5fd; }
+    .syn-heading { color: #60a5fa; font-weight: bold; }
+    .syn-list { color: #fcd34d; font-weight: bold; }
+    .syn-key { color: #93c5fd; font-weight: 500; }
+
+    /* Custom scrollbar Gnome style */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #4a4a4a;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #606060;
+    }
+
+    body.internal-dragging {
+      cursor: default !important;
+    }
+    body.internal-dragging * {
+      user-select: none !important;
+    }
+    #drag-ghost {
+      pointer-events: none;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    }
+  </style>
+</head>
+<body id="appBody" class="h-full bg-gnome-bg text-gnome-text flex flex-col font-sans overflow-hidden select-none" data-theme="adwaita">
+  <!-- Classic App Menu Bar (GNOME / Windows styled) -->
+  <div id="menuBar" class="h-7 bg-gnome-sidebar border-b border-gnome-border flex items-center px-2 text-xs text-gnome-text shrink-0 gap-1 select-none z-30">
+    <!-- Mini App Icon (Sharp render) -->
+    <div class="flex items-center mr-1 pr-1.5 border-r border-gnome-border/60 shrink-0">
+      <img src="icon.png" alt="tron" class="w-4 h-4 object-contain" />
+    </div>
+
+    <!-- Archivo -->
+    <div class="relative menu-dropdown">
+      <button class="menu-btn px-2 py-0.5 rounded hover:bg-gnome-hover hover:text-white transition-colors">Archivo</button>
+      <div class="menu-content hidden absolute left-0 top-full mt-0.5 w-52 bg-gnome-surface border border-gnome-border rounded-md shadow-xl py-1 z-50 text-xs">
+        <button id="menuNewFile" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+          <span>Nuevo Archivo...</span><span class="text-gnome-textDim text-[11px]">Ctrl+N</span>
+        </button>
+        <button id="menuNewFolder" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+          <span>Nueva Carpeta...</span><span class="text-gnome-textDim text-[11px]">Ctrl+Shift+N</span>
+        </button>
+        <div class="my-1 border-t border-gnome-border/60"></div>
+        <button id="menuOpenDefault" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+          <span>Abrir con aplicación</span><span class="text-gnome-textDim text-[11px]">Enter</span>
+        </button>
+        <button id="menuDelete" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+          <span>Mover a Papelera</span><span class="text-gnome-textDim text-[11px]">Supr</span>
+        </button>
+        <div class="my-1 border-t border-gnome-border/60"></div>
+        <button id="menuAddFavorite" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+          <span>Añadir a Favoritos</span><span class="text-gnome-textDim text-[11px]">Ctrl+D</span>
+        </button>
+        <div class="my-1 border-t border-gnome-border/60"></div>
+        <button id="menuForceQuit" class="w-full text-left px-3 py-1.5 hover:bg-red-600 hover:text-white flex items-center justify-between text-red-400">
+          <span>Forzar Salida</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Edición -->
+    <div class="relative menu-dropdown">
+      <button class="menu-btn px-2 py-0.5 rounded hover:bg-gnome-hover hover:text-white transition-colors">Edición</button>
+      <div class="menu-content hidden absolute left-0 top-full mt-0.5 w-48 bg-gnome-surface border border-gnome-border rounded-md shadow-xl py-1 z-50 text-xs">
+        <button id="menuCut" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+          <span>Cortar</span><span class="text-gnome-textDim text-[11px]">Ctrl+X</span>
+        </button>
+        <button id="menuCopy" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+          <span>Copiar</span><span class="text-gnome-textDim text-[11px]">Ctrl+C</span>
+        </button>
+        <button id="menuPaste" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between disabled:opacity-40 disabled:pointer-events-none">
+          <span>Pegar</span><span class="text-gnome-textDim text-[11px]">Ctrl+V</span>
+        </button>
+        <div class="my-1 border-t border-gnome-border/60"></div>
+        <button id="menuSelectAll" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+          <span>Seleccionar todo</span><span class="text-gnome-textDim text-[11px]">Ctrl+A</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Ver -->
+    <div class="relative menu-dropdown">
+      <button class="menu-btn px-2 py-0.5 rounded hover:bg-gnome-hover hover:text-white transition-colors">Ver</button>
+      <div class="menu-content hidden absolute left-0 top-full mt-0.5 w-52 bg-gnome-surface border border-gnome-border rounded-md shadow-xl py-1 z-50 text-xs">
+        <button id="menuQuickView" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+          <span>QuickView</span><span class="text-gnome-textDim text-[11px]">Espacio</span>
+        </button>
+        <button id="menuCalcDirSizes" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+          <span>Calcular espacio de carpetas</span>
+        </button>
+        <button id="menuRefresh" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+          <span>Actualizar</span><span class="text-gnome-textDim text-[11px]">F5</span>
+        </button>
+        <button id="menuToggleHidden" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+          <span>Mostrar archivos ocultos</span><span class="text-gnome-textDim text-[11px]">Ctrl+H</span>
+        </button>
+        <div class="my-1 border-t border-gnome-border/60"></div>
+        <button id="menuAppearance" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between font-medium text-gnome-active">
+          <span>Personalizar aspecto...</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Ayuda -->
+    <div class="relative menu-dropdown">
+      <button class="menu-btn px-2 py-0.5 rounded hover:bg-gnome-hover hover:text-white transition-colors">Ayuda</button>
+      <div class="menu-content hidden absolute left-0 top-full mt-0.5 w-52 bg-gnome-surface border border-gnome-border rounded-md shadow-xl py-1 z-50 text-xs">
+        <button id="menuShortcuts" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+          <span>Atajos de teclado</span><span class="text-gnome-textDim text-[11px]">F1</span>
+        </button>
+        <button id="menuAbout" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+          <span>Acerca de tronExplorer</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top Navigation Header -->
+  <header class="h-11 bg-gnome-surface border-b border-gnome-border flex items-center justify-between px-3 shrink-0 gap-2">
+    <!-- History & Navigation buttons -->
+    <div class="flex items-center gap-1">
+      <button id="btnBack" title="Atrás (Alt+Left o Backspace)" class="p-1.5 rounded-md hover:bg-gnome-hover active:bg-gnome-border text-gnome-text disabled:opacity-30 disabled:pointer-events-none">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+      </button>
+      <button id="btnForward" title="Adelante (Alt+Right)" class="p-1.5 rounded-md hover:bg-gnome-hover active:bg-gnome-border text-gnome-text disabled:opacity-30 disabled:pointer-events-none">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+      </button>
+      <button id="btnRefresh" title="Actualizar (F5)" class="p-1.5 rounded-md hover:bg-gnome-hover active:bg-gnome-border text-gnome-text">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+      </button>
+    </div>
+
+    <!-- Breadcrumb Path Bar -->
+    <nav id="breadcrumbs" class="flex-1 flex items-center gap-1 overflow-x-auto px-2 py-1 bg-gnome-sidebar rounded-md border border-gnome-border text-xs text-gnome-text whitespace-nowrap scrollbar-none">
+      <!-- Generated dynamically -->
+    </nav>
+
+    <!-- Search Input Filter, Recursive Checkbox & Hidden Toggle -->
+    <div class="flex items-center gap-2">
+      <label id="lblShowHidden" class="flex items-center gap-1.5 text-[11px] text-gnome-textDim hover:text-gnome-text cursor-pointer select-none" title="Mostrar u ocultar archivos ocultos, de sistema y dotfiles (Ctrl+H)">
+        <input id="chkShowHidden" type="checkbox" class="rounded bg-gnome-sidebar border-gnome-border text-gnome-active focus:ring-0" />
+        <span class="hidden sm:inline">Ocultos</span>
+      </label>
+      <label class="flex items-center gap-1.5 text-[11px] text-gnome-textDim hover:text-gnome-text cursor-pointer select-none" title="Buscar en subcarpetas del directorio actual">
+        <input id="chkRecursiveSearch" type="checkbox" class="rounded bg-gnome-sidebar border-gnome-border text-gnome-active focus:ring-0" />
+        <span class="hidden sm:inline">Recursivo</span>
+      </label>
+      <div class="relative w-60">
+        <input id="searchInput" type="text" placeholder="Buscar en carpeta..." class="w-full bg-gnome-sidebar border border-gnome-border rounded-md px-2.5 py-1 text-xs text-gnome-text placeholder-gnome-textDim focus:outline-none focus:border-gnome-active" />
+        <button id="btnClearSearch" class="hidden absolute right-2 top-1/2 -translate-y-1/2 text-gnome-textDim hover:text-gnome-text text-xs">✕</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Action Bar (Nuevo archivo, Nueva carpeta, Cortar, Copiar, Pegar, Papelera, Calcular tamaño) -->
+  <div id="actionBar" class="h-9 bg-gnome-bg border-b border-gnome-border flex items-center justify-between px-3 shrink-0 text-xs text-gnome-text">
+    <div class="flex items-center gap-1.5">
+      <button id="btnActionNewFile" class="px-2.5 py-1 rounded bg-gnome-surface hover:bg-gnome-hover border border-gnome-border flex items-center gap-1.5 text-xs transition-colors" title="Crear nuevo archivo (Ctrl+N)">
+        <span>📄</span>
+        <span>Nuevo Archivo</span>
+      </button>
+      <button id="btnActionNewFolder" class="px-2.5 py-1 rounded bg-gnome-surface hover:bg-gnome-hover border border-gnome-border flex items-center gap-1.5 text-xs transition-colors" title="Crear nueva carpeta (Ctrl+Shift+N)">
+        <span>📁</span>
+        <span>Nueva Carpeta</span>
+      </button>
+      <div class="h-4 border-r border-gnome-border/80 mx-1"></div>
+      <button id="btnActionCut" class="p-1 px-2 rounded hover:bg-gnome-surface text-gnome-text flex items-center gap-1 transition-colors" title="Cortar selección (Ctrl+X)">
+        <span>✂️</span>
+        <span class="hidden sm:inline">Cortar</span>
+      </button>
+      <button id="btnActionCopy" class="p-1 px-2 rounded hover:bg-gnome-surface text-gnome-text flex items-center gap-1 transition-colors" title="Copiar selección (Ctrl+C)">
+        <span>📋</span>
+        <span class="hidden sm:inline">Copiar</span>
+      </button>
+      <button id="btnActionPaste" class="p-1 px-2 rounded hover:bg-gnome-surface text-gnome-text flex items-center gap-1 transition-colors disabled:opacity-40 disabled:pointer-events-none" title="Pegar elementos (Ctrl+V)" disabled>
+        <span>📥</span>
+        <span class="hidden sm:inline">Pegar</span>
+      </button>
+      <button id="btnActionDelete" class="p-1 px-2 rounded hover:bg-red-600/20 text-red-400 flex items-center gap-1 transition-colors" title="Mover a papelera (Supr)">
+        <span>🗑️</span>
+        <span class="hidden sm:inline">Eliminar</span>
+      </button>
+      <div class="h-4 border-r border-gnome-border/80 mx-1"></div>
+      <button id="btnActionCalcDirSizes" class="p-1 px-2 rounded hover:bg-gnome-surface text-gnome-text flex items-center gap-1 transition-colors" title="Calcular espacio ocupado por carpetas">
+        <span>📊</span>
+        <span class="hidden md:inline">Calcular Tamaños</span>
+      </button>
+    </div>
+
+    <div class="flex items-center gap-2 text-[11px] text-gnome-textDim relative">
+      <!-- Clipboard Status Badge -->
+      <span id="clipboardBadge" class="hidden px-2 py-0.5 bg-gnome-active/20 text-gnome-active border border-gnome-active/40 rounded">Portapapeles</span>
+
+      <!-- Interactive Progress Bar for Paste / Transfer -->
+      <div id="pasteProgressContainer" class="hidden relative items-center cursor-pointer select-none group" title="Clic para ver detalles de transferencia">
+        <div class="flex items-center gap-2 px-3 py-1 rounded-full bg-gnome-surface border border-gnome-border hover:border-gnome-active shadow-sm transition-all">
+          <span id="pasteProgressIcon" class="text-xs animate-spin">⏳</span>
+          <span id="pasteProgressLabel" class="text-[11px] font-medium text-gnome-text">Pegando</span>
+          <!-- Mini Progress Bar -->
+          <div class="w-24 sm:w-32 h-2.5 bg-gnome-sidebar rounded-full overflow-hidden border border-gnome-border/60">
+            <div id="pasteProgressBar" class="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full transition-all duration-150" style="width: 0%"></div>
+          </div>
+          <span id="pasteProgressPercent" class="text-[11px] font-bold text-gnome-active w-8 text-right">0%</span>
+        </div>
+
+        <!-- Transfer Details Popover Card (Multi-task capable) -->
+        <div id="pasteDetailsCard" class="hidden absolute right-0 top-full mt-2 w-96 bg-gnome-surface border border-gnome-border rounded-xl shadow-2xl p-4 z-50 text-xs text-gnome-text space-y-3">
+          <div class="flex items-center justify-between border-b border-gnome-border/70 pb-2">
+            <div class="flex items-center gap-2 font-semibold text-gnome-text">
+              <span class="text-amber-400">⚡</span> <span id="pasteDetailsTitle">Transferencias en curso</span>
+            </div>
+            <button id="btnClosePasteDetails" class="text-gnome-textDim hover:text-white text-xs px-1">✕</button>
+          </div>
+          <div id="pasteTasksList" class="space-y-3 max-h-80 overflow-y-auto pr-1">
+            <!-- Dynamic task rows generated here for multi-task support -->
+          </div>
+        </div>
+      </div>
+
+      <button id="btnOpenAppearance" class="p-1 px-2 rounded hover:bg-gnome-surface text-gnome-text flex items-center gap-1 transition-colors" title="Personalizar tema, fuente y colores">
+        <span>🎨 Tema</span>
+      </button>
+      <button id="btnActionQuickView" class="p-1 px-2 rounded hover:bg-gnome-surface text-gnome-text flex items-center gap-1" title="Vista previa (Espacio)">
+        <span>👁️ QuickView</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Main Content Layout (Sidebar + File List) -->
+  <div class="flex-1 flex min-h-0">
+    <!-- Sidebar -->
+    <aside class="w-60 bg-gnome-sidebar border-r border-gnome-border flex flex-col shrink-0 p-2 overflow-y-auto space-y-4">
+      <!-- Favoritos -->
+      <div>
+        <div class="flex items-center justify-between px-2 mb-1">
+          <span class="text-[11px] font-semibold text-gnome-textDim uppercase tracking-wider">Favoritos</span>
+          <button id="btnAddCurrentFav" title="Añadir carpeta actual a favoritos" class="text-xs text-gnome-textDim hover:text-white">+</button>
+        </div>
+        <div id="favoriteLinks" class="space-y-0.5">
+          <!-- Favorites generated dynamically -->
+        </div>
+      </div>
+
+      <!-- Ubicaciones del Sistema -->
+      <div>
+        <div class="text-[11px] font-semibold text-gnome-textDim px-2 mb-1 uppercase tracking-wider">Ubicaciones</div>
+        <div id="quickLinks" class="space-y-0.5">
+          <!-- Quick links generated dynamically -->
+        </div>
+      </div>
+
+      <!-- Red -->
+      <div>
+        <div class="flex items-center justify-between px-2 mb-1">
+          <span class="text-[11px] font-semibold text-gnome-textDim uppercase tracking-wider">Red</span>
+          <button id="btnConnectNetwork" title="Conectar a recurso de red..." class="text-xs text-gnome-textDim hover:text-white">🔗</button>
+        </div>
+        <div id="networkLinks" class="space-y-0.5">
+          <button id="btnOpenNetworkDialog" class="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-gnome-hover text-xs text-gnome-text text-left transition-colors">
+            <span class="text-sm">🌐</span>
+            <span class="truncate">Recurso de Red (UNC)...</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Unidades -->
+      <div>
+        <div class="text-[11px] font-semibold text-gnome-textDim px-2 mb-1 uppercase tracking-wider">Unidades</div>
+        <div id="driveLinks" class="space-y-0.5">
+          <!-- Drives generated dynamically -->
+        </div>
+      </div>
+    </aside>
+
+    <!-- Files Container -->
+    <main class="flex-1 flex flex-col min-w-0 bg-gnome-bg">
+      <!-- File List Header with Sorting -->
+      <div class="grid grid-cols-12 gap-2 px-4 py-2 border-b border-gnome-border text-xs font-medium text-gnome-textDim bg-gnome-surface/50">
+        <div id="sortHeaderName" class="col-span-6 sort-header flex items-center gap-1 hover:text-white" title="Ordenar por Nombre">
+          <span>Nombre</span>
+          <span id="sortIconName" class="text-[10px] text-gnome-active">▲</span>
+        </div>
+        <div id="sortHeaderType" class="col-span-2 sort-header flex items-center gap-1 hover:text-white" title="Ordenar por Tipo de archivo">
+          <span>Tipo</span>
+          <span id="sortIconType" class="text-[10px] hidden text-gnome-active"></span>
+        </div>
+        <div id="sortHeaderSize" class="col-span-2 sort-header flex items-center justify-end gap-1 hover:text-white" title="Ordenar por Tamaño">
+          <span>Tamaño</span>
+          <span id="sortIconSize" class="text-[10px] hidden text-gnome-active"></span>
+        </div>
+        <div id="sortHeaderDate" class="col-span-2 sort-header flex items-center justify-end gap-1 hover:text-white" title="Ordenar por Fecha de modificación">
+          <span>Modificado</span>
+          <span id="sortIconDate" class="text-[10px] hidden text-gnome-active"></span>
+        </div>
+      </div>
+
+      <!-- File List Body -->
+      <div id="fileList" class="flex-1 overflow-y-auto outline-none focus:ring-1 focus:ring-gnome-active/50" tabindex="0">
+        <!-- File rows generated dynamically -->
+      </div>
+
+      <!-- Status Bar Footer -->
+      <footer id="statusBar" class="h-6 bg-gnome-surface border-t border-gnome-border flex items-center justify-between px-3 text-[11px] text-gnome-textDim shrink-0">
+        <span id="statusItemCount">0 elementos</span>
+        <span id="statusSelection">Ningún elemento seleccionado</span>
+      </footer>
+    </main>
+  </div>
+
+  <!-- QuickView Modal Overlay -->
+  <div id="quickViewModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-6">
+    <div id="quickViewCard" class="bg-gnome-surface border border-gnome-border rounded-xl shadow-2xl flex flex-col w-full max-w-4xl max-h-[85vh] overflow-hidden">
+      <!-- QuickView Header -->
+      <div class="h-10 bg-gnome-sidebar border-b border-gnome-border flex items-center justify-between px-4 shrink-0">
+        <div class="flex items-center gap-2 min-w-0">
+          <span id="qvIcon" class="shrink-0 text-sm">📄</span>
+          <span id="qvTitle" class="font-medium text-xs text-gnome-text truncate">nombre_archivo.ext</span>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <span id="qvBadge" class="text-[10px] px-2 py-0.5 bg-gnome-surface rounded border border-gnome-border text-gnome-textDim uppercase">TIPO</span>
+          <button id="btnQvOpenDefault" title="Abrir con la aplicación por defecto de Windows (Enter)" class="px-2.5 py-1 rounded bg-gnome-active hover:bg-gnome-activeHover text-white text-xs flex items-center gap-1.5 transition-colors font-medium">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+            <span>Abrir</span>
+          </button>
+          <button id="btnQvDelete" title="Mover a papelera (Del)" class="px-2 py-1 rounded bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white text-xs flex items-center gap-1 transition-colors">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            <span>Eliminar</span>
+          </button>
+          <button id="btnQvClose" title="Cerrar (Esc o Espacio)" class="p-1 rounded hover:bg-gnome-hover text-gnome-textDim hover:text-gnome-text">✕</button>
+        </div>
+      </div>
+
+      <!-- QuickView Content Area -->
+      <div id="qvContent" class="flex-1 min-h-[300px] overflow-auto flex items-center justify-center p-4 bg-gnome-bg/60">
+        <!-- Injected dynamically: image, text, video, audio, or fallback metadata card -->
+      </div>
+
+      <!-- QuickView Footer Bar -->
+      <div class="h-8 bg-gnome-sidebar border-t border-gnome-border flex items-center justify-between px-4 text-[11px] text-gnome-textDim shrink-0">
+        <span id="qvDetails">Tamaño: 0 KB | Modificado: --</span>
+        <span class="text-[10px] text-gnome-textDim/70">Navega con Flechas | Del papelera | Esc cerrar</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Styled Modal: Nuevo Archivo -->
+  <div id="modalNewFile" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div class="bg-gnome-surface border border-gnome-border rounded-xl shadow-2xl w-full max-w-md p-5 flex flex-col gap-4">
+      <div class="flex items-center justify-between border-b border-gnome-border pb-3">
+        <h3 class="text-sm font-semibold text-gnome-text flex items-center gap-2">
+          <span>📄</span> Nuevo Archivo
+        </h3>
+        <button id="btnCloseNewFileModal" class="text-gnome-textDim hover:text-white text-xs">✕</button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block text-gnome-textDim mb-1 font-medium">Nombre del archivo con extensión:</label>
+          <input id="inputNewFileName" type="text" placeholder="ej: notas.md, script.py, config.yaml" class="w-full bg-gnome-sidebar border border-gnome-border rounded-md px-3 py-1.5 text-xs text-gnome-text placeholder-gnome-textDim focus:outline-none focus:border-gnome-active" />
+        </div>
+
+        <div class="flex flex-wrap gap-1.5 pt-1">
+          <span class="text-[11px] text-gnome-textDim self-center mr-1">Extensiones rápidas:</span>
+          <button class="ext-tag px-2 py-0.5 rounded bg-gnome-bg border border-gnome-border hover:bg-gnome-active hover:text-white text-[11px] transition-colors" data-ext=".md">.md</button>
+          <button class="ext-tag px-2 py-0.5 rounded bg-gnome-bg border border-gnome-border hover:bg-gnome-active hover:text-white text-[11px] transition-colors" data-ext=".txt">.txt</button>
+          <button class="ext-tag px-2 py-0.5 rounded bg-gnome-bg border border-gnome-border hover:bg-gnome-active hover:text-white text-[11px] transition-colors" data-ext=".yaml">.yaml</button>
+          <button class="ext-tag px-2 py-0.5 rounded bg-gnome-bg border border-gnome-border hover:bg-gnome-active hover:text-white text-[11px] transition-colors" data-ext=".json">.json</button>
+          <button class="ext-tag px-2 py-0.5 rounded bg-gnome-bg border border-gnome-border hover:bg-gnome-active hover:text-white text-[11px] transition-colors" data-ext=".js">.js</button>
+          <button class="ext-tag px-2 py-0.5 rounded bg-gnome-bg border border-gnome-border hover:bg-gnome-active hover:text-white text-[11px] transition-colors" data-ext=".rs">.rs</button>
+        </div>
+
+        <label class="flex items-center gap-2 text-gnome-text select-none cursor-pointer pt-1">
+          <input id="chkOpenAfterCreate" type="checkbox" checked class="rounded bg-gnome-sidebar border-gnome-border text-gnome-active focus:ring-0" />
+          <span>Abrir con el editor predeterminado al crear</span>
+        </label>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 border-t border-gnome-border pt-3">
+        <button id="btnCancelNewFile" class="px-3 py-1.5 rounded-md hover:bg-gnome-hover text-gnome-text text-xs transition-colors">Cancelar</button>
+        <button id="btnConfirmNewFile" class="px-4 py-1.5 rounded-md bg-gnome-active hover:bg-gnome-activeHover text-white font-medium text-xs transition-colors">Crear y Abrir</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Styled Modal: Nueva Carpeta -->
+  <div id="modalNewFolder" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div class="bg-gnome-surface border border-gnome-border rounded-xl shadow-2xl w-full max-w-md p-5 flex flex-col gap-4">
+      <div class="flex items-center justify-between border-b border-gnome-border pb-3">
+        <h3 class="text-sm font-semibold text-gnome-text flex items-center gap-2">
+          <span>📁</span> Nueva Carpeta
+        </h3>
+        <button id="btnCloseNewFolderModal" class="text-gnome-textDim hover:text-white text-xs">✕</button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block text-gnome-textDim mb-1 font-medium">Nombre de la carpeta:</label>
+          <input id="inputNewFolderName" type="text" placeholder="ej: Nueva Carpeta" class="w-full bg-gnome-sidebar border border-gnome-border rounded-md px-3 py-1.5 text-xs text-gnome-text placeholder-gnome-textDim focus:outline-none focus:border-gnome-active" />
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 border-t border-gnome-border pt-3">
+        <button id="btnCancelNewFolder" class="px-3 py-1.5 rounded-md hover:bg-gnome-hover text-gnome-text text-xs transition-colors">Cancelar</button>
+        <button id="btnConfirmNewFolder" class="px-4 py-1.5 rounded-md bg-gnome-active hover:bg-gnome-activeHover text-white font-medium text-xs transition-colors">Crear Carpeta</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Styled Modal: Conectar a Red (UNC) -->
+  <div id="modalNetwork" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div class="bg-gnome-surface border border-gnome-border rounded-xl shadow-2xl w-full max-w-md p-5 flex flex-col gap-4">
+      <div class="flex items-center justify-between border-b border-gnome-border pb-3">
+        <h3 class="text-sm font-semibold text-gnome-text flex items-center gap-2">
+          <span>🌐</span> Conectar a Recurso de Red
+        </h3>
+        <button id="btnCloseNetworkModal" class="text-gnome-textDim hover:text-white text-xs">✕</button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block text-gnome-textDim mb-1 font-medium">Ruta UNC del recurso compartido:</label>
+          <input id="inputNetworkPath" type="text" placeholder="\\servidor\compartido o \\192.168.1.100\datos" class="w-full bg-gnome-sidebar border border-gnome-border rounded-md px-3 py-1.5 text-xs text-gnome-text placeholder-gnome-textDim focus:outline-none focus:border-gnome-active" />
+        </div>
+        <p class="text-[11px] text-gnome-textDim">Introduce la dirección del servidor o equipo en red local al que deseas acceder directamente.</p>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 border-t border-gnome-border pt-3">
+        <button id="btnCancelNetwork" class="px-3 py-1.5 rounded-md hover:bg-gnome-hover text-gnome-text text-xs transition-colors">Cancelar</button>
+        <button id="btnConfirmNetwork" class="px-4 py-1.5 rounded-md bg-gnome-active hover:bg-gnome-activeHover text-white font-medium text-xs transition-colors">Conectar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Styled Modal: Acerca de / Atajos -->
+  <div id="modalHelp" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div class="bg-gnome-surface border border-gnome-border rounded-xl shadow-2xl w-full max-w-lg p-5 flex flex-col gap-4">
+      <div class="flex items-center justify-between border-b border-gnome-border pb-3">
+        <h3 class="text-sm font-semibold text-gnome-text flex items-center gap-2">
+          <span>⚡</span> tronExplorer — Guía de Atajos
+        </h3>
+        <button id="btnCloseHelpModal" class="text-gnome-textDim hover:text-white text-xs">✕</button>
+      </div>
+
+      <div class="overflow-y-auto max-h-80 text-xs space-y-2 text-gnome-text">
+        <div class="grid grid-cols-2 gap-2 p-2 bg-gnome-bg/70 rounded-md border border-gnome-border">
+          <span class="font-medium text-gnome-active">Espacio</span><span>Abrir/Cerrar QuickView</span>
+          <span class="font-medium text-gnome-active">Enter</span><span>Abrir elemento / Entrar en carpeta</span>
+          <span class="font-medium text-gnome-active">Backspace / Alt+←</span><span>Carpeta anterior / Atrás</span>
+          <span class="font-medium text-gnome-active">Flechas ↑ / ↓</span><span>Mover selección arriba/abajo</span>
+          <span class="font-medium text-gnome-active">Letra / Número</span><span>Saltar al archivo por inicial</span>
+          <span class="font-medium text-gnome-active">Shift + Flechas</span><span>Selección múltiple continua</span>
+          <span class="font-medium text-gnome-active">Ctrl + C / X / V</span><span>Copiar, Cortar y Pegar</span>
+          <span class="font-medium text-gnome-active">Arrastrar (+ Ctrl)</span><span>Mover (o Copiar con Ctrl)</span>
+          <span class="font-medium text-gnome-active">Clic derecho</span><span>Menú contextual con Duplicar</span>
+          <span class="font-medium text-gnome-active">Ctrl + N / Shift+N</span><span>Nuevo archivo / Nueva carpeta</span>
+          <span class="font-medium text-gnome-active">Ctrl + D</span><span>Añadir carpeta actual a Favoritos</span>
+          <span class="font-medium text-gnome-active">Ctrl + H</span><span>Mostrar/Ocultar archivos ocultos</span>
+          <span class="font-medium text-gnome-active">Delete (Supr)</span><span>Mover a papelera de reciclaje</span>
+          <span class="font-medium text-gnome-active">F5 / Ctrl + R</span><span>Actualizar vista</span>
+          <span class="font-medium text-gnome-active">Esc</span><span>Cerrar visor / limpiar filtro</span>
+        </div>
+        <p class="text-[11px] text-gnome-textDim text-center pt-2">tronExplorer v0.1.0 — Diseñado con Tauri v2 + Rust + Tailwind CSS para máxima fluidez y bajo consumo.</p>
+      </div>
+
+      <div class="flex items-center justify-end border-t border-gnome-border pt-3">
+        <button id="btnConfirmHelp" class="px-4 py-1.5 rounded-md bg-gnome-active hover:bg-gnome-activeHover text-white font-medium text-xs transition-colors">Entendido</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Styled Modal: Personalización de Aspecto -->
+  <div id="modalAppearance" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div class="bg-gnome-surface border border-gnome-border rounded-xl shadow-2xl w-full max-w-md p-5 flex flex-col gap-4">
+      <div class="flex items-center justify-between border-b border-gnome-border pb-3">
+        <h3 class="text-sm font-semibold text-gnome-text flex items-center gap-2">
+          <span>🎨</span> Personalizar Aspecto
+        </h3>
+        <button id="btnCloseAppearanceModal" class="text-gnome-textDim hover:text-white text-xs">✕</button>
+      </div>
+
+      <div class="space-y-4 text-xs">
+        <!-- Tema -->
+        <div>
+          <label class="block text-gnome-textDim mb-1.5 font-medium">Tema Visual:</label>
+          <select id="selectTheme" class="w-full bg-gnome-sidebar border border-gnome-border rounded-md px-3 py-2 text-xs text-gnome-text focus:outline-none focus:border-gnome-active">
+            <option value="adwaita">GNOME Adwaita Dark (Por defecto)</option>
+            <option value="light">GNOME Adwaita Light (Modo Claro)</option>
+            <option value="windows10">Windows 10 Fluent Dark</option>
+            <option value="ubuntu">Ubuntu Yaru Dark</option>
+            <option value="manjaro">Manjaro Breath Teal</option>
+            <option value="nvchad">NvChad OneDark</option>
+            <option value="tokyonight">Tokyo Night Storm</option>
+            <option value="matteblack">Matte Black Minimal</option>
+          </select>
+        </div>
+
+        <!-- Escala y tamaño de elementos de interfaz (Slider de 5 niveles: 12px, 14px, 16px, 18px, 20px) -->
+        <div class="p-3 bg-gnome-sidebar/50 rounded-lg border border-gnome-border space-y-2">
+          <div class="flex items-center justify-between">
+            <label for="rangeUiScale" class="font-medium text-gnome-text">Tamaño de elementos de la interfaz:</label>
+            <span id="lblUiScaleValue" class="px-2 py-0.5 rounded bg-gnome-active text-white text-[11px] font-semibold">14px (Normal)</span>
+          </div>
+          <input id="rangeUiScale" type="range" min="12" max="20" step="2" value="14" class="w-full accent-blue-500 cursor-pointer" />
+          <div class="flex justify-between text-[10px] text-gnome-textDim px-0.5">
+            <span>12px</span>
+            <span>14px</span>
+            <span>16px</span>
+            <span>18px</span>
+            <span>20px</span>
+          </div>
+          <p class="text-[10px] text-gnome-textDim">Ajusta armónicamente botones, barra de ruta, buscador y barra lateral.</p>
+        </div>
+
+        <!-- Densidad de lista -->
+        <div>
+          <label class="block text-gnome-textDim mb-1.5 font-medium">Espaciado de lista de archivos:</label>
+          <div class="grid grid-cols-3 gap-2">
+            <label class="flex items-center gap-2 p-2 rounded border border-gnome-border bg-gnome-sidebar/50 cursor-pointer hover:border-gnome-active">
+              <input type="radio" name="density" value="compact" class="text-gnome-active focus:ring-0">
+              <span>Compacto</span>
+            </label>
+            <label class="flex items-center gap-2 p-2 rounded border border-gnome-border bg-gnome-sidebar/50 cursor-pointer hover:border-gnome-active">
+              <input type="radio" name="density" value="normal" checked class="text-gnome-active focus:ring-0">
+              <span>Normal</span>
+            </label>
+            <label class="flex items-center gap-2 p-2 rounded border border-gnome-border bg-gnome-sidebar/50 cursor-pointer hover:border-gnome-active">
+              <input type="radio" name="density" value="spacious" class="text-gnome-active focus:ring-0">
+              <span>Cómodo</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Tamaño de fuente -->
+        <div>
+          <label class="block text-gnome-textDim mb-1.5 font-medium">Tamaño de texto en la lista:</label>
+          <select id="selectFontSize" class="w-full bg-gnome-sidebar border border-gnome-border rounded-md px-3 py-2 text-xs text-gnome-text focus:outline-none focus:border-gnome-active">
+            <option value="text-xs">Pequeña (12px)</option>
+            <option value="text-sm" selected>Media estándar (14px)</option>
+            <option value="text-base">Grande (16px)</option>
+            <option value="text-lg">Extra Grande (18px)</option>
+            <option value="text-xl">Enorme (20px)</option>
+          </select>
+        </div>
+
+        <!-- Negrita -->
+        <div class="p-3 bg-gnome-sidebar/40 rounded-lg border border-gnome-border">
+          <label class="flex items-center gap-2.5 cursor-pointer">
+            <input id="chkNormalFontWeight" type="checkbox" class="w-4 h-4 rounded bg-gnome-sidebar border-gnome-border text-gnome-active focus:ring-0">
+            <span class="font-normal text-gnome-text">Usar texto estándar (sin negrita excesiva en nombres)</span>
+          </label>
+        </div>
+
+        <!-- Extensiones de texto adicionales -->
+        <div class="p-3 bg-gnome-sidebar/50 rounded-lg border border-gnome-border space-y-1.5">
+          <label class="block text-gnome-text font-medium">Extensiones tratadas como texto:</label>
+          <input id="inputCustomTextExts" type="text" placeholder="ej: sql, str, log, conf, env, bak" class="w-full bg-gnome-surface border border-gnome-border rounded-md px-3 py-1.5 text-xs text-gnome-text placeholder-gnome-textDim focus:outline-none focus:border-gnome-active" />
+          <p class="text-[10px] text-gnome-textDim">Separadas por comas. Estas extensiones se mostrarán como archivos de texto y se previsualizarán con visor de código en QuickView.</p>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 border-t border-gnome-border pt-3">
+        <button id="btnCancelAppearance" class="px-3 py-1.5 rounded-md hover:bg-gnome-hover text-gnome-text text-xs transition-colors">Cancelar</button>
+        <button id="btnConfirmAppearance" class="px-4 py-1.5 rounded-md bg-gnome-active hover:bg-gnome-activeHover text-white font-medium text-xs transition-colors">Aplicar Cambios</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Styled Modal: Renombrar Favorito -->
+  <div id="modalRenameFavorite" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div class="bg-gnome-surface border border-gnome-border rounded-xl shadow-2xl w-full max-w-sm p-5 flex flex-col gap-4">
+      <div class="flex items-center justify-between border-b border-gnome-border pb-3">
+        <h3 class="text-sm font-semibold text-gnome-text flex items-center gap-2">
+          <span>⭐</span> Renombrar Favorito
+        </h3>
+        <button id="btnCloseRenameFavModal" class="text-gnome-textDim hover:text-white text-xs">✕</button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block text-gnome-textDim mb-1 font-medium">Nombre visible en favoritos:</label>
+          <input id="inputRenameFavName" type="text" class="w-full bg-gnome-sidebar border border-gnome-border rounded-md px-3 py-1.5 text-xs text-gnome-text placeholder-gnome-textDim focus:outline-none focus:border-gnome-active" />
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 border-t border-gnome-border pt-3">
+        <button id="btnCancelRenameFav" class="px-3 py-1.5 rounded-md hover:bg-gnome-hover text-gnome-text text-xs transition-colors">Cancelar</button>
+        <button id="btnConfirmRenameFav" class="px-4 py-1.5 rounded-md bg-gnome-active hover:bg-gnome-activeHover text-white font-medium text-xs transition-colors">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Styled Modal: Confirmar Cierre si hay transferencias activas -->
+  <div id="modalConfirmExit" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div class="bg-gnome-surface border border-red-500/40 rounded-xl shadow-2xl w-full max-w-md p-5 flex flex-col gap-4">
+      <div class="flex items-center justify-between border-b border-gnome-border pb-3">
+        <h3 class="text-sm font-semibold text-red-400 flex items-center gap-2">
+          <span>⚠️</span> Tareas en ejecución
+        </h3>
+        <button id="btnCloseExitModal" class="text-gnome-textDim hover:text-white text-xs">✕</button>
+      </div>
+
+      <div class="space-y-2 text-xs text-gnome-text">
+        <p class="font-medium text-gnome-text">Hay transferencias de archivos (copia o movimiento) ejecutándose en segundo plano.</p>
+        <p class="text-gnome-textDim">Si cierras la aplicación ahora, las tareas actuales se cancelarán y podrían quedar archivos incompletos.</p>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 border-t border-gnome-border pt-3">
+        <button id="btnCancelExit" class="px-4 py-1.5 rounded-md bg-gnome-sidebar hover:bg-gnome-hover border border-gnome-border text-gnome-text text-xs transition-colors">Seguir copiando</button>
+        <button id="btnForceExit" class="px-4 py-1.5 rounded-md bg-red-600 hover:bg-red-700 text-white font-medium text-xs transition-colors">Cerrar de todos modos</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Styled Context Menu for File Items (includes Duplicar) -->
+  <div id="fileContextMenu" class="hidden fixed z-50 w-52 bg-gnome-surface border border-gnome-border rounded-lg shadow-2xl py-1 text-xs text-gnome-text select-none">
+    <button id="ctxMenuOpen" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+      <span>Abrir</span><span class="text-gnome-textDim text-[11px]">Enter</span>
+    </button>
+    <button id="ctxMenuQuickView" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+      <span>QuickView</span><span class="text-gnome-textDim text-[11px]">Espacio</span>
+    </button>
+    <div class="my-1 border-t border-gnome-border/60"></div>
+    <button id="ctxMenuCut" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+      <span>Cortar</span><span class="text-gnome-textDim text-[11px]">Ctrl+X</span>
+    </button>
+    <button id="ctxMenuCopy" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+      <span>Copiar</span><span class="text-gnome-textDim text-[11px]">Ctrl+C</span>
+    </button>
+    <button id="ctxMenuDuplicate" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between font-medium text-gnome-active">
+      <span>Duplicar</span>
+    </button>
+    <div class="my-1 border-t border-gnome-border/60"></div>
+    <button id="ctxMenuAddFavorite" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+      <span>Añadir a Favoritos</span>
+    </button>
+    <button id="ctxMenuDelete" class="w-full text-left px-3 py-1.5 hover:bg-red-600 hover:text-white text-red-400 flex items-center justify-between">
+      <span>Mover a Papelera</span><span class="text-gnome-textDim text-[11px]">Supr</span>
+    </button>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

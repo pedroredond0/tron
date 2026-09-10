@@ -1,0 +1,18 @@
+/node_modules
+/dist
+/build
+/out
+
+# Rust
+/src-tauri/target
+*.rs.bk
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+*.exe
+test_*
+tronExplorer-Portable.exe
+/main.rs
