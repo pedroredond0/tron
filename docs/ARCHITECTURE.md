@@ -179,6 +179,7 @@ A continuación se detallan los 26 comandos Tauri invocables desde el frontend m
 | `extract_zip_archive`| `zip_path: String, dest_dir: String` | `Result<(), String>` | Descomprime el archivo `.zip` con validación de seguridad. |
 | `list_zip_contents` | `zip_path: String` | `Vec<ZipEntryInfo>` | Devuelve la lista interna de entradas dentro del ZIP. |
 | `generate_directory_listing` | `options: ListingOptions` | `ListingResult` | Genera árbol o listado en fichero `.txt`. |
+| `get_disk_free_space` | `path: Option<String>` | `Result<DiskSpaceInfo, String>` | Devuelve el espacio libre y total de la unidad o volumen. |
 
 ---
 
