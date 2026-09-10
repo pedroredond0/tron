@@ -147,6 +147,8 @@
     btnActionPaste: document.getElementById('btnActionPaste'),
     btnActionDelete: document.getElementById('btnActionDelete'),
     btnActionQuickView: document.getElementById('btnActionQuickView'),
+    btnToggleSplitView: document.getElementById('btnToggleSplitView'),
+    menuToggleSplitView: document.getElementById('menuToggleSplitView'),
     btnActionCalcDirSizes: document.getElementById('btnActionCalcDirSizes'),
     btnOpenAppearance: document.getElementById('btnOpenAppearance'),
     iconActionTerminal: document.getElementById('iconActionTerminal'),
@@ -662,6 +664,7 @@ modalSherlock: document.getElementById('modalSherlock'),
       renderFileList();
       updateStatusBar();
       if (isSplitView) updatePanelHighlights();
+      recordFrequentLocation(state.currentDirectory);
       el.fileList.focus();
     } catch (err) {
       alert('Error al acceder al directorio: ' + err);
@@ -834,21 +837,9 @@ modalSherlock: document.getElementById('modalSherlock'),
         }
       }
 
-      
-      let gitBadgeHtml = '';
-      if (item.git_status) {
-        if (item.git_status === 'clean') {
-          gitBadgeHtml = `<span class="shrink-0 w-1.5 h-1.5 rounded-full bg-green-500/80" title="Git: Limpio"></span>`;
-        } else if (item.git_status === 'dirty') {
-          gitBadgeHtml = `<span class="shrink-0 w-1.5 h-1.5 rounded-full bg-orange-500/80" title="Git: Cambios sin commitear"></span>`;
-        } else {
-          gitBadgeHtml = `<span class="shrink-0 w-1.5 h-1.5 rounded-full bg-blue-500/80" title="Repositorio Git"></span>`;
-        }
-      }
-
       colName.innerHTML = `
         <span class="shrink-0 select-none item-icon">${getFileIcon(item)}</span>
-        <span class="truncate select-none ${fontClass}">${escapeHtml(item.name)}</span>\n        ${gitBadgeHtml}
+        <span class="truncate select-none ${fontClass}">${escapeHtml(item.name)}</span>
         ${parentPathHtml}
       `;
 
@@ -2412,30 +2403,36 @@ async function startTransferOperation(action, sources, targetDir) {
     } else {
       el.clipboardBadge.classList.add('hidden');
     }
+  }
 
-  function toggleSplitView() {
+  async function toggleSplitView() {
     isSplitView = !isSplitView;
     if (isSplitView) {
       el.panelB.classList.remove('hidden');
       el.pathIndicatorA.classList.remove('hidden');
+      if (el.btnToggleSplitView) el.btnToggleSplitView.classList.add('bg-gnome-active/20', 'text-gnome-active');
       if (!panels[1].currentDirectory) {
-        panels[1].currentDirectory = panels[0].currentDirectory;
-        const prev = activePanel;
-        activePanel = 1;
-        loadDirectory(panels[1].currentDirectory, true).then(() => {
-          activePanel = prev;
-          updatePanelHighlights();
-        });
+        panels[1].currentDirectory = panels[0].currentDirectory || 'C:\\';
       }
+      const prevActive = activePanel;
+      activePanel = 1;
+      await loadDirectory(panels[1].currentDirectory, false);
+      activePanel = prevActive;
+      renderBreadcrumbs();
+      renderFileList();
+      updateSortHeaderUI();
+      updateStatusBar();
       updatePanelHighlights();
+      el.fileList.focus();
     } else {
       el.panelB.classList.add('hidden');
       el.pathIndicatorA.classList.add('hidden');
-      if (activePanel === 1) {
-        activePanel = 0;
-        renderBreadcrumbs();
-        updateStatusBar();
-      }
+      if (el.btnToggleSplitView) el.btnToggleSplitView.classList.remove('bg-gnome-active/20', 'text-gnome-active');
+      activePanel = 0;
+      renderBreadcrumbs();
+      renderFileList();
+      updateSortHeaderUI();
+      updateStatusBar();
       updatePanelHighlights();
       el.fileList.focus();
     }
@@ -2444,19 +2441,68 @@ async function startTransferOperation(action, sources, targetDir) {
   function updatePanelHighlights() {
     if (!isSplitView) return;
     if (activePanel === 0) {
-      el.panelA.classList.add('bg-gnome-hover', 'bg-opacity-10');
-      el.panelB.classList.remove('bg-gnome-hover', 'bg-opacity-10');
+      el.panelA.classList.add('bg-gnome-hover/10');
+      el.panelB.classList.remove('bg-gnome-hover/10');
       el.pathIndicatorA.classList.add('text-gnome-active');
       el.pathIndicatorB.classList.remove('text-gnome-active');
     } else {
-      el.panelB.classList.add('bg-gnome-hover', 'bg-opacity-10');
-      el.panelA.classList.remove('bg-gnome-hover', 'bg-opacity-10');
+      el.panelB.classList.add('bg-gnome-hover/10');
+      el.panelA.classList.remove('bg-gnome-hover/10');
       el.pathIndicatorB.classList.add('text-gnome-active');
       el.pathIndicatorA.classList.remove('text-gnome-active');
     }
     el.pathIndicatorA.textContent = panels[0].currentDirectory || '';
     el.pathIndicatorB.textContent = panels[1].currentDirectory || '';
   }
+
+  function recordFrequentLocation(locPath) {
+    if (!locPath || typeof locPath !== 'string') return;
+    const clean = locPath.trim();
+    if (!clean) return;
+    if (!state.frequentLocations) state.frequentLocations = {};
+    state.frequentLocations[clean] = (state.frequentLocations[clean] || 0) + 1;
+    try {
+      localStorage.setItem('tron_frequent_locations', JSON.stringify(state.frequentLocations));
+    } catch (e) {}
+    renderFrequentLinks();
+  }
+
+  function renderFrequentLinks() {
+    if (!el.frequentLinks) return;
+    el.frequentLinks.innerHTML = '';
+    const entries = Object.entries(state.frequentLocations || {})
+      .filter(([p, count]) => p && count > 0)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5);
+
+    if (entries.length === 0) {
+      el.frequentLinks.innerHTML = '<div class="px-2 py-1 text-[11px] text-gnome-textDim italic select-none">Sin actividad reciente</div>';
+      return;
+    }
+
+    entries.forEach(([locPath, count]) => {
+      const isWindows = /^[a-zA-Z]:[\\\/]/.test(locPath) || locPath.startsWith('\\\\');
+      const sep = isWindows ? '\\' : '/';
+      const cleanPath = isWindows ? locPath.replace(/\//g, '\\') : locPath;
+      const lastSlash = cleanPath.lastIndexOf(sep);
+      let folderName = lastSlash >= 0 ? cleanPath.substring(lastSlash + 1) : cleanPath;
+      if (!folderName && lastSlash === 2 && isWindows) folderName = cleanPath;
+      if (!folderName) folderName = cleanPath;
+
+      const btn = document.createElement('button');
+      btn.className = 'w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-md hover:bg-gnome-hover text-xs text-gnome-text text-left transition-colors group select-none';
+      btn.title = `${cleanPath} (${count} visitas)`;
+      btn.innerHTML = `
+        <div class="flex items-center gap-2 min-w-0 flex-1 truncate">
+          <span class="ui-icon-box text-amber-400">🕒</span>
+          <span class="truncate">${escapeHtml(folderName)}</span>
+        </div>
+        <span class="text-[10px] px-1.5 py-0.2 rounded bg-gnome-surface text-gnome-textDim font-mono">${count}</span>
+      `;
+      btn.onclick = () => loadDirectory(cleanPath);
+      setupSidebarDropTarget(btn, cleanPath);
+      el.frequentLinks.appendChild(btn);
+    });
   }
 
   async function duplicateSelectedItem(specificItem = null) {
@@ -3628,6 +3674,9 @@ async function startTransferOperation(action, sources, targetDir) {
 
     // 3. Favorites
     loadFavorites();
+
+    // 4. Frequent Locations
+    renderFrequentLinks();
   }
 
   // Setup Menu Dropdowns (Auto-open on hover once active)
@@ -3669,7 +3718,7 @@ async function startTransferOperation(action, sources, targetDir) {
 
   // Initialization & Event Listeners
   function init() {
-    window.addEventListener('keydown', handleGlobalKeyDown);
+    window.addEventListener('keydown', handleGlobalKeyDown, true);
 
     // Navigation bar
     el.btnBack.onclick = goBack;
@@ -3718,6 +3767,7 @@ async function startTransferOperation(action, sources, targetDir) {
     el.btnActionPaste.onclick = pasteClipboardItems;
     el.btnActionDelete.onclick = deleteCurrentItem;
     el.btnActionQuickView.onclick = openQuickView;
+    if (el.btnToggleSplitView) el.btnToggleSplitView.onclick = toggleSplitView;
 
     // Sidebar buttons
     el.btnAddCurrentFav.onclick = addCurrentToFavorites;
@@ -3752,6 +3802,7 @@ async function startTransferOperation(action, sources, targetDir) {
       updateStatusBar();
     };
     el.menuQuickView.onclick = () => { closeAllMenus(); openQuickView(); };
+    if (el.menuToggleSplitView) el.menuToggleSplitView.onclick = () => { closeAllMenus(); toggleSplitView(); };
     el.menuRefresh.onclick = () => { closeAllMenus(); loadDirectory(state.currentDirectory, false); };
     el.menuShortcuts.onclick = () => { closeAllMenus(); openHelpModal(); };
     el.menuAbout.onclick = () => { closeAllMenus(); openAboutModal(); };
