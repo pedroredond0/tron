@@ -74,23 +74,64 @@
   }
 
   // State Management with Panel & Tab Architecture
-  const panels = [
-    { tabs: [ createTabState() ], activeTab: 0 },
-    { tabs: [ createTabState() ], activeTab: 0 }
-  ];
+  function createPanelState() {
+    return {
+      tabs: [ createTabState() ],
+      activeTab: 0,
+      get currentTab() {
+        if (!this.tabs || this.tabs.length === 0) {
+          this.tabs = [ createTabState() ];
+          this.activeTab = 0;
+        }
+        if (this.activeTab < 0 || this.activeTab >= this.tabs.length) {
+          this.activeTab = Math.max(0, this.tabs.length - 1);
+        }
+        return this.tabs[this.activeTab];
+      },
+      get currentDirectory() { return this.currentTab.currentDirectory || ''; },
+      set currentDirectory(v) {
+        this.currentTab.currentDirectory = v;
+        this.currentTab.name = v ? getDirBaseName(v) : 'Inicio';
+        renderTabs();
+      },
+      get items() { return this.currentTab.items || []; },
+      set items(v) { this.currentTab.items = v; },
+      get filteredItems() { return this.currentTab.filteredItems || []; },
+      set filteredItems(v) { this.currentTab.filteredItems = v; },
+      get selectedIndex() { return this.currentTab.selectedIndex; },
+      set selectedIndex(v) { this.currentTab.selectedIndex = v; },
+      get selectionAnchor() { return this.currentTab.selectionAnchor; },
+      set selectionAnchor(v) { this.currentTab.selectionAnchor = v; },
+      get selectedItems() { return this.currentTab.selectedItems; },
+      set selectedItems(v) { this.currentTab.selectedItems = v; },
+      get history() { return this.currentTab.history; },
+      set history(v) { this.currentTab.history = v; },
+      get historyIndex() { return this.currentTab.historyIndex; },
+      set historyIndex(v) { this.currentTab.historyIndex = v; },
+      get searchQuery() { return this.currentTab.searchQuery; },
+      set searchQuery(v) { this.currentTab.searchQuery = v; },
+      get isSearchingRecursive() { return this.currentTab.isSearchingRecursive; },
+      set isSearchingRecursive(v) { this.currentTab.isSearchingRecursive = v; },
+      get activeSherlockFilter() { return this.currentTab.activeSherlockFilter; },
+      set activeSherlockFilter(v) { this.currentTab.activeSherlockFilter = v; },
+      get sherlockResults() { return this.currentTab.sherlockResults; },
+      set sherlockResults(v) { this.currentTab.sherlockResults = v; },
+      get searchItems() { return this.currentTab.searchItems; },
+      set searchItems(v) { this.currentTab.searchItems = v; },
+      get freeSpaceBytes() { return this.currentTab.freeSpaceBytes; },
+      set freeSpaceBytes(v) { this.currentTab.freeSpaceBytes = v; },
+      get totalSpaceBytes() { return this.currentTab.totalSpaceBytes; },
+      set totalSpaceBytes(v) { this.currentTab.totalSpaceBytes = v; },
+      get expandedDirs() { return this.currentTab.expandedDirs; }
+    };
+  }
+
+  const panels = [ createPanelState(), createPanelState() ];
   let activePanel = 0;
   let isSplitView = false;
 
   function getActiveTabObj(panelIdx = activePanel) {
-    const p = panels[panelIdx];
-    if (!p.tabs || p.tabs.length === 0) {
-      p.tabs = [ createTabState() ];
-      p.activeTab = 0;
-    }
-    if (p.activeTab < 0 || p.activeTab >= p.tabs.length) {
-      p.activeTab = Math.max(0, p.tabs.length - 1);
-    }
-    return p.tabs[p.activeTab];
+    return panels[panelIdx].currentTab;
   }
 
   // File Color Tags Store: { [normalizedPath]: [color1, color2, ...] }
@@ -259,6 +300,12 @@
   const baseEl = {
     panelA: document.getElementById('panelA'),
     panelB: document.getElementById('panelB'),
+    panelAHeader: document.getElementById('panelAHeader'),
+    panelBHeader: document.getElementById('panelBHeader'),
+    panelABadge: document.getElementById('panelABadge'),
+    panelBBadge: document.getElementById('panelBBadge'),
+    panelACount: document.getElementById('panelACount'),
+    panelBCount: document.getElementById('panelBCount'),
     pathIndicatorA: document.getElementById('pathIndicatorA'),
     pathIndicatorB: document.getElementById('pathIndicatorB'),
     tabBar: document.getElementById('tabBar'),
@@ -2167,12 +2214,7 @@ modalSherlock: document.getElementById('modalSherlock'),
 
     if (e.key === 'Tab' && isSplitView && !isInputActive) {
       e.preventDefault();
-      activePanel = activePanel === 0 ? 1 : 0;
-      updatePanelHighlights();
-      renderBreadcrumbs();
-      updateSortHeaderUI();
-      updateStatusBar();
-      el.fileList.focus();
+      switchActivePanel(activePanel === 0 ? 1 : 0);
       return;
     }
     if (isModKey(e) && e.shiftKey && (e.key === 'c' || e.key === 'C')) {
@@ -2697,24 +2739,28 @@ async function startTransferOperation(action, sources, targetDir) {
     isSplitView = !isSplitView;
     if (isSplitView) {
       el.panelB.classList.remove('hidden');
-      el.pathIndicatorA.classList.remove('hidden');
       if (el.btnToggleSplitView) el.btnToggleSplitView.classList.add('bg-gnome-active/20', 'text-gnome-active');
+      
+      // If panel 1 has no directory or empty, clone panel 0's current directory
       if (!panels[1].currentDirectory) {
-        panels[1].currentDirectory = panels[0].currentDirectory || 'C:\\';
+        const sourceDir = panels[0].currentDirectory || state.currentDirectory || state.userHomeDir || '/';
+        panels[1].currentDirectory = sourceDir;
       }
+      
       const prevActive = activePanel;
       activePanel = 1;
       await loadDirectory(panels[1].currentDirectory, false);
       activePanel = prevActive;
+      
       renderBreadcrumbs();
       renderFileList();
       updateSortHeaderUI();
       updateStatusBar();
       updatePanelHighlights();
+      renderTabs();
       el.fileList.focus();
     } else {
       el.panelB.classList.add('hidden');
-      el.pathIndicatorA.classList.add('hidden');
       if (el.btnToggleSplitView) el.btnToggleSplitView.classList.remove('bg-gnome-active/20', 'text-gnome-active');
       activePanel = 0;
       renderBreadcrumbs();
@@ -2722,25 +2768,74 @@ async function startTransferOperation(action, sources, targetDir) {
       updateSortHeaderUI();
       updateStatusBar();
       updatePanelHighlights();
+      renderTabs();
       el.fileList.focus();
     }
   }
 
+  function switchActivePanel(newPanelIdx) {
+    if (activePanel === newPanelIdx) return;
+    activePanel = newPanelIdx;
+    updatePanelHighlights();
+    renderBreadcrumbs();
+    updateSortHeaderUI();
+    updateStatusBar();
+    renderTabs();
+    if (el.fileList) el.fileList.focus();
+  }
+
   function updatePanelHighlights() {
-    if (!isSplitView) return;
-    if (activePanel === 0) {
-      el.panelA.classList.add('bg-gnome-hover/10');
-      el.panelB.classList.remove('bg-gnome-hover/10');
-      el.pathIndicatorA.classList.add('text-gnome-active');
-      el.pathIndicatorB.classList.remove('text-gnome-active');
-    } else {
-      el.panelB.classList.add('bg-gnome-hover/10');
-      el.panelA.classList.remove('bg-gnome-hover/10');
-      el.pathIndicatorB.classList.add('text-gnome-active');
-      el.pathIndicatorA.classList.remove('text-gnome-active');
+    if (!isSplitView) {
+      if (el.panelAHeader) el.panelAHeader.classList.add('hidden');
+      if (el.panelBHeader) el.panelBHeader.classList.add('hidden');
+      el.panelA.classList.remove('ring-1', 'ring-inset', 'ring-gnome-active/40');
+      el.panelB.classList.remove('ring-1', 'ring-inset', 'ring-gnome-active/40');
+      return;
     }
-    el.pathIndicatorA.textContent = panels[0].currentDirectory || '';
-    el.pathIndicatorB.textContent = panels[1].currentDirectory || '';
+
+    if (el.panelAHeader) el.panelAHeader.classList.remove('hidden');
+    if (el.panelBHeader) el.panelBHeader.classList.remove('hidden');
+
+    const dirA = panels[0].currentDirectory || '';
+    const dirB = panels[1].currentDirectory || '';
+
+    if (el.pathIndicatorA) {
+      el.pathIndicatorA.textContent = dirA;
+      el.pathIndicatorA.title = dirA;
+    }
+    if (el.pathIndicatorB) {
+      el.pathIndicatorB.textContent = dirB;
+      el.pathIndicatorB.title = dirB;
+    }
+
+    if (el.panelACount) {
+      const countA = panels[0].filteredItems?.length || 0;
+      el.panelACount.textContent = `${countA} elem.`;
+    }
+    if (el.panelBCount) {
+      const countB = panels[1].filteredItems?.length || 0;
+      el.panelBCount.textContent = `${countB} elem.`;
+    }
+
+    if (activePanel === 0) {
+      el.panelA.classList.add('ring-1', 'ring-inset', 'ring-gnome-active/40');
+      el.panelB.classList.remove('ring-1', 'ring-inset', 'ring-gnome-active/40');
+      if (el.panelABadge) {
+        el.panelABadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-gnome-active text-white shrink-0 shadow-sm';
+      }
+      if (el.panelBBadge) {
+        el.panelBBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-gnome-sidebar border border-gnome-border text-gnome-textDim shrink-0';
+      }
+    } else {
+      el.panelB.classList.add('ring-1', 'ring-inset', 'ring-gnome-active/40');
+      el.panelA.classList.remove('ring-1', 'ring-inset', 'ring-gnome-active/40');
+      if (el.panelBBadge) {
+        el.panelBBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-gnome-active text-white shrink-0 shadow-sm';
+      }
+      if (el.panelABadge) {
+        el.panelABadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-gnome-sidebar border border-gnome-border text-gnome-textDim shrink-0';
+      }
+    }
   }
 
   function recordFrequentLocation(locPath) {
@@ -3621,7 +3716,7 @@ async function startTransferOperation(action, sources, targetDir) {
 
   async function createTab(dir = '') {
     const p = panels[activePanel];
-    const initialDir = dir || p.currentDirectory || state.currentDirectory || 'C:\\';
+    const initialDir = dir || p.currentDirectory || state.currentDirectory || state.userHomeDir || '/';
     const newTab = createTabState(initialDir);
     p.tabs.push(newTab);
     p.activeTab = p.tabs.length - 1;
@@ -4223,6 +4318,10 @@ async function startTransferOperation(action, sources, targetDir) {
     // 1. User Places with guaranteed absolute paths from Rust backend
     try {
       const places = await invoke('get_user_places') || [];
+      const homePlace = places.find(p => p.id === 'home') || places[0];
+      if (homePlace && homePlace.path) {
+        state.userHomeDir = homePlace.path;
+      }
       el.quickLinks.innerHTML = '';
       places.forEach(p => {
         const btn = document.createElement('button');
@@ -5005,18 +5104,26 @@ async function startTransferOperation(action, sources, targetDir) {
     });
     if (el.fileList) {
       elPanels.forEach(p => {
-      p.fileList.addEventListener('scroll', () => closeFileContextMenu());
-      p.fileList.addEventListener('mousedown', () => {
-        const idx = elPanels.indexOf(p);
-        if (isSplitView && activePanel !== idx) {
-          activePanel = idx;
-          updatePanelHighlights();
-          renderBreadcrumbs();
-          updateSortHeaderUI();
-          updateStatusBar();
-        }
+        p.fileList.addEventListener('scroll', () => closeFileContextMenu());
+        p.fileList.addEventListener('mousedown', () => {
+          const idx = elPanels.indexOf(p);
+          if (isSplitView && activePanel !== idx) {
+            switchActivePanel(idx);
+          }
+        });
       });
-    });
+    }
+
+    // Panel Header Clicks (Split View)
+    if (el.panelAHeader) {
+      el.panelAHeader.addEventListener('click', () => {
+        if (isSplitView) switchActivePanel(0);
+      });
+    }
+    if (el.panelBHeader) {
+      el.panelBHeader.addEventListener('click', () => {
+        if (isSplitView) switchActivePanel(1);
+      });
     }
 
     // Directory Size Calculation
@@ -5040,6 +5147,113 @@ async function startTransferOperation(action, sources, targetDir) {
     listen('transfer-finished', (event) => {
       handleTransferFinished(event.payload);
     }).catch(err => console.warn('Error listening transfer-finished:', err));
+
+    // Native OS Menu Action Dispatcher (macOS native menu bar and system accelerators)
+    listen('menu-action', (event) => {
+      const actionId = event.payload;
+      if (!actionId) return;
+      switch (actionId) {
+        case 'about_tron':
+          openAboutModal();
+          break;
+        case 'open_preferences':
+        case 'open_appearance':
+          openAppearanceModal();
+          break;
+        case 'new_file':
+          openNewFileModal();
+          break;
+        case 'new_folder':
+          openNewFolderModal();
+          break;
+        case 'new_tab':
+          createTab();
+          break;
+        case 'close_tab':
+          closeTab(panels[activePanel].activeTab);
+          break;
+        case 'rename_item':
+          if (state.selectedItems.size > 1) {
+            openBatchRenameModal();
+          } else {
+            openRenameItemModal();
+          }
+          break;
+        case 'duplicate_item':
+          duplicateSelectedItem();
+          break;
+        case 'compress_zip':
+          openCompressModal();
+          break;
+        case 'export_listing':
+          openExportListModal();
+          break;
+        case 'delete_item':
+          deleteCurrentItem();
+          break;
+        case 'show_properties':
+          showItemProperties();
+          break;
+        case 'add_favorite':
+          addCurrentToFavorites();
+          break;
+        case 'cut_items':
+          cutSelectedItems();
+          break;
+        case 'copy_items':
+          copySelectedItems();
+          break;
+        case 'paste_items':
+          pasteClipboardItems();
+          break;
+        case 'select_all':
+          state.selectedItems.clear();
+          state.filteredItems.forEach(i => state.selectedItems.add(i.path));
+          renderFileList();
+          updateStatusBar();
+          break;
+        case 'copy_path': {
+          const item = panels[activePanel].filteredItems[panels[activePanel].selectedIndex];
+          if (item) copyToClipboard('"' + item.path + '"');
+          break;
+        }
+        case 'copy_posix': {
+          const item = panels[activePanel].filteredItems[panels[activePanel].selectedIndex];
+          if (item) copyToClipboard('"' + getPosixPath(item.path) + '"');
+          break;
+        }
+        case 'toggle_quickview':
+          if (state.quickViewOpen) {
+            closeQuickView();
+          } else {
+            openQuickView();
+          }
+          break;
+        case 'toggle_split':
+          toggleSplitView();
+          break;
+        case 'refresh_dir':
+          loadDirectory(state.currentDirectory, false);
+          break;
+        case 'toggle_hidden':
+          toggleShowHiddenFiles();
+          break;
+        case 'open_sherlock':
+          openSherlockModal();
+          break;
+        case 'open_jump':
+          openJumpToFolder();
+          break;
+        case 'open_terminal':
+          openCurrentTerminal();
+          break;
+        case 'help_shortcuts':
+          openHelpModal();
+          break;
+        default:
+          console.log('Unhandled menu-action:', actionId);
+      }
+    }).catch(err => console.warn('Error listening menu-action:', err));
 
     // Native OS file drop (Dragging files from Windows Explorer into the app)
     const handleNativeDrop = (event) => {
