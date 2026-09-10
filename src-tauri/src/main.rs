@@ -2705,6 +2705,375 @@ fn list_zip_contents(zip_path: String) -> Result<Vec<ArchiveEntryItem>, String> 
     Ok(list)
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ListingOptions {
+    pub dir_path: String,
+    pub output_path: String,
+    pub format: String, // "tree" | "flat"
+    pub recursive: bool,
+    pub include_files: bool,
+    pub max_depth: Option<usize>, // None if unlimited
+    pub include_details: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ListingResult {
+    pub output_path: String,
+    pub total_dirs: usize,
+    pub total_files: usize,
+    pub total_size: u64,
+    pub line_count: usize,
+}
+
+fn format_listing_size(bytes: u64) -> String {
+    if bytes == 0 {
+        return "0 B".to_string();
+    }
+    const KIB: f64 = 1024.0;
+    const MIB: f64 = KIB * 1024.0;
+    const GIB: f64 = MIB * 1024.0;
+    const TIB: f64 = GIB * 1024.0;
+
+    let b = bytes as f64;
+    if b >= TIB {
+        format!("{:.1} TB", b / TIB)
+    } else if b >= GIB {
+        format!("{:.1} GB", b / GIB)
+    } else if b >= MIB {
+        format!("{:.1} MB", b / MIB)
+    } else if b >= KIB {
+        format!("{:.1} KB", b / KIB)
+    } else {
+        format!("{} B", bytes)
+    }
+}
+
+fn format_unix_timestamp(secs: u64) -> String {
+    if secs == 0 {
+        return "--".to_string();
+    }
+    let days = (secs / 86400) as i64;
+    let rem_secs = secs % 86400;
+    let hours = rem_secs / 3600;
+    let mins = (rem_secs % 3600) / 60;
+
+    let z = days + 719468;
+    let era = (if z >= 0 { z } else { z - 146096 }) / 146097;
+    let doe = (z - era * 146097) as u32;
+    let yoe = (doe - doe / 1024 + doe / 1461 - doe / 142400) / 365;
+    let y = (yoe as i64) + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = if m <= 2 { y + 1 } else { y };
+
+    format!("{:04}-{:02}-{:02} {:02}:{:02}", y, m, d, hours, mins)
+}
+
+struct ListingEntry {
+    name: String,
+    path: PathBuf,
+    is_dir: bool,
+    size: u64,
+    modified: u64,
+}
+
+fn traverse_tree_listing(
+    dir: &Path,
+    prefix: &str,
+    current_depth: usize,
+    max_depth: Option<usize>,
+    include_files: bool,
+    include_details: bool,
+    output: &mut String,
+    total_dirs: &mut usize,
+    total_files: &mut usize,
+    total_size: &mut u64,
+    line_count: &mut usize,
+) {
+    let entries_res = fs::read_dir(dir);
+    if entries_res.is_err() {
+        output.push_str(&format!("{}    [Acceso denegado]\n", prefix));
+        *line_count += 1;
+        return;
+    }
+
+    let mut items: Vec<ListingEntry> = Vec::new();
+    if let Ok(entries) = entries_res {
+        for entry in entries.flatten() {
+            let p = entry.path();
+            let is_d = p.is_dir();
+            if !is_d && !include_files {
+                continue;
+            }
+
+            let meta = p.metadata().ok();
+            let size = meta.as_ref().map(|m| m.len()).unwrap_or(0);
+            let modified = meta
+                .and_then(|m| m.modified().ok())
+                .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+
+            items.push(ListingEntry {
+                name: entry.file_name().to_string_lossy().to_string(),
+                path: p,
+                is_dir: is_d,
+                size,
+                modified,
+            });
+        }
+    }
+
+    items.sort_by(|a, b| {
+        if a.is_dir != b.is_dir {
+            b.is_dir.cmp(&a.is_dir)
+        } else {
+            a.name.to_lowercase().cmp(&b.name.to_lowercase())
+        }
+    });
+
+    let count = items.len();
+    for (idx, item) in items.iter().enumerate() {
+        let is_last = idx == count - 1;
+        let branch = if is_last { "└── " } else { "├── " };
+        let child_prefix = if is_last { "    " } else { "│   " };
+
+        if item.is_dir {
+            *total_dirs += 1;
+            *line_count += 1;
+            let detail = if include_details && item.modified > 0 {
+                format!("  (modificado: {})", format_unix_timestamp(item.modified))
+            } else {
+                String::new()
+            };
+            output.push_str(&format!("{}{}{}/{}\n", prefix, branch, item.name, detail));
+
+            let can_recurse = match max_depth {
+                Some(limit) => current_depth < limit,
+                None => true,
+            };
+
+            if can_recurse {
+                let next_prefix = format!("{}{}", prefix, child_prefix);
+                traverse_tree_listing(
+                    &item.path,
+                    &next_prefix,
+                    current_depth + 1,
+                    max_depth,
+                    include_files,
+                    include_details,
+                    output,
+                    total_dirs,
+                    total_files,
+                    total_size,
+                    line_count,
+                );
+            }
+        } else {
+            *total_files += 1;
+            *total_size += item.size;
+            *line_count += 1;
+            let detail = if include_details {
+                format!("  ({}, {})", format_listing_size(item.size), format_unix_timestamp(item.modified))
+            } else {
+                String::new()
+            };
+            output.push_str(&format!("{}{}{}{}\n", prefix, branch, item.name, detail));
+        }
+    }
+}
+
+fn traverse_flat_listing(
+    dir: &Path,
+    base_dir: &Path,
+    current_depth: usize,
+    max_depth: Option<usize>,
+    recursive: bool,
+    include_files: bool,
+    include_details: bool,
+    output: &mut String,
+    total_dirs: &mut usize,
+    total_files: &mut usize,
+    total_size: &mut u64,
+    line_count: &mut usize,
+) {
+    let entries_res = fs::read_dir(dir);
+    if entries_res.is_err() {
+        return;
+    }
+
+    let mut items: Vec<ListingEntry> = Vec::new();
+    if let Ok(entries) = entries_res {
+        for entry in entries.flatten() {
+            let p = entry.path();
+            let is_d = p.is_dir();
+            if !is_d && !include_files {
+                continue;
+            }
+
+            let meta = p.metadata().ok();
+            let size = meta.as_ref().map(|m| m.len()).unwrap_or(0);
+            let modified = meta
+                .and_then(|m| m.modified().ok())
+                .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+
+            items.push(ListingEntry {
+                name: entry.file_name().to_string_lossy().to_string(),
+                path: p,
+                is_dir: is_d,
+                size,
+                modified,
+            });
+        }
+    }
+
+    items.sort_by(|a, b| {
+        if a.is_dir != b.is_dir {
+            b.is_dir.cmp(&a.is_dir)
+        } else {
+            a.name.to_lowercase().cmp(&b.name.to_lowercase())
+        }
+    });
+
+    for item in &items {
+        let rel_path = item.path.strip_prefix(base_dir).unwrap_or(&item.path);
+        let rel_display = rel_path.to_string_lossy().to_string();
+
+        *line_count += 1;
+        if item.is_dir {
+            *total_dirs += 1;
+            let date_str = if include_details { format_unix_timestamp(item.modified) } else { "".to_string() };
+            output.push_str(&format!("{:<7} {:>10}   {:<16}  {}/\n", "[DIR]", "", date_str, rel_display));
+
+            if recursive {
+                let can_recurse = match max_depth {
+                    Some(limit) => current_depth < limit,
+                    None => true,
+                };
+                if can_recurse {
+                    traverse_flat_listing(
+                        &item.path,
+                        base_dir,
+                        current_depth + 1,
+                        max_depth,
+                        recursive,
+                        include_files,
+                        include_details,
+                        output,
+                        total_dirs,
+                        total_files,
+                        total_size,
+                        line_count,
+                    );
+                }
+            }
+        } else {
+            *total_files += 1;
+            *total_size += item.size;
+            let size_str = if include_details { format_listing_size(item.size) } else { "".to_string() };
+            let date_str = if include_details { format_unix_timestamp(item.modified) } else { "".to_string() };
+            output.push_str(&format!("{:<7} {:>10}   {:<16}  {}\n", "[FILE]", size_str, date_str, rel_display));
+        }
+    }
+}
+
+#[tauri::command]
+fn generate_directory_listing(options: ListingOptions) -> Result<ListingResult, String> {
+    let target_dir = PathBuf::from(&options.dir_path);
+    if !target_dir.exists() || !target_dir.is_dir() {
+        return Err("El directorio especificado no existe".into());
+    }
+
+    let out_path = PathBuf::from(&options.output_path);
+    if let Some(parent) = out_path.parent() {
+        fs::create_dir_all(parent).map_err(|e| format!("No se pudo crear el directorio destino: {}", e))?;
+    }
+
+    let now_secs = std::time::SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let now_str = format_unix_timestamp(now_secs);
+
+    let mut output = String::with_capacity(32 * 1024);
+    output.push_str("================================================================================\n");
+    output.push_str(&format!("LISTADO DE DIRECTORIO: {}\n", options.dir_path));
+    output.push_str(&format!("Generado por: Tron File Manager\n"));
+    output.push_str(&format!("Fecha de generación: {}\n", now_str));
+    output.push_str(&format!("Formato: {}\n", if options.format == "tree" { "Estructura en Árbol" } else { "Lista detallada" }));
+    let depth_str = match options.max_depth {
+        Some(d) => format!("{} niveles", d),
+        None => "Completo (sin límite)".to_string(),
+    };
+    output.push_str(&format!("Profundidad de exploración: {}\n", depth_str));
+    output.push_str(&format!("Contenido: {}\n", if options.include_files { "Directorios y Archivos" } else { "Solo Directorios" }));
+    output.push_str("================================================================================\n\n");
+
+    let mut total_dirs = 0usize;
+    let mut total_files = 0usize;
+    let mut total_size = 0u64;
+    let mut line_count = 0usize;
+
+    if options.format == "tree" {
+        output.push_str(&format!("[{}]\n", options.dir_path));
+        line_count += 1;
+        traverse_tree_listing(
+            &target_dir,
+            "",
+            1,
+            options.max_depth,
+            options.include_files,
+            options.include_details,
+            &mut output,
+            &mut total_dirs,
+            &mut total_files,
+            &mut total_size,
+            &mut line_count,
+        );
+    } else {
+        output.push_str(&format!("{:<7} {:>10}   {:<16}  {}\n", "TIPO", "TAMAÑO", "FECHA", "NOMBRE / RUTA"));
+        output.push_str("--------------------------------------------------------------------------------\n");
+        line_count += 2;
+        traverse_flat_listing(
+            &target_dir,
+            &target_dir,
+            1,
+            options.max_depth,
+            options.recursive,
+            options.include_files,
+            options.include_details,
+            &mut output,
+            &mut total_dirs,
+            &mut total_files,
+            &mut total_size,
+            &mut line_count,
+        );
+    }
+
+    output.push_str("\n================================================================================\n");
+    output.push_str("RESUMEN:\n");
+    output.push_str(&format!("- Carpetas: {}\n", total_dirs));
+    output.push_str(&format!("- Archivos: {}\n", total_files));
+    output.push_str(&format!("- Espacio total: {}\n", format_listing_size(total_size)));
+    output.push_str(&format!("- Elementos listados: {}\n", total_dirs + total_files));
+    output.push_str("================================================================================\n");
+
+    fs::write(&out_path, output.as_bytes())
+        .map_err(|e| format!("Error al escribir el archivo de listado: {}", e))?;
+
+    Ok(ListingResult {
+        output_path: options.output_path,
+        total_dirs,
+        total_files,
+        total_size,
+        line_count,
+    })
+}
+
 #[tauri::command]
 fn force_exit_app() {
     std::process::exit(0);
@@ -2740,7 +3109,8 @@ fn main() {
             launch_with_app,
             compress_to_zip,
             extract_zip_archive,
-            list_zip_contents
+            list_zip_contents,
+            generate_directory_listing
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

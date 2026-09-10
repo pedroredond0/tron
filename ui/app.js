@@ -266,7 +266,25 @@
     btnDateClear: document.getElementById('btnDateClear'),
     btnResetSherlockFilters: document.getElementById('btnResetSherlockFilters'),
     btnExecuteSherlock: document.getElementById('btnExecuteSherlock'),
-    txtExecuteSherlock: document.getElementById('txtExecuteSherlock')
+    txtExecuteSherlock: document.getElementById('txtExecuteSherlock'),
+    // Generador de Listados a Archivo
+    btnActionExportList: document.getElementById('btnActionExportList'),
+    menuExportList: document.getElementById('menuExportList'),
+    ctxMenuExportList: document.getElementById('ctxMenuExportList'),
+    modalExportList: document.getElementById('modalExportList'),
+    btnCloseExportListModal: document.getElementById('btnCloseExportListModal'),
+    btnCancelExportList: document.getElementById('btnCancelExportList'),
+    btnConfirmExportList: document.getElementById('btnConfirmExportList'),
+    exportListTargetDir: document.getElementById('exportListTargetDir'),
+    inputExportListName: document.getElementById('inputExportListName'),
+    chkExportListRecursive: document.getElementById('chkExportListRecursive'),
+    chkExportListIncludeFiles: document.getElementById('chkExportListIncludeFiles'),
+    chkExportListDetails: document.getElementById('chkExportListDetails'),
+    exportListDepthContainer: document.getElementById('exportListDepthContainer'),
+    exportListDepthLabel: document.getElementById('exportListDepthLabel'),
+    rangeExportListDepth: document.getElementById('rangeExportListDepth'),
+    chkExportListFullDepth: document.getElementById('chkExportListFullDepth'),
+    chkExportListOpenAfter: document.getElementById('chkExportListOpenAfter')
   };
 
   // Format Helpers
@@ -1464,7 +1482,7 @@
         return;
       }
 
-      // If in any modal input (New File, New Folder, Network UNC, Appearance, Rename Fav, Rename Item, Compress, Open With)
+      // If in any modal input (New File, New Folder, Network UNC, Appearance, Rename Fav, Rename Item, Compress, Open With, Export List)
       if (e.key === 'Escape') {
         e.preventDefault();
         closeNewFileModal();
@@ -1480,6 +1498,7 @@
         closeOpenWithModal();
         closeCompressModal();
         closeArchiveViewModal();
+        closeExportListModal();
         return;
       }
 
@@ -1499,6 +1518,8 @@
           confirmCompress();
         } else if (activeEl === el.inputOpenWithApp) {
           launchCustomOpenWith();
+        } else if (activeEl === el.inputExportListName) {
+          executeExportList();
         } else if (activeEl === el.inputSherlockQuery || activeEl === el.inputSherlockSizeNum) {
           executeSherlockFromInputs();
         }
@@ -2584,6 +2605,148 @@
     currentArchiveEntries = [];
     currentArchiveItem = null;
     el.fileList.focus();
+  }
+
+  // --- Export Directory Listing Controller (ls / dir / tree) ---
+  let exportListTargetDirectory = '';
+
+  function openExportListModal(specificDir = null) {
+    let target = specificDir;
+    if (!target) {
+      if (state.contextTargetItem && state.contextTargetItem.is_directory) {
+        target = state.contextTargetItem.path;
+      } else if (state.selectedIndex >= 0 && state.selectedIndex < state.filteredItems.length) {
+        const item = state.filteredItems[state.selectedIndex];
+        if (item.is_directory) {
+          target = item.path;
+        }
+      }
+    }
+    if (!target) {
+      target = state.currentDirectory;
+    }
+    if (!target) return;
+
+    exportListTargetDirectory = target;
+
+    // Determine default file name
+    const norm = target.replace(/\\/g, '/').replace(/\/+$/, '');
+    const dirBase = norm.split('/').filter(Boolean).pop() || 'directorio';
+    const defaultName = `listado_${dirBase}`;
+
+    if (el.exportListTargetDir) {
+      el.exportListTargetDir.textContent = target;
+      el.exportListTargetDir.title = target;
+    }
+    if (el.inputExportListName) {
+      el.inputExportListName.value = defaultName;
+    }
+
+    // Reset controls to sensible defaults
+    const treeRadio = document.querySelector('input[name="exportListFormat"][value="tree"]');
+    if (treeRadio) treeRadio.checked = true;
+
+    if (el.chkExportListRecursive) el.chkExportListRecursive.checked = true;
+    if (el.chkExportListIncludeFiles) el.chkExportListIncludeFiles.checked = true;
+    if (el.chkExportListDetails) el.chkExportListDetails.checked = true;
+    if (el.chkExportListOpenAfter) el.chkExportListOpenAfter.checked = true;
+    if (el.rangeExportListDepth) el.rangeExportListDepth.value = '2';
+    if (el.chkExportListFullDepth) el.chkExportListFullDepth.checked = false;
+    updateExportListDepthUI();
+
+    if (el.modalExportList) {
+      el.modalExportList.classList.remove('hidden');
+      if (el.inputExportListName) {
+        el.inputExportListName.focus();
+        el.inputExportListName.select();
+      }
+    }
+  }
+
+  function closeExportListModal() {
+    if (el.modalExportList) {
+      el.modalExportList.classList.add('hidden');
+    }
+    el.fileList.focus();
+  }
+
+  function updateExportListDepthUI() {
+    if (!el.exportListDepthLabel || !el.rangeExportListDepth || !el.chkExportListFullDepth) return;
+    const isFull = el.chkExportListFullDepth.checked;
+    el.rangeExportListDepth.disabled = isFull;
+    if (isFull) {
+      el.exportListDepthLabel.textContent = 'Completa (sin límite)';
+      el.exportListDepthLabel.className = 'font-mono font-bold text-amber-400 bg-amber-950/40 px-2 py-0.5 rounded border border-amber-500/40';
+    } else {
+      const val = el.rangeExportListDepth.value;
+      el.exportListDepthLabel.textContent = `${val} ${val === '1' ? 'nivel' : 'niveles'}`;
+      el.exportListDepthLabel.className = 'font-mono font-bold text-gnome-active bg-gnome-surface px-2 py-0.5 rounded border border-gnome-border';
+    }
+  }
+
+  async function executeExportList() {
+    if (!exportListTargetDirectory || !el.inputExportListName || !state.currentDirectory) return;
+
+    let filename = el.inputExportListName.value.trim();
+    if (!filename) filename = 'listado_directorio';
+    if (!filename.toLowerCase().endsWith('.txt')) {
+      filename += '.txt';
+    }
+
+    const isWindows = /^[a-zA-Z]:[\\\/]/.test(state.currentDirectory) || state.currentDirectory.startsWith('\\\\');
+    const sep = isWindows ? '\\' : '/';
+    const cleanDir = state.currentDirectory.replace(/[\\\/]+$/, '');
+    const outFilePath = `${cleanDir}${sep}${filename}`;
+
+    const formatRadio = document.querySelector('input[name="exportListFormat"]:checked');
+    const format = formatRadio ? formatRadio.value : 'tree';
+
+    const recursive = el.chkExportListRecursive ? el.chkExportListRecursive.checked : true;
+    const includeFiles = el.chkExportListIncludeFiles ? el.chkExportListIncludeFiles.checked : true;
+    const includeDetails = el.chkExportListDetails ? el.chkExportListDetails.checked : true;
+    const isFullDepth = el.chkExportListFullDepth ? el.chkExportListFullDepth.checked : false;
+    const depthVal = el.rangeExportListDepth ? parseInt(el.rangeExportListDepth.value, 10) : 2;
+    const maxDepth = isFullDepth ? null : (isNaN(depthVal) ? 2 : depthVal);
+    const openAfter = el.chkExportListOpenAfter ? el.chkExportListOpenAfter.checked : false;
+
+    closeExportListModal();
+
+    try {
+      if (el.btnActionExportList) {
+        el.btnActionExportList.classList.add('animate-pulse', 'text-gnome-active');
+      }
+
+      const res = await invoke('generate_directory_listing', {
+        options: {
+          target_path: exportListTargetDirectory,
+          output_file: outFilePath,
+          format: format,
+          recursive: recursive,
+          include_files: includeFiles,
+          include_details: includeDetails,
+          max_depth: maxDepth
+        }
+      });
+
+      // Reload current directory so the new .txt appears
+      await loadDirectory(state.currentDirectory, false);
+
+      // Select newly created txt file
+      const idx = state.filteredItems.findIndex(i => i.path.toLowerCase() === outFilePath.toLowerCase());
+      if (idx >= 0) {
+        setSelectionIndex(idx);
+      }
+
+      if (openAfter) {
+        openInTextEditor(outFilePath);
+      }
+    } catch (err) {
+      alert('Error al generar listado: ' + err);
+    } finally {
+      if (el.btnActionExportList) {
+        el.btnActionExportList.classList.remove('animate-pulse', 'text-gnome-active');
+      }
+    }
   }
 
   // Modals & New File / New Folder
@@ -4345,6 +4508,44 @@
           }
         }
       };
+    }
+
+    // Export Directory Listing bindings
+    if (el.btnActionExportList) {
+      el.btnActionExportList.onclick = () => {
+        openExportListModal();
+      };
+    }
+    if (el.menuExportList) {
+      el.menuExportList.onclick = () => {
+        closeAllMenus();
+        openExportListModal();
+      };
+    }
+    if (el.ctxMenuExportList) {
+      el.ctxMenuExportList.onclick = () => {
+        const target = (state.contextTargetItem && state.contextTargetItem.is_directory)
+          ? state.contextTargetItem.path
+          : state.currentDirectory;
+        closeAllMenus();
+        closeFileContextMenu();
+        openExportListModal(target);
+      };
+    }
+    if (el.btnCloseExportListModal) {
+      el.btnCloseExportListModal.onclick = closeExportListModal;
+    }
+    if (el.btnCancelExportList) {
+      el.btnCancelExportList.onclick = closeExportListModal;
+    }
+    if (el.btnConfirmExportList) {
+      el.btnConfirmExportList.onclick = executeExportList;
+    }
+    if (el.rangeExportListDepth) {
+      el.rangeExportListDepth.oninput = updateExportListDepthUI;
+    }
+    if (el.chkExportListFullDepth) {
+      el.chkExportListFullDepth.onchange = updateExportListDepthUI;
     }
   }
 
