@@ -264,6 +264,25 @@
       display: block;
     }
 
+    #qvIcon {
+      width: 1.25rem;
+      height: 1.25rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      line-height: 1;
+    }
+
+    #qvIcon img {
+      width: 100%;
+      height: 100%;
+      max-width: 1.25rem;
+      max-height: 1.25rem;
+      object-fit: contain;
+      display: block;
+    }
+
     /* Dynamic UI scale properties */
     header {
       font-size: var(--app-ui-scale, 14px) !important;
@@ -742,7 +761,7 @@
       <!-- QuickView Header -->
       <div class="h-10 bg-gnome-sidebar border-b border-gnome-border flex items-center justify-between px-4 shrink-0">
         <div class="flex items-center gap-2 min-w-0">
-          <span id="qvIcon" class="shrink-0 text-sm">📄</span>
+          <span id="qvIcon" class="shrink-0 text-sm w-5 h-5 flex items-center justify-center">📄</span>
           <span id="qvTitle" class="font-medium text-xs text-gnome-text truncate">nombre_archivo.ext</span>
         </div>
         <div class="flex items-center gap-2 shrink-0">
