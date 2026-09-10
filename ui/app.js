@@ -11,6 +11,38 @@
     return () => {};
   });
 
+  // Platform detection for Mac-friendly shortcuts (Cmd instead of Ctrl)
+  const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+  function isModKey(e) {
+    return isMac ? e.metaKey : e.ctrlKey;
+  }
+  function adaptShortcutsForMac() {
+    if (!isMac) return;
+    try {
+      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
+      let node;
+      while ((node = walker.nextNode())) {
+        if (node.nodeValue && node.nodeValue.includes('Ctrl')) {
+          node.nodeValue = node.nodeValue.replace(/Ctrl\s*\+\s*/g, 'Cmd + ').replace(/Ctrl\+/g, 'Cmd+');
+        }
+      }
+      document.querySelectorAll('[title]').forEach(el => {
+        const t = el.getAttribute('title');
+        if (t && t.includes('Ctrl')) {
+          el.setAttribute('title', t.replace(/Ctrl\s*\+\s*/g, 'Cmd + ').replace(/Ctrl\+/g, 'Cmd+'));
+        }
+      });
+      document.querySelectorAll('[placeholder]').forEach(el => {
+        const p = el.getAttribute('placeholder');
+        if (p && p.includes('Ctrl')) {
+          el.setAttribute('placeholder', p.replace(/Ctrl\s*\+\s*/g, 'Cmd + ').replace(/Ctrl\+/g, 'Cmd+'));
+        }
+      });
+    } catch (err) {
+      console.warn('adaptShortcutsForMac error:', err);
+    }
+  }
+
   // Helper to create tab state
   let nextTabId = 1;
   function createTabState(dir = '') {
@@ -1991,8 +2023,8 @@ modalSherlock: document.getElementById('modalSherlock'),
       return; // Do not process normal list navigation while QuickView is open
     }
 
-    // Normal Window Navigation
-    if (e.ctrlKey && (e.key === 'a' || e.key === 'A')) {
+    // Normal Window Navigation (Mac Cmd / Win-Linux Ctrl)
+    if (isModKey(e) && (e.key === 'a' || e.key === 'A')) {
       e.preventDefault();
       state.selectedItems.clear();
       state.filteredItems.forEach(i => state.selectedItems.add(i.path));
@@ -2001,49 +2033,49 @@ modalSherlock: document.getElementById('modalSherlock'),
       return;
     }
 
-    if (e.ctrlKey && (e.key === 'c' || e.key === 'C')) {
+    if (isModKey(e) && (e.key === 'c' || e.key === 'C') && !e.shiftKey && !e.altKey) {
       e.preventDefault();
       copySelectedItems();
       return;
     }
 
-    if (e.ctrlKey && (e.key === 'x' || e.key === 'X')) {
+    if (isModKey(e) && (e.key === 'x' || e.key === 'X')) {
       e.preventDefault();
       cutSelectedItems();
       return;
     }
 
-    if (e.ctrlKey && (e.key === 'v' || e.key === 'V')) {
+    if (isModKey(e) && (e.key === 'v' || e.key === 'V')) {
       e.preventDefault();
       pasteClipboardItems();
       return;
     }
 
-    if (e.ctrlKey && e.shiftKey && (e.key === 'n' || e.key === 'N')) {
+    if (isModKey(e) && e.shiftKey && (e.key === 'n' || e.key === 'N')) {
       e.preventDefault();
       openNewFolderModal();
       return;
     }
 
-    if (e.ctrlKey && (e.key === 'n' || e.key === 'N')) {
+    if (isModKey(e) && (e.key === 'n' || e.key === 'N')) {
       e.preventDefault();
       openNewFileModal();
       return;
     }
 
-    if (e.ctrlKey && (e.key === 'd' || e.key === 'D')) {
+    if (isModKey(e) && (e.key === 'd' || e.key === 'D')) {
       e.preventDefault();
       duplicateSelectedItem();
       return;
     }
 
-    if (e.ctrlKey && (e.key === 'b' || e.key === 'B')) {
+    if (isModKey(e) && (e.key === 'b' || e.key === 'B')) {
       e.preventDefault();
       addCurrentToFavorites();
       return;
     }
 
-    if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+    if (isModKey(e) && (e.key === 'k' || e.key === 'K')) {
       e.preventDefault();
       if (el.searchInput) {
         el.searchInput.focus();
@@ -2052,7 +2084,7 @@ modalSherlock: document.getElementById('modalSherlock'),
       return;
     }
 
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'f' || e.key === 'F')) {
+    if (isModKey(e) && e.shiftKey && (e.key === 'f' || e.key === 'F')) {
       e.preventDefault();
       openSherlockModal();
       return;
@@ -2060,7 +2092,7 @@ modalSherlock: document.getElementById('modalSherlock'),
 
     if (e.key === 'F2') {
       e.preventDefault();
-      if (state.selectedItems.size > 1 || e.ctrlKey) {
+      if (state.selectedItems.size > 1 || isModKey(e)) {
         openBatchRenameModal();
       } else {
         openRenameItemModal();
@@ -2075,32 +2107,32 @@ modalSherlock: document.getElementById('modalSherlock'),
       return;
     }
 
-    if (e.ctrlKey && (e.key === 'h' || e.key === 'H')) {
+    if (isModKey(e) && (e.key === 'h' || e.key === 'H')) {
       e.preventDefault();
       toggleShowHiddenFiles();
       return;
     }
 
     // Tabs & Terminal Shortcuts
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 't' || e.key === 'T')) {
+    if (isModKey(e) && e.shiftKey && (e.key === 't' || e.key === 'T')) {
       e.preventDefault();
       openCurrentTerminal();
       return;
     }
 
-    if ((e.ctrlKey || e.metaKey) && (e.key === 't' || e.key === 'T')) {
+    if (isModKey(e) && (e.key === 't' || e.key === 'T')) {
       e.preventDefault();
       createTab();
       return;
     }
 
-    if ((e.ctrlKey || e.metaKey) && (e.key === 'w' || e.key === 'W')) {
+    if (isModKey(e) && (e.key === 'w' || e.key === 'W')) {
       e.preventDefault();
       closeTab(panels[activePanel].activeTab);
       return;
     }
 
-    if ((e.ctrlKey || e.metaKey) && e.key >= '1' && e.key <= '9') {
+    if (isModKey(e) && e.key >= '1' && e.key <= '9') {
       const tabNum = parseInt(e.key, 10) - 1;
       const p = panels[activePanel];
       if (p.tabs && tabNum < p.tabs.length) {
@@ -2110,9 +2142,9 @@ modalSherlock: document.getElementById('modalSherlock'),
       }
     }
 
-    if (e.key === 'F5' || (e.ctrlKey && (e.key === 'r' || e.key === 'R'))) {
+    if (e.key === 'F5' || (isModKey(e) && (e.key === 'r' || e.key === 'R'))) {
       e.preventDefault();
-      if (e.key === 'F5' && isSplitView && !e.ctrlKey) {
+      if (e.key === 'F5' && isSplitView && !isModKey(e)) {
         const targetDir = panels[activePanel === 0 ? 1 : 0].currentDirectory;
         if (state.currentDirectory && targetDir && state.currentDirectory !== targetDir && state.selectedItems.size > 0) {
           startTransferOperation('copy', Array.from(state.selectedItems), targetDir);
@@ -2123,7 +2155,7 @@ modalSherlock: document.getElementById('modalSherlock'),
       return;
     }
 
-    if (e.key === 'F3' || (e.ctrlKey && e.key === '\\')) {
+    if (e.key === 'F3' || (isModKey(e) && e.key === '\\')) {
       e.preventDefault();
       toggleSplitView();
       return;
@@ -2139,20 +2171,20 @@ modalSherlock: document.getElementById('modalSherlock'),
       el.fileList.focus();
       return;
     }
-    if (e.ctrlKey && e.shiftKey && (e.key === 'c' || e.key === 'C')) {
+    if (isModKey(e) && e.shiftKey && (e.key === 'c' || e.key === 'C')) {
       e.preventDefault();
       const item = panels[activePanel].filteredItems[panels[activePanel].selectedIndex];
       if (item) copyToClipboard('"' + item.path + '"');
       return;
     }
-    if (e.ctrlKey && e.altKey && (e.key === 'c' || e.key === 'C')) {
+    if (isModKey(e) && e.altKey && (e.key === 'c' || e.key === 'C')) {
       e.preventDefault();
       const item = panels[activePanel].filteredItems[panels[activePanel].selectedIndex];
       if (item) copyToClipboard('"' + getPosixPath(item.path) + '"');
       return;
     }
 
-    if (e.ctrlKey && (e.key === 'p' || e.key === 'P')) {
+    if (isModKey(e) && (e.key === 'p' || e.key === 'P')) {
       e.preventDefault();
       openJumpToFolder();
       return;
@@ -3556,7 +3588,7 @@ async function startTransferOperation(action, sources, targetDir) {
       tabEl.innerHTML = `
         <span class="text-[11px] opacity-70">📁</span>
         <span class="truncate flex-1">${escapeHtml(t.name || 'Carpeta')}</span>
-        <button type="button" class="btn-close-tab w-3.5 h-3.5 rounded-full flex items-center justify-center text-[10px] opacity-40 group-hover:opacity-100 hover:bg-white/20 hover:text-white transition-opacity" title="Cerrar pestaña (Ctrl+W)">✕</button>
+        <button type="button" class="btn-close-tab w-3.5 h-3.5 rounded-full flex items-center justify-center text-[10px] opacity-40 group-hover:opacity-100 hover:bg-white/20 hover:text-white transition-opacity" title="Cerrar pestaña (${isMac ? 'Cmd+W' : 'Ctrl+W'})">✕</button>
       `;
 
       tabEl.onclick = (e) => {
@@ -4038,7 +4070,7 @@ async function startTransferOperation(action, sources, targetDir) {
     if (state.favorites.length === 0) {
       const emptyMsg = document.createElement('div');
       emptyMsg.className = 'text-[11px] text-gnome-textDim px-2 py-1 italic';
-      emptyMsg.textContent = 'Sin favoritos aún (Ctrl+B)';
+      emptyMsg.textContent = isMac ? 'Sin favoritos aún (Cmd+B)' : 'Sin favoritos aún (Ctrl+B)';
       el.favoriteLinks.appendChild(emptyMsg);
       return;
     }
@@ -4270,6 +4302,7 @@ async function startTransferOperation(action, sources, targetDir) {
 
   // Initialization & Event Listeners
   function init() {
+    adaptShortcutsForMac();
     window.addEventListener('keydown', handleGlobalKeyDown, true);
 
     // Navigation bar
