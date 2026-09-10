@@ -605,8 +605,8 @@
   </div>
 
   <!-- QuickView Modal Overlay -->
-  <div id="quickViewModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-6">
-    <div id="quickViewCard" class="bg-gnome-surface border border-gnome-border rounded-xl shadow-2xl flex flex-col w-full max-w-4xl max-h-[85vh] overflow-hidden">
+  <div id="quickViewModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-3">
+    <div id="quickViewCard" class="bg-gnome-surface border border-gnome-border rounded-xl shadow-2xl flex flex-col w-full max-w-5xl max-h-[92vh] overflow-hidden">
       <!-- QuickView Header -->
       <div class="h-10 bg-gnome-sidebar border-b border-gnome-border flex items-center justify-between px-4 shrink-0">
         <div class="flex items-center gap-2 min-w-0">
@@ -632,14 +632,8 @@
       </div>
 
       <!-- QuickView Content Area -->
-      <div id="qvContent" class="flex-1 min-h-[300px] overflow-auto flex items-center justify-center p-4 bg-gnome-bg/60">
+      <div id="qvContent" class="flex-1 min-h-[350px] overflow-auto flex items-center justify-center p-4 bg-gnome-bg/60">
         <!-- Injected dynamically: image, text, video, audio, or fallback metadata card -->
-      </div>
-
-      <!-- QuickView Footer Bar -->
-      <div class="h-8 bg-gnome-sidebar border-t border-gnome-border flex items-center justify-between px-4 text-[11px] text-gnome-textDim shrink-0">
-        <span id="qvDetails">Tamaño: 0 KB | Modificado: --</span>
-        <span class="text-[10px] text-gnome-textDim/70">Navega con Flechas | Del papelera | Esc cerrar</span>
       </div>
     </div>
   </div>

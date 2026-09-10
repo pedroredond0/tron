@@ -44,7 +44,9 @@
     textEditorCustomPath: localStorage.getItem('tron_text_editor_custom') || '',
     monochromeIcons: localStorage.getItem('tron_monochrome_icons') === 'true',
     draggedInternalPaths: [],
-    activeSherlockFilter: null
+    activeSherlockFilter: null,
+    sherlockResults: null,
+    searchItems: null
   };
 
   // DOM Elements
@@ -354,18 +356,18 @@
           }
           break;
         case 'size':
-          const sizeA = a.is_directory ? (state.dirSizes.get(a.path)?.total_size || 0) : (a.size || 0);
-          const sizeB = b.is_directory ? (state.dirSizes.get(b.path)?.total_size || 0) : (b.size || 0);
-          res = sizeA - sizeB;
-          if (res === 0) {
-            res = a.name.localeCompare(b.name, 'es', { sensitivity: 'base', numeric: true });
-          }
+          const sizeA = a.is_directory ? (state.dirSizes.get(a.path)?.total_size || a.size || 0) : (a.size || 0);
+          const sizeB = b.is_directory ? (state.dirSizes.get(b.path)?.total_size || b.size || 0) : (b.size || 0);
+          if (sizeA < sizeB) res = -1;
+          else if (sizeA > sizeB) res = 1;
+          else res = a.name.localeCompare(b.name, 'es', { sensitivity: 'base', numeric: true });
           break;
         case 'date':
-          res = (a.modified || 0) - (b.modified || 0);
-          if (res === 0) {
-            res = a.name.localeCompare(b.name, 'es', { sensitivity: 'base', numeric: true });
-          }
+          const dateA = a.modified || 0;
+          const dateB = b.modified || 0;
+          if (dateA < dateB) res = -1;
+          else if (dateA > dateB) res = 1;
+          else res = a.name.localeCompare(b.name, 'es', { sensitivity: 'base', numeric: true });
           break;
       }
       return state.sortAsc ? res : -res;
@@ -421,6 +423,8 @@
       state.items = res.items || [];
       state.searchQuery = '';
       state.isSearchingRecursive = false;
+      state.sherlockResults = null;
+      state.searchItems = null;
       if (el.sherlockBanner) el.sherlockBanner.classList.add('hidden');
       state.activeSherlockFilter = null;
       el.searchInput.value = '';
@@ -534,6 +538,24 @@
 
   // File Filtering & Sorting
   function applyFilter() {
+    if (state.activeSherlockFilter && state.sherlockResults) {
+      let res = state.sherlockResults;
+      if (!state.showHiddenFiles) {
+        res = res.filter(item => !item.is_hidden);
+      }
+      state.filteredItems = sortItems([...res]);
+      return;
+    }
+
+    if (state.isSearchingRecursive && state.searchItems) {
+      let res = state.searchItems;
+      if (!state.showHiddenFiles) {
+        res = res.filter(item => !item.is_hidden);
+      }
+      state.filteredItems = sortItems([...res]);
+      return;
+    }
+
     const q = state.searchQuery.toLowerCase().trim();
     let res = state.items;
     if (!state.showHiddenFiles) {
@@ -893,9 +915,11 @@
     el.qvTitle.textContent = item.name;
     el.qvIcon.textContent = getFileIcon(item);
     el.qvBadge.textContent = item.is_directory ? 'CARPETA' : (item.extension || item.file_type || 'archivo').toUpperCase();
-    el.qvDetails.textContent = item.is_directory
-      ? `Carpeta | Modificado: ${formatDate(item.modified)}`
-      : `Tamaño: ${formatSize(item.size)} | Modificado: ${formatDate(item.modified)}`;
+    if (el.qvDetails) {
+      el.qvDetails.textContent = item.is_directory
+        ? `Carpeta | Modificado: ${formatDate(item.modified)}`
+        : `Tamaño: ${formatSize(item.size)} | Modificado: ${formatDate(item.modified)}`;
+    }
     el.qvContent.innerHTML = `<div class="text-xs text-gnome-textDim">Cargando vista previa...</div>`;
 
     if (item.is_directory) {
@@ -1000,7 +1024,9 @@
           <div><span class="text-gnome-text font-medium">Ruta:</span> <span class="break-all">${escapeHtml(item.path)}</span></div>
         `;
       }
-      el.qvDetails.textContent = `Tamaño: ${formatSize(res.total_size)} | ${res.file_count} archivos, ${res.dir_count} carpetas`;
+      if (el.qvDetails) {
+        el.qvDetails.textContent = `Tamaño: ${formatSize(res.total_size)} | ${res.file_count} archivos, ${res.dir_count} carpetas`;
+      }
     } catch (err) {
       if (state.activeDirCalcId !== calcId || !state.quickViewOpen) return;
       const statusEl = document.getElementById('qvDirCalcStatus');
@@ -3375,7 +3401,8 @@
 
     if (!q) {
       state.isSearchingRecursive = false;
-      state.filteredItems = [...state.items];
+      state.searchItems = null;
+      applyFilter();
       state.selectedIndex = state.filteredItems.length > 0 ? 0 : -1;
       state.selectionAnchor = state.selectedIndex;
       state.selectedItems.clear();
@@ -3389,6 +3416,7 @@
 
     if (!isRecursive) {
       state.isSearchingRecursive = false;
+      state.searchItems = null;
       applyFilter();
       state.selectedIndex = state.filteredItems.length > 0 ? 0 : -1;
       state.selectionAnchor = state.selectedIndex;
@@ -3410,7 +3438,8 @@
         query: q,
         maxResults: 200
       });
-      state.filteredItems = results || [];
+      state.searchItems = results || [];
+      state.filteredItems = sortItems([...state.searchItems]);
       state.selectedIndex = state.filteredItems.length > 0 ? 0 : -1;
       state.selectionAnchor = state.selectedIndex;
       state.selectedItems.clear();
@@ -3422,6 +3451,7 @@
     } catch (err) {
       console.error('Error en búsqueda recursiva:', err);
       state.isSearchingRecursive = false;
+      state.searchItems = null;
       applyFilter();
       renderFileList();
       updateStatusBar();
@@ -3514,7 +3544,8 @@
       }
 
       state.isSearchingRecursive = true;
-      state.filteredItems = res.items || [];
+      state.sherlockResults = res.items || [];
+      state.filteredItems = sortItems([...state.sherlockResults]);
       state.activeSherlockFilter = { ...config, filter };
 
       // Update banner UI
@@ -3622,6 +3653,7 @@
       el.btnSherlockBannerClose.onclick = () => {
         if (el.sherlockBanner) el.sherlockBanner.classList.add('hidden');
         state.activeSherlockFilter = null;
+        state.sherlockResults = null;
         loadDirectory(state.currentDirectory, false);
       };
     }
