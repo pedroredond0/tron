@@ -177,9 +177,11 @@ A continuación se detallan los 26 comandos Tauri invocables desde el frontend m
 | `launch_with_app` | `path: String, app_path: String` | `Result<(), String>` | Ejecuta el archivo con una aplicación específica o binario. |
 | `compress_to_zip` | `items: Vec<String>, dest_zip: String` | `Result<(), String>` | Comprime los elementos seleccionados en un archivo `.zip`. |
 | `extract_zip_archive`| `zip_path: String, dest_dir: String` | `Result<(), String>` | Descomprime el archivo `.zip` con validación de seguridad. |
-| `list_zip_contents` | `zip_path: String` | `Vec<ZipEntryInfo>` | Devuelve la lista interna de entradas dentro del ZIP. |
 | `generate_directory_listing` | `options: ListingOptions` | `ListingResult` | Genera árbol o listado en fichero `.txt`. |
 | `get_disk_free_space` | `path: Option<String>` | `Result<DiskSpaceInfo, String>` | Devuelve el espacio libre y total de la unidad o volumen. |
+| `search_subfolders` | `base_path: String, query: String, max_depth: Option<usize>` | `Result<Vec<FolderJumpItem>, String>` | Búsqueda recursiva multihilo de carpetas para salto rápido (`Ctrl+P`). |
+| `read_file_hex` | `path: String` | `Result<String, String>` | Genera volcado hexadecimal con offset y representación ASCII (`H` en QuickView). |
+| `batch_rename` | `items: Vec<String>, pattern: String, replace: String, prefix: String, suffix: String, sequence: Option<SequenceConfig>` | `Result<usize, String>` | Renombrado en masa con secuencias y patrones numéricos. |
 
 ---
 
@@ -215,9 +217,11 @@ const state = {
 ### 5.2. Máquina de Estados de Navegación por Teclado
 El controlador `handleGlobalKeyDown` intercepta y gestiona los eventos de teclado de manera inteligente:
 1. **Trampa de Modales y Campos de Texto**: Si el foco se encuentra en un `<input>` o `<textarea>`, las teclas alfanuméricas escriben normalmente y `Enter`/`Escape` confirman o cancelan el modal actual.
-2. **Selección por Rango Continuo (`Shift + Flechas`)**: Calcula el rango comprendido entre `selectionAnchor` y el nuevo índice, seleccionando todos los elementos intermedios como en los exploradores de escritorio nativos.
-3. **Navegación Alfanumérica Instantánea (Type-Ahead)**: Al presionar cualquier letra o número (`A-Z`, `0-9`), el cursor salta cíclicamente al siguiente archivo o carpeta cuyo nombre comience por dicho carácter.
-4. **Modo QuickView Activo**: El espacio o escape cierran el visor, las flechas navegan por los archivos del directorio cargando la nueva vista previa al instante y `Delete` envía el archivo a la papelera avanzando automáticamente al siguiente sin cerrar el visor.
+2. **Salto Rápido a Carpeta (`Ctrl + P`)**: Abre el buscador difuso recursivo para escanear y saltar a cualquier subdirectorio hasta 5 niveles de profundidad de forma asíncrona.
+3. **Panel Dual Dividido (`F3` / `Ctrl + \`)**: Conmuta entre vista simple y panel dual, permitiendo copiar archivos entre paneles con `F5` y alternar el foco con `Tab`.
+4. **Selección por Rango Continuo (`Shift + Flechas`)**: Calcula el rango comprendido entre `selectionAnchor` y el nuevo índice, seleccionando todos los elementos intermedios como en los exploradores de escritorio nativos.
+5. **Navegación Alfanumérica Instantánea (Type-Ahead)**: Al presionar cualquier letra o número (`A-Z`, `0-9`), el cursor salta cíclicamente al siguiente archivo o carpeta cuyo nombre comience por dicho carácter.
+6. **Modo QuickView Activo**: El espacio o escape cierran el visor, `H` genera volcado hexadecimal en tiempo real, las flechas navegan por los archivos del directorio cargando la nueva vista previa al instante y `Delete` envía el archivo a la papelera avanzando automáticamente al siguiente sin cerrar el visor.
 
 ### 5.3. Sistema de Iconografía Dinámica Multi-Pack (`ui/packs.js`)
 El motor de iconos desacopla completamente el diseño visual de la lógica del explorador:

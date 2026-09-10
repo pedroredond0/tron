@@ -33,12 +33,21 @@ Construido sobre **Tauri v2**, **Rust** y una interfaz web ultrarrápida en **Va
 
 ---
 
+### 🪟 Panel Dual Dividido al Instante (`Split View` / Tecla `F3` o `Ctrl + \`)
+- **Dos Paneles Independientes**: Divide la pantalla verticalmente para trabajar con dos rutas simultáneas sin necesidad de abrir múltiples ventanas.
+- **Alternancia Rápida con `Tab`**: Cambia el foco del teclado inmediatamente entre el panel izquierdo y derecho.
+- **Transferencia Directa (`F5`)**: Pulsa `F5` para copiar de inmediato los archivos seleccionados de un panel al directorio del otro panel.
+- **Botón en Cabecera**: Acceso directo con un solo clic desde la barra superior de acciones.
+
+---
+
 ### 👁️ QuickView Instantáneo (`ESPACIO`)
 - **Previsualización Flotante Inmediata**: Pulsa la barra espaciadora sobre cualquier archivo para ver su contenido al instante sin salir del explorador.
+- **Visor Hexadecimal / Raw (`H` en QuickView)**: Inspecciona bytes raw y cabeceras de cualquier archivo binario o documento mediante volcado hexadecimal con offset y caracteres ASCII.
 - **Streaming Multimedia Local de Alta Eficiencia**: Incorpora un servidor HTTP interno en un puerto efímero (`127.0.0.1:0`) con soporte de peticiones parciales (`Range: bytes=start-end`), permitiendo reproducir archivos de audio y vídeo de varios gigabytes al instante y realizar saltos temporales (scrubbing) sin agotar la memoria RAM.
 - **Soporte Completo de Formatos**:
   - *Imágenes*: PNG, JPG, JPEG, SVG, WebP, GIF animado, BMP, ICO, TIFF.
-  - *Documentos*: Visor interactivo integrado para documentos PDF.
+  - *Documentos*: Visor interactivo integrado para documentos PDF y DOCX.
   - *Código y Texto*: Resaltado sintáctico con numeración de líneas para Rust, JavaScript, TypeScript, Python, JSON, Markdown, YAML, TOML, HTML, CSS, C/C++, Shell, etc. (con límite de seguridad de 5 MB).
   - *Directorios*: Cálculo asíncrono en tiempo real del tamaño ocupado en disco y conteo de archivos.
 - **Acciones Rápidas en Visor**: Botones para abrir con la aplicación predeterminada, editar en el editor configurado, navegar con flechas y enviar a la papelera con `DELETE` pasando fluidamente al siguiente archivo.
@@ -88,6 +97,11 @@ Construido sobre **Tauri v2**, **Rust** y una interfaz web ultrarrápida en **Va
 ---
 
 ### 📋 Operaciones de Ficheros y Navegación
+- **Salto Rápido a Carpeta (`Ctrl + P`)**: Buscador difuso recursivo para localizar instantáneamente cualquier subcarpeta a niveles profundos y navegar a ella pulsando `Enter`.
+- **Renombrado en Masa (`Ctrl + F2` o `F2` con varios seleccionados)**: Renombra múltiples archivos simultáneamente con soporte de secuencias numéricas automáticas (`#`, `##`, `###`), prefijos, sufijos y reemplazo de texto con vista previa en vivo.
+- **Copia Rápida de Rutas**:
+  - `Ctrl + Shift + C`: Copia la ruta absoluta entrecomillada al portapapeles.
+  - `Ctrl + Alt + C`: Copia la ruta en formato POSIX normalizado (`/`).
 - **Portapapeles Completo**: Copiar (`Ctrl + C`), Cortar (`Ctrl + X`), Pegar (`Ctrl + V`) con soporte de auto-renombrado anticolición `(copia X)` y atenuación visual de elementos cortados.
 - **Duplicar al Instante (`Ctrl + D`)**: Crea una copia inmediata del elemento seleccionado.
 - **Renombrado Inmediato (`F2`)**: Diálogo ágil de renombrado con selección automática del nombre sin la extensión.
@@ -106,9 +120,17 @@ Construido sobre **Tauri v2**, **Rust** y una interfaz web ultrarrápida en **Va
 | :--- | :--- | :--- |
 | **`ESPACIO`** | Vista Previa | Abrir / Cerrar QuickView |
 | **`ENTER`** | Navegación | Abrir archivo / Entrar en carpeta |
+| **`Ctrl + P`** | Navegación | Ir a carpeta (Buscador difuso recursivo) |
+| **`F3`** o **`Ctrl + \`** | Vista | Dividir pantalla (Vista dual / Split View) |
+| **`Tab`** | Vista | Alternar foco entre paneles (Vista dual) |
+| **`F5`** | Operaciones | Copiar selección al otro panel (en vista dual) / Actualizar |
+| **`H`** *(en QuickView)* | Vista Previa | Volcado hexadecimal / raw del archivo |
+| **`F2`** | Archivos | Renombrar elemento seleccionado |
+| **`Ctrl + F2`** / **`F2`** *(múltiple)* | Archivos | Renombrado en masa con secuencias y patrones |
+| **`Ctrl + Shift + C`** | Portapapeles | Copiar ruta absoluta entrecomillada |
+| **`Ctrl + Alt + C`** | Portapapeles | Copiar ruta en formato POSIX normalizado (`/`) |
 | **`Ctrl + N`** | Archivos | Crear nuevo archivo en blanco |
 | **`Ctrl + Shift + N`** | Archivos | Crear nueva carpeta |
-| **`F2`** | Archivos | Renombrar elemento seleccionado |
 | **`Ctrl + D`** | Archivos | Duplicar archivo o carpeta seleccionada |
 | **`Ctrl + C`** | Edición | Copiar elementos seleccionados |
 | **`Ctrl + X`** | Edición | Cortar elementos seleccionados |
@@ -122,7 +144,7 @@ Construido sobre **Tauri v2**, **Rust** y una interfaz web ultrarrápida en **Va
 | **`Ctrl + H`** | Ver | Mostrar / Ocultar archivos ocultos |
 | **`Ctrl + T`** | Sistema | Abrir terminal predeterminada en la carpeta actual |
 | **`Alt + Enter`** | Sistema | Ver propiedades nativas del archivo/carpeta |
-| **`F5`** o **`Ctrl + R`** | Ver | Actualizar contenido del directorio |
+| **`Ctrl + R`** | Ver | Actualizar contenido del directorio |
 | **`F1`** | Ayuda | Abrir panel de ayuda y atajos de teclado |
 | **`Backspace`** / **`Alt + ←`** | Navegación | Ir atrás en el historial |
 | **`Alt + →`** | Navegación | Ir adelante en el historial |

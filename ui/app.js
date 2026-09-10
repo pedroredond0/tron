@@ -1709,6 +1709,13 @@ modalSherlock: document.getElementById('modalSherlock'),
           executeExportList();
         } else if (activeEl === el.inputSherlockQuery || activeEl === el.inputSherlockSizeNum) {
           executeSherlockFromInputs();
+        } else if (activeEl === el.inputJumpToFolder) {
+          const filtered = el.inputJumpToFolder._filtered || [];
+          if (filtered.length > 0 && jumpFolderSelectedIndex >= 0 && jumpFolderSelectedIndex < filtered.length) {
+            const item = filtered[jumpFolderSelectedIndex];
+            closeJumpToFolder();
+            loadDirectory(item.path, false);
+          }
         }
         return;
       }
@@ -5002,46 +5009,121 @@ async function startTransferOperation(action, sources, targetDir) {
 
   // --- Sherlock Advanced Search Controller ---
   
+  // --- Jump to Folder (Ctrl + P) Controller ---
   let jumpFolderItems = [];
   let jumpFolderSelectedIndex = 0;
+  let jumpFolderDebounceTimer = null;
+  let jumpFolderSearchSeq = 0;
 
   function openJumpToFolder() {
-    // Only search directories in the current panel
-    jumpFolderItems = panels[activePanel].items.filter(i => i.is_directory);
-    if (jumpFolderItems.length === 0) return;
-    
     el.inputJumpToFolder.value = '';
+    jumpFolderSelectedIndex = 0;
     el.modalJumpToFolder.classList.remove('hidden');
     el.inputJumpToFolder.focus();
+    
+    // Initial direct subfolders in current panel
+    const currentItems = panels[activePanel].items.filter(i => i.is_directory);
+    jumpFolderItems = currentItems.map(i => ({
+      name: i.name,
+      path: i.path,
+      relative_path: i.name
+    }));
+    
     renderJumpToFolder();
+    
+    // Also trigger background search to load deeper folders if needed
+    triggerJumpFolderSearch('');
   }
 
   function closeJumpToFolder() {
+    if (jumpFolderDebounceTimer) {
+      clearTimeout(jumpFolderDebounceTimer);
+      jumpFolderDebounceTimer = null;
+    }
     el.modalJumpToFolder.classList.add('hidden');
     el.fileList.focus();
   }
 
-  function renderJumpToFolder() {
-    const q = el.inputJumpToFolder.value.toLowerCase();
-    const filtered = jumpFolderItems.filter(i => i.name.toLowerCase().includes(q)).slice(0, 50);
+  function triggerJumpFolderSearch(q) {
+    if (jumpFolderDebounceTimer) {
+      clearTimeout(jumpFolderDebounceTimer);
+    }
     
-    if (jumpFolderSelectedIndex >= filtered.length) jumpFolderSelectedIndex = 0;
-    if (filtered.length === 0) jumpFolderSelectedIndex = -1;
+    const seq = ++jumpFolderSearchSeq;
+    const baseDir = state.currentDirectory;
+    if (!baseDir) return;
+
+    jumpFolderDebounceTimer = setTimeout(async () => {
+      try {
+        const results = await invoke('search_subfolders', {
+          basePath: baseDir,
+          query: q,
+          maxDepth: 5
+        });
+        if (seq !== jumpFolderSearchSeq) return; // Discard outdated response
+        jumpFolderItems = results || [];
+        if (jumpFolderSelectedIndex >= jumpFolderItems.length) jumpFolderSelectedIndex = 0;
+        renderJumpToFolder();
+      } catch (err) {
+        console.warn('Error en search_subfolders:', err);
+      }
+    }, q ? 150 : 0);
+  }
+
+  function renderJumpToFolder() {
+    const q = el.inputJumpToFolder.value.trim().toLowerCase();
+    
+    // Local filter if we already have items
+    let displayItems = jumpFolderItems;
+    if (q) {
+      displayItems = jumpFolderItems.filter(i => 
+        i.name.toLowerCase().includes(q) || (i.relative_path && i.relative_path.toLowerCase().includes(q))
+      );
+    }
+
+    if (jumpFolderSelectedIndex >= displayItems.length) jumpFolderSelectedIndex = 0;
+    if (displayItems.length === 0) jumpFolderSelectedIndex = -1;
 
     el.jumpToFolderList.innerHTML = '';
-    filtered.forEach((item, idx) => {
+    if (displayItems.length === 0) {
+      const emptyDiv = document.createElement('div');
+      emptyDiv.className = 'px-4 py-6 text-center text-xs text-gnome-textDim italic';
+      emptyDiv.textContent = q ? `No se encontraron subcarpetas que coincidan con "${q}"` : 'No hay subcarpetas en este directorio';
+      el.jumpToFolderList.appendChild(emptyDiv);
+      el.inputJumpToFolder._filtered = [];
+      return;
+    }
+
+    displayItems.forEach((item, idx) => {
       const div = document.createElement('div');
-      div.className = `px-3 py-2 rounded-md text-sm cursor-pointer flex items-center gap-2 ${idx === jumpFolderSelectedIndex ? 'bg-gnome-active text-white' : 'text-gnome-text hover:bg-gnome-hover'}`;
-      div.innerHTML = `<span class="text-gnome-textDim">📁</span> <span class="truncate">${escapeHtml(item.name)}</span>`;
-      div.onmousedown = () => {
+      const isSelected = idx === jumpFolderSelectedIndex;
+      div.className = `px-3 py-2 rounded-md text-xs cursor-pointer flex items-center justify-between gap-3 ${isSelected ? 'bg-gnome-active text-white' : 'text-gnome-text hover:bg-gnome-hover'}`;
+      
+      const relPath = (item.relative_path && item.relative_path !== item.name) ? item.relative_path : '';
+      
+      div.innerHTML = `
+        <div class="flex items-center gap-2 min-w-0 flex-1">
+          <span class="text-sm shrink-0">📁</span>
+          <span class="font-medium truncate">${escapeHtml(item.name)}</span>
+        </div>
+        ${relPath ? `<span class="text-[11px] font-mono shrink-0 truncate max-w-[200px] ${isSelected ? 'text-white/80' : 'text-gnome-textDim'}">${escapeHtml(relPath)}</span>` : ''}
+      `;
+      
+      div.onmousedown = (ev) => {
+        ev.preventDefault();
         closeJumpToFolder();
         loadDirectory(item.path, false);
       };
+      
       el.jumpToFolderList.appendChild(div);
+      
+      if (isSelected) {
+        div.scrollIntoView({ block: 'nearest' });
+      }
     });
     
     // Store filtered to access on enter
-    el.inputJumpToFolder._filtered = filtered;
+    el.inputJumpToFolder._filtered = displayItems;
   }
 
   function openSherlockModal() {
@@ -5402,6 +5484,42 @@ async function startTransferOperation(action, sources, targetDir) {
     }
     if (el.chkExportListFullDepth) {
       el.chkExportListFullDepth.onchange = updateExportListDepthUI;
+    }
+
+    // Jump to Folder (Ctrl + P) Input Listeners
+    if (el.inputJumpToFolder) {
+      el.inputJumpToFolder.oninput = () => {
+        jumpFolderSelectedIndex = 0;
+        renderJumpToFolder();
+        triggerJumpFolderSearch(el.inputJumpToFolder.value.trim());
+      };
+
+      el.inputJumpToFolder.onkeydown = (e) => {
+        const filtered = el.inputJumpToFolder._filtered || [];
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          if (filtered.length > 0) {
+            jumpFolderSelectedIndex = (jumpFolderSelectedIndex + 1) % filtered.length;
+            renderJumpToFolder();
+          }
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          if (filtered.length > 0) {
+            jumpFolderSelectedIndex = (jumpFolderSelectedIndex - 1 + filtered.length) % filtered.length;
+            renderJumpToFolder();
+          }
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          if (filtered.length > 0 && jumpFolderSelectedIndex >= 0 && jumpFolderSelectedIndex < filtered.length) {
+            const item = filtered[jumpFolderSelectedIndex];
+            closeJumpToFolder();
+            loadDirectory(item.path, false);
+          }
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          closeJumpToFolder();
+        }
+      };
     }
   }
 

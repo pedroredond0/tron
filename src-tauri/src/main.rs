@@ -1134,6 +1134,93 @@ fn batch_rename(renames: Vec<(String, String)>) -> Result<Vec<String>, String> {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FolderJumpItem {
+    pub name: String,
+    pub path: String,
+    pub relative_path: String,
+}
+
+#[tauri::command]
+fn search_subfolders(
+    base_path: String,
+    query: String,
+    max_depth: Option<usize>,
+) -> Result<Vec<FolderJumpItem>, String> {
+    let root = PathBuf::from(&base_path);
+    if !root.exists() || !root.is_dir() {
+        return Err("Directorio base no válido".into());
+    }
+
+    let q = query.to_lowercase().trim().to_string();
+    let max_d = max_depth.unwrap_or(5);
+    let limit = 60;
+    let mut results = Vec::new();
+
+    let mut stack = vec![(root.clone(), 0usize)];
+
+    while let Some((current, depth)) = stack.pop() {
+        if depth > max_d {
+            continue;
+        }
+
+        if let Ok(entries) = fs::read_dir(&current) {
+            for entry in entries.flatten() {
+                if let Ok(file_type) = entry.file_type() {
+                    if file_type.is_dir() {
+                        let name = match entry.file_name().into_string() {
+                            Ok(n) => n,
+                            Err(_) => continue,
+                        };
+
+                        if name == ".git" {
+                            continue;
+                        }
+
+                        let p = entry.path();
+                        let rel = match p.strip_prefix(&root) {
+                            Ok(r) => r.to_string_lossy().to_string(),
+                            Err(_) => name.clone(),
+                        };
+
+                        let matches = if q.is_empty() {
+                            depth == 0
+                        } else {
+                            name.to_lowercase().contains(&q) || rel.to_lowercase().contains(&q)
+                        };
+
+                        if matches {
+                            results.push(FolderJumpItem {
+                                name: name.clone(),
+                                path: p.to_string_lossy().to_string(),
+                                relative_path: rel,
+                            });
+                            if results.len() >= limit {
+                                return Ok(results);
+                            }
+                        }
+
+                        if depth < max_d {
+                            stack.push((p, depth + 1));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    results.sort_by(|a, b| {
+        let depth_a = a.relative_path.matches(&['/', '\\'][..]).count();
+        let depth_b = b.relative_path.matches(&['/', '\\'][..]).count();
+        match depth_a.cmp(&depth_b) {
+            std::cmp::Ordering::Equal => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+            other => other,
+        }
+    });
+
+    Ok(results)
+}
+
 #[tauri::command]
 fn read_file_hex(path: String) -> Result<String, String> {
     use std::io::Read;
@@ -3270,6 +3357,7 @@ fn main() {
             read_file_preview,
             read_file_hex,
             batch_rename,
+            search_subfolders,
             delete_file_item,
             open_file_default,
             create_new_file,
