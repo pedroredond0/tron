@@ -101,6 +101,21 @@
     btnActionQuickView: document.getElementById('btnActionQuickView'),
     btnActionCalcDirSizes: document.getElementById('btnActionCalcDirSizes'),
     btnOpenAppearance: document.getElementById('btnOpenAppearance'),
+    // Toolbar icon elements
+    iconActionTerminal: document.getElementById('iconActionTerminal'),
+    iconActionEdit: document.getElementById('iconActionEdit'),
+    iconActionNewFile: document.getElementById('iconActionNewFile'),
+    iconActionNewFolder: document.getElementById('iconActionNewFolder'),
+    iconActionCut: document.getElementById('iconActionCut'),
+    iconActionCopy: document.getElementById('iconActionCopy'),
+    iconActionPaste: document.getElementById('iconActionPaste'),
+    iconActionDelete: document.getElementById('iconActionDelete'),
+    iconActionCalcDirSizes: document.getElementById('iconActionCalcDirSizes'),
+    iconActionSherlock: document.getElementById('iconActionSherlock'),
+    iconActionExportList: document.getElementById('iconActionExportList'),
+    iconOpenAppearance: document.getElementById('iconOpenAppearance'),
+    iconActionQuickView: document.getElementById('iconActionQuickView'),
+    iconNetwork: document.getElementById('iconNetwork'),
     chkRecursiveSearch: document.getElementById('chkRecursiveSearch'),
     clipboardBadge: document.getElementById('clipboardBadge'),
     pasteProgressContainer: document.getElementById('pasteProgressContainer'),
@@ -338,13 +353,45 @@
 
   function getFileIcon(item) {
     const key = getFileIconKey(item);
+    return getUiIconHtml(key, getDefaultEmojiForIconKey(key));
+  }
+
+  function getUiIconHtml(key, defaultFallback, extraClass = '') {
     const pack = state.iconPack || 'default';
-
     if (pack !== 'default') {
-      return `<img src="icons/${pack}/${key}.svg" class="w-4 h-4 object-contain inline-block align-middle pointer-events-none" alt="" onerror="this.outerHTML='${getDefaultEmojiForIconKey(key)}'" />`;
+      return `<img src="icons/${pack}/${key}.svg" class="w-full h-full object-contain inline-block align-middle pointer-events-none ${extraClass}" alt="" onerror="this.outerHTML='${defaultFallback || ''}'" />`;
     }
+    return defaultFallback || '';
+  }
 
-    return getDefaultEmojiForIconKey(key);
+  function getPlaceIconKey(id) {
+    switch (id) {
+      case 'home': return 'home';
+      case 'desktop': return 'desktop';
+      case 'downloads': return 'archive';
+      case 'documents': return 'document';
+      case 'pictures': return 'image';
+      case 'videos': return 'video';
+      case 'music': return 'audio';
+      default: return 'folder';
+    }
+  }
+
+  function updateToolbarIcons() {
+    if (el.iconActionTerminal) el.iconActionTerminal.innerHTML = getUiIconHtml('terminal', '&gt;_');
+    if (el.iconActionEdit) el.iconActionEdit.innerHTML = getUiIconHtml('code', '📝');
+    if (el.iconActionNewFile) el.iconActionNewFile.innerHTML = getUiIconHtml('text', '📄');
+    if (el.iconActionNewFolder) el.iconActionNewFolder.innerHTML = getUiIconHtml('folder', '📁');
+    if (el.iconActionCut) el.iconActionCut.innerHTML = getUiIconHtml('cut', '✂️');
+    if (el.iconActionCopy) el.iconActionCopy.innerHTML = getUiIconHtml('copy', '📋');
+    if (el.iconActionPaste) el.iconActionPaste.innerHTML = getUiIconHtml('paste', '📥');
+    if (el.iconActionDelete) el.iconActionDelete.innerHTML = getUiIconHtml('delete', '🗑️');
+    if (el.iconActionCalcDirSizes) el.iconActionCalcDirSizes.innerHTML = getUiIconHtml('spreadsheet', '📊');
+    if (el.iconActionSherlock) el.iconActionSherlock.innerHTML = getUiIconHtml('search', '🔍');
+    if (el.iconActionExportList) el.iconActionExportList.innerHTML = getUiIconHtml('document', '🔭📄');
+    if (el.iconOpenAppearance) el.iconOpenAppearance.innerHTML = getUiIconHtml('gear', '⚙️');
+    if (el.iconActionQuickView) el.iconActionQuickView.innerHTML = getUiIconHtml('eye', '👁️');
+    if (el.iconNetwork) el.iconNetwork.innerHTML = getUiIconHtml('network', '🌐');
   }
 
   function getDefaultEmojiForIconKey(key) {
@@ -694,7 +741,7 @@
 
       // 1. Name & Icon (col-span-6)
       const colName = document.createElement('div');
-      colName.className = 'col-span-6 flex items-center gap-2 min-w-0 pointer-events-none';
+      colName.className = 'col-span-6 flex items-center gap-2.5 min-w-0 pointer-events-none';
       const fontClass = state.normalFontWeight ? 'font-normal' : 'font-medium';
       
       let parentPathHtml = '';
@@ -718,7 +765,7 @@
       }
 
       colName.innerHTML = `
-        <span class="shrink-0 text-sm select-none item-icon">${getFileIcon(item)}</span>
+        <span class="shrink-0 select-none item-icon">${getFileIcon(item)}</span>
         <span class="truncate select-none ${fontClass}">${escapeHtml(item.name)}</span>
         ${parentPathHtml}
       `;
@@ -3172,7 +3219,7 @@
 
       const leftPart = document.createElement('div');
       leftPart.className = 'flex items-center gap-2 min-w-0 flex-1 truncate';
-      leftPart.innerHTML = `<span class="text-xs opacity-50 cursor-grab" title="Arrastrar para reordenar">⠿</span> <span class="text-sm">⭐</span> <span class="truncate">${escapeHtml(f.name)}</span>`;
+      leftPart.innerHTML = `<span class="text-xs opacity-50 cursor-grab" title="Arrastrar para reordenar">⠿</span> <span class="ui-icon-box">${getUiIconHtml('favorite', '⭐')}</span> <span class="truncate">${escapeHtml(f.name)}</span>`;
 
       const rightPart = document.createElement('div');
       rightPart.className = 'flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity';
@@ -3253,7 +3300,9 @@
       places.forEach(p => {
         const btn = document.createElement('button');
         btn.className = 'w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-gnome-hover text-xs text-gnome-text text-left transition-colors';
-        btn.innerHTML = `<span class="text-sm">${p.icon}</span> <span class="truncate">${escapeHtml(p.name)}</span>`;
+        const placeKey = getPlaceIconKey(p.id);
+        const iconHtml = getUiIconHtml(placeKey, p.icon || '📁');
+        btn.innerHTML = `<span class="ui-icon-box">${iconHtml}</span> <span class="truncate">${escapeHtml(p.name)}</span>`;
         btn.title = p.path;
         btn.onclick = () => loadDirectory(p.path);
         setupSidebarDropTarget(btn, p.path);
@@ -3270,7 +3319,8 @@
       drives.forEach(d => {
         const btn = document.createElement('button');
         btn.className = 'w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-gnome-hover text-xs text-gnome-text text-left transition-colors';
-        btn.innerHTML = `<span class="text-sm">💽</span> <span class="truncate">${escapeHtml(d.name)}</span>`;
+        const iconHtml = getUiIconHtml('drive', '💽');
+        btn.innerHTML = `<span class="ui-icon-box">${iconHtml}</span> <span class="truncate">${escapeHtml(d.name)}</span>`;
         btn.onclick = () => loadDirectory(d.path);
         setupSidebarDropTarget(btn, d.path);
         el.driveLinks.appendChild(btn);
@@ -3704,6 +3754,32 @@
         }
       });
     }
+
+    if (el.selectIconPack) {
+      el.selectIconPack.addEventListener('change', (e) => {
+        state.iconPack = e.target.value;
+        updateToolbarIcons();
+        loadSidebar();
+        renderFileList();
+      });
+    }
+
+    document.querySelectorAll('input[name="density"]').forEach(radio => {
+      radio.addEventListener('change', (e) => {
+        let rowPadding = '6px';
+        let iconSize = '28px';
+        if (e.target.value === 'compact') {
+          rowPadding = '2px';
+          iconSize = '20px';
+        } else if (e.target.value === 'spacious') {
+          rowPadding = '12px';
+          iconSize = '40px';
+        }
+        document.documentElement.style.setProperty('--app-row-padding', rowPadding);
+        document.documentElement.style.setProperty('--app-icon-size', iconSize);
+        renderFileList();
+      });
+    });
 
     // Sort Column Headers Wiring
     if (el.sortHeaderName) el.sortHeaderName.onclick = () => setSort('name');
@@ -4243,11 +4319,18 @@
     document.documentElement.style.setProperty('--app-ui-scale', scalePx);
     document.documentElement.style.setProperty('--app-ui-scale-num', uiScale);
 
-    // Apply row padding based on density
+    // Apply row padding and icon size based on density
     let rowPadding = '6px';
-    if (density === 'compact') rowPadding = '2px';
-    if (density === 'spacious') rowPadding = '12px';
+    let iconSize = '28px';
+    if (density === 'compact') {
+      rowPadding = '2px';
+      iconSize = '20px';
+    } else if (density === 'spacious') {
+      rowPadding = '12px';
+      iconSize = '40px';
+    }
     document.documentElement.style.setProperty('--app-row-padding', rowPadding);
+    document.documentElement.style.setProperty('--app-icon-size', iconSize);
 
     // Apply font size class to appBody and fileList
     const body = document.getElementById('appBody');
@@ -4256,6 +4339,8 @@
       body.classList.add(fontSize);
     }
 
+    updateToolbarIcons();
+    loadSidebar();
     renderFileList();
   }
 

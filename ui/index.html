@@ -220,9 +220,48 @@
     .theme-app-text { color: var(--app-text) !important; }
     .theme-app-text-dim { color: var(--app-text-dim) !important; }
 
+    :root {
+      --app-icon-size: 28px;
+    }
+
     .file-row {
       padding-top: var(--app-row-padding, 6px);
       padding-bottom: var(--app-row-padding, 6px);
+    }
+
+    .item-icon {
+      width: var(--app-icon-size, 28px);
+      height: var(--app-icon-size, 28px);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: calc(var(--app-icon-size, 28px) * 0.82);
+      line-height: 1;
+      flex-shrink: 0;
+    }
+
+    .item-icon img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+
+    .ui-icon-box {
+      width: 1.15rem;
+      height: 1.15rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      line-height: 1;
+    }
+
+    .ui-icon-box img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
     }
 
     /* Dynamic UI scale properties */
@@ -279,6 +318,7 @@
 
     /* Monochrome icons */
     [data-monochrome-icons="true"] .item-icon,
+    [data-monochrome-icons="true"] .ui-icon-box,
     [data-monochrome-icons="true"] #qvIcon,
     [data-monochrome-icons="true"] aside button > span:first-child,
     [data-monochrome-icons="true"] #actionBar button > span:first-child,
@@ -489,11 +529,11 @@
   <div id="actionBar" class="h-9 bg-gnome-bg border-b border-gnome-border flex items-center justify-between px-3 shrink-0 text-xs text-gnome-text">
     <div class="flex items-center gap-1.5">
       <button id="btnActionTerminal" class="px-2.5 py-1 rounded bg-gnome-surface hover:bg-gnome-hover border border-gnome-border flex items-center gap-1.5 text-xs transition-colors" title="Abrir terminal aquí (Ctrl+T)">
-        <span class="font-mono font-bold text-gnome-active">&gt;_</span>
+        <span id="iconActionTerminal" class="ui-icon-box font-mono font-bold text-gnome-active">&gt;_</span>
         <span class="hidden sm:inline">Terminal</span>
       </button>
       <button id="btnActionEdit" class="px-2.5 py-1 rounded bg-gnome-surface hover:bg-gnome-hover border border-gnome-border flex items-center gap-1.5 text-xs transition-colors" title="Abrir con editor de texto">
-        <span>📝</span>
+        <span id="iconActionEdit" class="ui-icon-box">📝</span>
         <span class="hidden sm:inline">Editar</span>
       </button>
 
@@ -503,10 +543,10 @@
       <div class="flex items-center rounded bg-gnome-surface border border-gnome-border overflow-hidden">
         <span class="px-2 py-1 text-xs font-medium text-gnome-text select-none">Nuevo</span>
         <button id="btnActionNewFile" class="p-1 px-2 hover:bg-gnome-hover text-gnome-text border-l border-gnome-border transition-colors flex items-center justify-center" title="Crear nuevo archivo (Ctrl+N)">
-          <span>📄</span>
+          <span id="iconActionNewFile" class="ui-icon-box">📄</span>
         </button>
         <button id="btnActionNewFolder" class="p-1 px-2 hover:bg-gnome-hover text-gnome-text border-l border-gnome-border transition-colors flex items-center justify-center" title="Crear nueva carpeta (Ctrl+Shift+N)">
-          <span>📁</span>
+          <span id="iconActionNewFolder" class="ui-icon-box">📁</span>
         </button>
       </div>
 
@@ -514,34 +554,34 @@
 
       <!-- Cortar, Copiar, Pegar, Eliminar: Solo iconos -->
       <button id="btnActionCut" class="p-1.5 px-2 rounded hover:bg-gnome-surface text-gnome-text flex items-center justify-center transition-colors" title="Cortar selección (Ctrl+X)">
-        <span>✂️</span>
+        <span id="iconActionCut" class="ui-icon-box">✂️</span>
       </button>
       <button id="btnActionCopy" class="p-1.5 px-2 rounded hover:bg-gnome-surface text-gnome-text flex items-center justify-center transition-colors" title="Copiar selección (Ctrl+C)">
-        <span>📋</span>
+        <span id="iconActionCopy" class="ui-icon-box">📋</span>
       </button>
       <button id="btnActionPaste" class="p-1.5 px-2 rounded hover:bg-gnome-surface text-gnome-text flex items-center justify-center transition-colors disabled:opacity-40 disabled:pointer-events-none" title="Pegar elementos (Ctrl+V)" disabled>
-        <span>📥</span>
+        <span id="iconActionPaste" class="ui-icon-box">📥</span>
       </button>
       <button id="btnActionDelete" class="p-1.5 px-2 rounded hover:bg-red-600/20 text-red-400 flex items-center justify-center transition-colors" title="Mover a papelera (Supr)">
-        <span>🗑️</span>
+        <span id="iconActionDelete" class="ui-icon-box">🗑️</span>
       </button>
 
       <div class="h-4 border-r border-gnome-border/80 mx-1"></div>
 
       <!-- Calcular tamaños que ponga Size -->
-      <button id="btnActionCalcDirSizes" class="p-1 px-2 rounded hover:bg-gnome-surface text-gnome-text flex items-center gap-1 transition-colors" title="Calcular espacio ocupado por carpetas">
-        <span>📊</span>
+      <button id="btnActionCalcDirSizes" class="p-1 px-2 rounded hover:bg-gnome-surface text-gnome-text flex items-center gap-1.5 transition-colors" title="Calcular espacio ocupado por carpetas">
+        <span id="iconActionCalcDirSizes" class="ui-icon-box">📊</span>
         <span>Size</span>
       </button>
 
       <!-- Buscador Avanzado Sherlock (Icono de la lupa junto al boton Size) -->
       <button id="btnActionSherlock" class="p-1 px-2 rounded bg-gnome-surface hover:bg-gnome-hover border border-gnome-border text-gnome-text flex items-center justify-center transition-colors font-medium shadow-sm" title="Buscador Avanzado Sherlock (Ctrl+Shift+F)">
-        <span>🔍</span>
+        <span id="iconActionSherlock" class="ui-icon-box">🔍</span>
       </button>
 
       <!-- Generador de listados a archivo (txt) -->
       <button id="btnActionExportList" class="p-1 px-2 rounded bg-gnome-surface hover:bg-gnome-hover border border-gnome-border text-gnome-text flex items-center justify-center transition-colors font-medium shadow-sm" title="Generar listado / árbol del directorio a archivo txt (ls/dir/tree)">
-        <span class="text-xs">🔭📄</span>
+        <span id="iconActionExportList" class="ui-icon-box">🔭📄</span>
       </button>
     </div>
 
@@ -577,12 +617,12 @@
 
       <!-- Preferencias (antes Tema) -->
       <button id="btnOpenAppearance" class="p-1 px-2 rounded hover:bg-gnome-surface text-gnome-text flex items-center justify-center transition-colors" title="Preferencias (Temas, iconos, tamaños, archivos, editor, apps externas)">
-        <span>⚙️</span>
+        <span id="iconOpenAppearance" class="ui-icon-box">⚙️</span>
       </button>
 
       <!-- QuickView solo con el ojo -->
       <button id="btnActionQuickView" class="p-1 px-2 rounded hover:bg-gnome-surface text-gnome-text flex items-center justify-center transition-colors" title="Vista previa QuickView (Espacio)">
-        <span>👁️</span>
+        <span id="iconActionQuickView" class="ui-icon-box">👁️</span>
       </button>
     </div>
   </div>
@@ -618,7 +658,7 @@
         </div>
         <div id="networkLinks" class="space-y-0.5">
           <button id="btnOpenNetworkDialog" class="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-gnome-hover text-xs text-gnome-text text-left transition-colors">
-            <span class="text-sm">🌐</span>
+            <span id="iconNetwork" class="ui-icon-box">🌐</span>
             <span class="truncate">Recurso de Red (UNC)...</span>
           </button>
         </div>
