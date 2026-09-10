@@ -114,6 +114,13 @@ El motor de búsqueda avanzada de Tron permite indexar y filtrar el sistema de a
   - *Top 25 Archivos Pesados*: Mantiene una lista acotada de los 25 archivos de mayor peso en la jerarquía.
   - *Top 25 Carpetas Pesadas*: Calcula recursivamente el tamaño de los subdirectorios y ordena de mayor a menor.
 - **Filtros Multicriterio**: Admite combinación de patrones de texto (insensible a mayúsculas), rangos de tamaño (Bytes, KB, MB, GB), rangos de fechas (desde/hasta) y alcance (carpeta actual o raíz del sistema).
+- **Filtro Inteligente de Exclusiones (`should_skip_dir_for_search`)**:
+  Para evitar que los escaneos recursivos se ralenticen o queden atrapados en bucles de cientos de miles de archivos de caché en carpetas de usuario, el motor de búsqueda en Rust omite a nivel de rama de directorio:
+  - Directorios ocultos (`.git`, `.cache`, `.npm`, `.vscode`, `.local`, `.trashes`, `.spotlight-v100`, etc.).
+  - macOS: `Library`, `System`, `Cores`, `Caches`, `Application Support`.
+  - Windows: `AppData`, `Application Data`, `Local Settings`, `$Recycle.Bin`, `System Volume Information`, `Windows`, `ProgramData`, `Temp`, `Tmp`.
+  - Linux y desarrollo: `proc`, `sys`, `dev`, `run`, `var`, `lost+found`, `node_modules`, `target`.
+  Esta exclusión se aplica idénticamente en Sherlock, en el salto rápido `search_subfolders` (`Ctrl+P` / `Cmd+P`), en la búsqueda recursiva de la barra de herramientas y en el cálculo de tamaño de directorios.
 
 ### 3.4. Compresión y Descompresión ZIP (`zip` crate)
 - **Compresión (`compress_to_zip`)**: Emplea el algoritmo Deflate optimizado. Recorre recursivamente las selecciones (archivos o carpetas completos), preserva la estructura relativa de rutas y genera un archivo `.zip` estándar.
@@ -229,7 +236,10 @@ La aplicación soporta un modelo jerárquico de paneles y pestañas (`panels[act
 - **Estructura Dinámica In-Place**: En la vista de lista detallada, las carpetas disponen de un botón interactivo (`▶` / `▼`).
 - **Inyección Aplanada con Sangría Proporcional**: Al hacer clic en la flecha, el frontend consulta `read_directory` para esa subcarpeta específica y almacena los resultados en `state.expandedDirs`. El renderizador aplana la jerarquía inyectando los elementos hijos con desplazamiento visual `(depth * 18px)` sin alterar la ruta base de trabajo.
 
-### 5.5. Máquina de Estados de Navegación por Teclado
+### 5.5. Máquina de Estados de Navegación por Teclado y Detección de Plataforma
+El frontend detecta la plataforma (`isMac`) de manera transparente para proporcionar la experiencia idónea:
+- **Adaptación macOS (`Cmd` vs `Ctrl`)**: En macOS, la tecla modificadora principal cambia automáticamente a `metaKey` (`⌘ / Cmd`), permitiendo que `Cmd + C`, `Cmd + V`, `Cmd + P`, `Cmd + T`, `Cmd + W`, etc. funcionen de forma idiomática. En Windows y Linux se utiliza `ctrlKey` (`Ctrl`). Asimismo, la interfaz y la guía modal de ayuda (`adaptShortcutsForMac`) adaptan dinámicamente las etiquetas de texto `Ctrl +` por `Cmd +` en tiempo de ejecución.
+
 El controlador `handleGlobalKeyDown` intercepta y gestiona los eventos de teclado de manera inteligente:
 1. **Trampa de Modales y Campos de Texto**: Si el foco se encuentra en un `<input>` o `<textarea>`, las teclas alfanuméricas escriben normalmente y `Enter`/`Escape` confirman o cancelan el modal actual.
 2. **Salto Rápido a Carpeta (`Ctrl + P`)**: Abre el buscador difuso recursivo para escanear y saltar a cualquier subdirectorio hasta 5 niveles de profundidad de forma asíncrona.
@@ -298,6 +308,8 @@ Al presionar la barra espaciadora sobre un elemento seleccionado, se activa el c
 | **Propiedades** | `SHObjectProperties` nativo | Diálogo de información | Diálogo de información |
 | **Papelera** | Win32 `IFileOperation` | FreeDesktop Trash Spec (`~/.local/share/Trash`) | macOS Trash API |
 | **Unidades de Disco** | Letras de unidad (`C:\`, `D:\`) | `/`, `/mnt`, `/media`, `/run/media` | `/`, `/Volumes` |
+| **Atajos de Teclado** | `Ctrl` | `Ctrl` | `Cmd` (`⌘`) dinámico |
+| **Seguridad / Permisos**| UAC Estándar | Polkit / Permisos POSIX | Desbloqueo Gatekeeper (`xattr -d com.apple.quarantine` / `xattr -cr`) |
 | **Distribución** | `.exe` portable / instalador | `.deb`, `AppImage`, binario nativo Arch | `.app`, `.dmg` |
 
 ---

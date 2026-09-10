@@ -1141,6 +1141,26 @@ pub struct FolderJumpItem {
     pub relative_path: String,
 }
 
+/// Helper function to omit system, hidden, cache and temporary directories during recursive searches
+fn should_skip_dir_for_search(name: &str) -> bool {
+    // Hidden folders (.git, .cache, .npm, .vscode, .local, etc.)
+    if name.starts_with('.') {
+        return true;
+    }
+
+    let lower = name.to_lowercase();
+    match lower.as_str() {
+        // macOS system & user cache/runtime dirs
+        "library" | "system" | "cores" | ".trashes" | ".spotlight-v100" | "caches" | "application support" => true,
+        // Windows system & user cache/runtime dirs
+        "appdata" | "application data" | "local settings" | "$recycle.bin" | "system volume information"
+        | "windows" | "programdata" | "msocache" | "recovery" | "perflogs" | "temp" | "tmp" => true,
+        // Linux system & development noise dirs
+        "proc" | "sys" | "dev" | "run" | "var" | "lost+found" | "node_modules" | "target" => true,
+        _ => false,
+    }
+}
+
 #[tauri::command]
 fn search_subfolders(
     base_path: String,
@@ -1173,7 +1193,7 @@ fn search_subfolders(
                             Err(_) => continue,
                         };
 
-                        if name == ".git" {
+                        if should_skip_dir_for_search(&name) {
                             continue;
                         }
 
@@ -1892,6 +1912,10 @@ fn compute_directory_size(root: &Path, max_entries: Option<usize>) -> (u64, usiz
                         }
                     }
                     if meta.is_dir() {
+                        let file_name = entry.file_name().to_string_lossy().to_string();
+                        if should_skip_dir_for_search(&file_name) {
+                            continue;
+                        }
                         dir_count += 1;
                         stack.push(entry.path());
                     } else {
@@ -2007,7 +2031,15 @@ fn sherlock_search(filter: SherlockFilter) -> Result<SherlockResult, String> {
                         Err(_) => continue,
                     };
 
+                    let file_name = match entry.file_name().into_string() {
+                        Ok(n) => n,
+                        Err(_) => continue,
+                    };
+
                     if meta.is_dir() {
+                        if should_skip_dir_for_search(&file_name) {
+                            continue;
+                        }
                         stack.push(p);
                     } else {
                         let size = meta.len();
@@ -2043,15 +2075,29 @@ fn sherlock_search(filter: SherlockFilter) -> Result<SherlockResult, String> {
         if let Ok(entries) = fs::read_dir(&root) {
             for entry in entries.flatten() {
                 let p = entry.path();
+                let file_name = match entry.file_name().into_string() {
+                    Ok(n) => n,
+                    Err(_) => continue,
+                };
                 if let Ok(meta) = entry.metadata() {
                     if meta.is_dir() {
+                        if should_skip_dir_for_search(&file_name) {
+                            continue;
+                        }
                         candidate_dirs.push(p.clone());
                         if candidate_dirs.len() < 120 {
                             if let Ok(sub_entries) = fs::read_dir(&p) {
                                 for sub_entry in sub_entries.flatten() {
                                     let sub_p = sub_entry.path();
+                                    let sub_name = match sub_entry.file_name().into_string() {
+                                        Ok(n) => n,
+                                        Err(_) => continue,
+                                    };
                                     if let Ok(sub_meta) = sub_entry.metadata() {
                                         if sub_meta.is_dir() {
+                                            if should_skip_dir_for_search(&sub_name) {
+                                                continue;
+                                            }
                                             candidate_dirs.push(sub_p);
                                             if candidate_dirs.len() >= 120 {
                                                 break;
@@ -2138,9 +2184,16 @@ fn sherlock_search(filter: SherlockFilter) -> Result<SherlockResult, String> {
                         Ok(m) => m,
                         Err(_) => continue,
                     };
+                    let file_name = match entry.file_name().into_string() {
+                        Ok(n) => n,
+                        Err(_) => continue,
+                    };
 
                     let is_dir = meta.is_dir();
                     if is_dir {
+                        if should_skip_dir_for_search(&file_name) {
+                            continue;
+                        }
                         stack.push(p.clone());
                     }
 
@@ -2198,16 +2251,18 @@ fn sherlock_search(filter: SherlockFilter) -> Result<SherlockResult, String> {
                     Ok(m) => m,
                     Err(_) => continue,
                 };
-
-                let is_dir = meta.is_dir();
-                if is_dir {
-                    stack.push(p.clone());
-                }
-
                 let file_name = match entry.file_name().into_string() {
                     Ok(n) => n,
                     Err(_) => continue,
                 };
+
+                let is_dir = meta.is_dir();
+                if is_dir {
+                    if should_skip_dir_for_search(&file_name) {
+                        continue;
+                    }
+                    stack.push(p.clone());
+                }
 
                 // Query match
                 if !q.is_empty() && !file_name.to_lowercase().contains(&q) {
@@ -2292,6 +2347,9 @@ fn search_directory_recursive(base_path: String, query: String, max_results: Opt
 
                 let is_dir = meta.is_dir();
                 if is_dir {
+                    if should_skip_dir_for_search(&file_name) {
+                        continue;
+                    }
                     stack.push(p.clone());
                 }
 

@@ -82,6 +82,7 @@ Construido sobre **Tauri v2**, **Rust** y una interfaz web ultrarrápida en **Va
   - *Top 25 Archivos Más Pesados*: Identifica qué ficheros están ocupando más espacio.
   - *Top 25 Carpetas Más Pesadas*: Descubre las carpetas que más almacenamiento consumen.
 - **Filtros Multicriterio**: Búsqueda por subcadena, rango exacto de tamaño (Bytes, KB, MB, GB), rango de fechas de modificación (desde / hasta) y alcance (carpeta actual o unidad completa).
+- **Filtrado Inteligente de Alto Rendimiento**: Omite de forma transparente carpetas del sistema, ocultas (`.git`, `.cache`, `.npm`), temporales y de caché de usuario (`AppData`, `~/Library/Caches`, `node_modules`, etc.), garantizando búsquedas casi instantáneas sin sobrecargar la CPU incluso al escanear desde la carpeta raíz de usuario.
 
 ---
 
@@ -137,6 +138,8 @@ Construido sobre **Tauri v2**, **Rust** y una interfaz web ultrarrápida en **Va
 
 ## ⌨️ Atajos de Teclado
 
+> **Nota para macOS:** En macOS, todos los atajos basados en `Ctrl` utilizan la tecla **`Cmd` (`⌘`)** de manera automática y nativa (por ejemplo, `Cmd + P`, `Cmd + T`, `Cmd + C`, etc.).
+
 | Atajo | Categoría | Acción |
 | :--- | :--- | :--- |
 | **`ESPACIO`** | Vista Previa | Abrir / Cerrar QuickView |
@@ -189,6 +192,24 @@ Las compilaciones automáticas de cada versión están disponibles en la secció
 | **Arch Linux / Manjaro** | Binario / Script | Compilación nativa optimizada mediante `scripts/build-arch.sh`. |
 | **Windows 10 / 11 (x64)** | `.exe` Portable | Ejecutable autónomo sin dependencias externas (requiere WebView2 integrado en Windows 10/11). |
 | **macOS (Intel / Apple Silicon)** | `.app` / `.dmg` | Compilable mediante el toolchain estándar de Tauri en Darwin. |
+
+---
+
+## 🍎 Instalación y Permisos en macOS (Gatekeeper / Cuarentena)
+
+Al descargar la aplicación en macOS fuera de la Mac App Store, el sistema de seguridad Gatekeeper puede bloquear su ejecución marcando el binario en cuarentena. Para autorizar su apertura y eliminar el bloqueo:
+
+1. Abre la **Terminal**.
+2. Ejecuta el siguiente comando para retirar el atributo de cuarentena:
+   ```bash
+   xattr -d com.apple.quarantine "/Applications/Tron.app"
+   ```
+3. Si el comando indica `xattr: /Applications/Tron.app: No such xattr: com.apple.quarantine` o persiste el aviso del sistema, elimina de forma recursiva todos los atributos extendidos:
+   ```bash
+   xattr -cr "/Applications/Tron.app"
+   ```
+
+*(Si la aplicación está en otra ubicación como `~/Downloads/Tron.app`, ajusta la ruta en el comando).*
 
 ---
 
