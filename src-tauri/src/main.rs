@@ -3080,9 +3080,15 @@ fn force_exit_app() {
 }
 
 fn main() {
+    std::panic::set_hook(Box::new(|info| {
+        let msg = format!("PANIC: {:?}\n", info);
+        eprintln!("{}", msg);
+        let _ = std::fs::write("tron_crash.log", msg);
+    }));
+
     start_streaming_server();
 
-    tauri::Builder::default()
+    let result = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             get_user_places,
@@ -3112,6 +3118,11 @@ fn main() {
             list_zip_contents,
             generate_directory_listing
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .run(tauri::generate_context!());
+
+    if let Err(err) = result {
+        let err_msg = format!("TAURI RUN ERROR: {:?}\n", err);
+        eprintln!("{}", err_msg);
+        let _ = std::fs::write("tron_crash.log", err_msg);
+    }
 }

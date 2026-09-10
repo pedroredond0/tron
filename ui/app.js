@@ -359,7 +359,7 @@
   function getUiIconHtml(key, defaultFallback, extraClass = '') {
     const pack = state.iconPack || 'default';
     if (pack !== 'default') {
-      return `<img src="icons/${pack}/${key}.svg" class="w-full h-full object-contain inline-block align-middle pointer-events-none ${extraClass}" alt="" onerror="this.outerHTML='${defaultFallback || ''}'" />`;
+      return `<img src="icons/${pack}/${key}.svg" class="w-full h-full object-contain inline-block align-middle pointer-events-none ${extraClass}" alt="" />`;
     }
     return defaultFallback || '';
   }
@@ -4043,7 +4043,6 @@
 
     setupSherlockEvents();
     loadAppearanceSettings();
-    loadSidebar();
     loadDirectory(null);
   }
 
