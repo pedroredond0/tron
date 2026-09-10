@@ -507,6 +507,16 @@
     </div>
   </div>
 
+  <!-- Tab Bar -->
+  <div id="tabBar" class="h-8 bg-gnome-sidebar border-b border-gnome-border flex items-center px-2 shrink-0 gap-1 select-none overflow-x-auto scrollbar-none z-20">
+    <div id="tabList" class="flex items-center gap-1 min-w-0">
+      <!-- Tabs generated dynamically -->
+    </div>
+    <button id="btnNewTab" class="p-1 px-1.5 rounded hover:bg-gnome-hover text-gnome-textDim hover:text-white transition-colors text-xs flex items-center justify-center shrink-0" title="Nueva pestaña (Ctrl+T)">
+      <span class="text-sm font-semibold">+</span>
+    </button>
+  </div>
+
   <!-- Top Navigation Header -->
   <header class="h-11 bg-gnome-surface border-b border-gnome-border flex items-center justify-between px-3 shrink-0 gap-2">
     <!-- History & Navigation buttons -->
@@ -679,6 +689,17 @@
         <div class="text-[11px] font-semibold text-gnome-textDim px-2 mb-1 uppercase tracking-wider">Frecuentes</div>
         <div id="frequentLinks" class="space-y-0.5">
           <!-- Frequent links generated dynamically -->
+        </div>
+      </div>
+
+      <!-- Etiquetas por Colores -->
+      <div>
+        <div class="flex items-center justify-between px-2 mb-1">
+          <span class="text-[11px] font-semibold text-gnome-textDim uppercase tracking-wider">Etiquetas</span>
+          <button id="btnClearActiveTagFilter" title="Limpiar filtro de etiqueta" class="hidden text-[10px] text-gnome-active hover:underline">Ver todo</button>
+        </div>
+        <div id="tagLinks" class="space-y-0.5">
+          <!-- Color tags generated dynamically -->
         </div>
       </div>
 
@@ -973,7 +994,10 @@
           <span class="font-medium text-gnome-active">Ctrl + N / Shift+N</span><span>Nuevo archivo / Nueva carpeta</span>
           <span class="font-medium text-gnome-active">Ctrl + H</span><span>Mostrar/Ocultar archivos ocultos</span>
           <span class="font-medium text-gnome-active">Delete (Supr)</span><span>Mover a papelera de reciclaje</span>
-          <span class="font-medium text-gnome-active">Ctrl + T</span><span>Abrir terminal en carpeta actual</span>
+          <span class="font-medium text-gnome-active">Ctrl + T</span><span>Nueva pestaña de navegación</span>
+          <span class="font-medium text-gnome-active">Ctrl + W</span><span>Cerrar pestaña activa</span>
+          <span class="font-medium text-gnome-active">Ctrl + 1..9</span><span>Cambiar a pestaña 1 a 9</span>
+          <span class="font-medium text-gnome-active">Ctrl + Shift + T</span><span>Abrir terminal en carpeta actual</span>
           <span class="font-medium text-gnome-active">Alt + ↑</span><span>Subir al directorio padre</span>
           <span class="font-medium text-gnome-active">Esc</span><span>Cerrar visor / limpiar filtro / cancelar</span>
         </div>
@@ -1916,6 +1940,23 @@
     <button id="ctxMenuDuplicate" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between font-medium text-gnome-active">
       <span>Duplicar</span><span class="text-gnome-textDim text-[11px]">Ctrl+D</span>
     </button>
+    <div class="my-1 border-t border-gnome-border/60"></div>
+    <!-- Quick Color Tag Selector -->
+    <div class="px-3 py-1.5 flex flex-col gap-1 select-none">
+      <div class="text-[10px] text-gnome-textDim uppercase tracking-wider font-semibold flex items-center justify-between">
+        <span>Etiquetas de color</span>
+        <button id="ctxMenuClearTags" class="text-[10px] text-gnome-textDim hover:text-red-400" title="Quitar todas las etiquetas">Quitar</button>
+      </div>
+      <div id="ctxMenuTagColors" class="flex items-center gap-1.5 pt-0.5">
+        <button type="button" class="tag-color-btn w-4 h-4 rounded-full bg-red-500 hover:scale-125 transition-transform shadow-sm" data-color="red" title="Rojo"></button>
+        <button type="button" class="tag-color-btn w-4 h-4 rounded-full bg-orange-500 hover:scale-125 transition-transform shadow-sm" data-color="orange" title="Naranja"></button>
+        <button type="button" class="tag-color-btn w-4 h-4 rounded-full bg-yellow-400 hover:scale-125 transition-transform shadow-sm" data-color="yellow" title="Amarillo"></button>
+        <button type="button" class="tag-color-btn w-4 h-4 rounded-full bg-green-500 hover:scale-125 transition-transform shadow-sm" data-color="green" title="Verde"></button>
+        <button type="button" class="tag-color-btn w-4 h-4 rounded-full bg-blue-500 hover:scale-125 transition-transform shadow-sm" data-color="blue" title="Azul"></button>
+        <button type="button" class="tag-color-btn w-4 h-4 rounded-full bg-purple-500 hover:scale-125 transition-transform shadow-sm" data-color="purple" title="Púrpura"></button>
+        <button type="button" class="tag-color-btn w-4 h-4 rounded-full bg-gray-400 hover:scale-125 transition-transform shadow-sm" data-color="gray" title="Gris"></button>
+      </div>
+    </div>
     <div class="my-1 border-t border-gnome-border/60"></div>
     <button id="ctxMenuAddFavorite" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
       <span>Añadir a Favoritos</span><span class="text-gnome-textDim text-[11px]">Ctrl+B</span>

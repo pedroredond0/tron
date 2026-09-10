@@ -33,6 +33,27 @@ Construido sobre **Tauri v2**, **Rust** y una interfaz web ultrarrápida en **Va
 
 ---
 
+### 📑 Pestañas de Navegación (`Ctrl + T` / `Ctrl + W` / `Ctrl + 1..9`)
+- **Múltiples Carpetas en una Sola Ventana**: Abre pestañas independientes con su propio historial, posición de scroll y selección activa.
+- **Crear y Cerrar**: Nueva pestaña con `Ctrl + T` o clic en el botón `+`. Cierra la pestaña activa con `Ctrl + W`, clic en la `✕` o clic central con la rueda del ratón.
+- **Cambio Rápido**: Salta directamente a cualquier pestaña con `Ctrl + 1` hasta `Ctrl + 9`.
+
+---
+
+### 🏷️ Sistema de Etiquetas por Colores y Metadatos (Estilo Finder / Dolphin)
+- **7 Colores Rápidos**: Rojo, Naranja, Amarillo, Verde, Azul, Púrpura y Gris para categorizar proyectos, documentos pendientes o entregas.
+- **Asignación Inmediata**: Haz clic derecho sobre uno o varios archivos/carpetas y pulsa el color deseado en el selector del menú contextual.
+- **Indicadores Visuales**: Puntos de color estilizados junto al nombre del archivo en la lista.
+- **Filtrado en un Clic**: Sección dedicada "Etiquetas" en el panel lateral que muestra los contadores de archivos etiquetados y permite filtrar la vista al instante.
+
+---
+
+### 🌲 Vista en Árbol Plegable en el Listado (`▶` / `▼`)
+- **Exploración Jerárquica en Vivo**: Cada carpeta en la vista detallada cuenta con una flecha interactiva (`▶`/`▼`).
+- **Carga Asíncrona sin Desplazamiento**: Al pulsar la flecha, se cargan y despliegan sus subcarpetas y ficheros anidados con sangría visual proporcional sin navegar fuera del directorio base.
+
+---
+
 ### 🪟 Panel Dual Dividido al Instante (`Split View` / Tecla `F3` o `Ctrl + \`)
 - **Dos Paneles Independientes**: Divide la pantalla verticalmente para trabajar con dos rutas simultáneas sin necesidad de abrir múltiples ventanas.
 - **Alternancia Rápida con `Tab`**: Cambia el foco del teclado inmediatamente entre el panel izquierdo y derecho.
@@ -140,9 +161,10 @@ Construido sobre **Tauri v2**, **Rust** y una interfaz web ultrarrápida en **Va
 | **`DELETE`** | Archivos | Mover elemento(s) a la Papelera de reciclaje |
 | **`Ctrl + K`** | Búsqueda | Foco en la barra de filtro rápido de la carpeta |
 | **`Ctrl + Shift + F`** | Búsqueda | Abrir motor de búsqueda avanzada Sherlock |
-| **`Ctrl + B`** | Favoritos | Anclar carpeta actual a Favoritos |
-| **`Ctrl + H`** | Ver | Mostrar / Ocultar archivos ocultos |
-| **`Ctrl + T`** | Sistema | Abrir terminal predeterminada en la carpeta actual |
+| **`Ctrl + T`** | Pestañas | Abrir nueva pestaña de navegación |
+| **`Ctrl + W`** | Pestañas | Cerrar pestaña de navegación activa |
+| **`Ctrl + 1 .. 9`** | Pestañas | Cambiar a pestaña 1 a 9 |
+| **`Ctrl + Shift + T`** | Sistema | Abrir terminal predeterminada en la carpeta actual |
 | **`Alt + Enter`** | Sistema | Ver propiedades nativas del archivo/carpeta |
 | **`Ctrl + R`** | Ver | Actualizar contenido del directorio |
 | **`F1`** | Ayuda | Abrir panel de ayuda y atajos de teclado |

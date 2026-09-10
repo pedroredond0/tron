@@ -11,13 +11,108 @@
     return () => {};
   });
 
-  // State Management
+  // Helper to create tab state
+  let nextTabId = 1;
+  function createTabState(dir = '') {
+    return {
+      id: 'tab_' + (nextTabId++),
+      name: dir ? getDirBaseName(dir) : 'Inicio',
+      currentDirectory: dir,
+      items: [],
+      filteredItems: [],
+      selectedIndex: -1,
+      selectionAnchor: -1,
+      selectedItems: new Set(),
+      history: [],
+      historyIndex: -1,
+      searchQuery: '',
+      isSearchingRecursive: false,
+      activeSherlockFilter: null,
+      sherlockResults: null,
+      searchItems: null,
+      freeSpaceBytes: null,
+      totalSpaceBytes: null,
+      scrollTop: 0,
+      expandedDirs: new Map() // dirPath -> child items array
+    };
+  }
+
+  // State Management with Panel & Tab Architecture
   const panels = [
-    { currentDirectory: '', items: [], filteredItems: [], selectedIndex: -1, selectionAnchor: -1, selectedItems: new Set(), history: [], historyIndex: -1, searchQuery: '', isSearchingRecursive: false, activeSherlockFilter: null, sherlockResults: null, searchItems: null, freeSpaceBytes: null, totalSpaceBytes: null, scrollTop: 0 },
-    { currentDirectory: '', items: [], filteredItems: [], selectedIndex: -1, selectionAnchor: -1, selectedItems: new Set(), history: [], historyIndex: -1, searchQuery: '', isSearchingRecursive: false, activeSherlockFilter: null, sherlockResults: null, searchItems: null, freeSpaceBytes: null, totalSpaceBytes: null, scrollTop: 0 }
+    { tabs: [ createTabState() ], activeTab: 0 },
+    { tabs: [ createTabState() ], activeTab: 0 }
   ];
   let activePanel = 0;
   let isSplitView = false;
+
+  function getActiveTabObj(panelIdx = activePanel) {
+    const p = panels[panelIdx];
+    if (!p.tabs || p.tabs.length === 0) {
+      p.tabs = [ createTabState() ];
+      p.activeTab = 0;
+    }
+    if (p.activeTab < 0 || p.activeTab >= p.tabs.length) {
+      p.activeTab = Math.max(0, p.tabs.length - 1);
+    }
+    return p.tabs[p.activeTab];
+  }
+
+  // File Color Tags Store: { [normalizedPath]: [color1, color2, ...] }
+  let fileTagsMap = {};
+  try {
+    fileTagsMap = JSON.parse(localStorage.getItem('tron_file_tags') || '{}');
+  } catch (e) {
+    fileTagsMap = {};
+  }
+
+  const TAG_COLOR_DEFS = {
+    red: { name: 'Rojo', hex: '#ef4444', class: 'bg-red-500' },
+    orange: { name: 'Naranja', hex: '#f97316', class: 'bg-orange-500' },
+    yellow: { name: 'Amarillo', hex: '#eab308', class: 'bg-yellow-400' },
+    green: { name: 'Verde', hex: '#22c55e', class: 'bg-green-500' },
+    blue: { name: 'Azul', hex: '#3b82f6', class: 'bg-blue-500' },
+    purple: { name: 'Púrpura', hex: '#a855f7', class: 'bg-purple-500' },
+    gray: { name: 'Gris', hex: '#9ca3af', class: 'bg-gray-400' }
+  };
+
+  function normalizeTagPath(p) {
+    if (!p) return '';
+    return p.replace(/\\/g, '/').toLowerCase();
+  }
+
+  function getItemTags(p) {
+    const norm = normalizeTagPath(p);
+    return fileTagsMap[norm] || [];
+  }
+
+  function setItemTags(p, tags) {
+    const norm = normalizeTagPath(p);
+    if (!tags || tags.length === 0) {
+      delete fileTagsMap[norm];
+    } else {
+      fileTagsMap[norm] = Array.from(new Set(tags));
+    }
+    try {
+      localStorage.setItem('tron_file_tags', JSON.stringify(fileTagsMap));
+    } catch (e) {}
+    renderTagSidebar();
+  }
+
+  function toggleItemTag(p, color) {
+    const norm = normalizeTagPath(p);
+    const cur = getItemTags(norm);
+    let next;
+    if (cur.includes(color)) {
+      next = cur.filter(c => c !== color);
+    } else {
+      next = [...cur, color];
+    }
+    setItemTags(norm, next);
+  }
+
+  function clearItemTags(p) {
+    setItemTags(p, []);
+  }
 
   const state = {
     quickViewOpen: false,
@@ -26,6 +121,7 @@
     activeTransfers: new Map(),
     drives: [],
     favorites: [],
+    activeTagFilter: null, // null or color name e.g. 'red'
 
     frequentLocations: JSON.parse(localStorage.getItem('tron_frequent_locations') || '{}'),
 
@@ -47,37 +143,56 @@
     externalAppsConfig: null,
     draggedInternalPaths: [],
 
-    get currentDirectory() { return panels[activePanel].currentDirectory; },
-    set currentDirectory(v) { panels[activePanel].currentDirectory = v; },
-    get items() { return panels[activePanel].items; },
-    set items(v) { panels[activePanel].items = v; },
-    get filteredItems() { return panels[activePanel].filteredItems; },
-    set filteredItems(v) { panels[activePanel].filteredItems = v; },
-    get selectedIndex() { return panels[activePanel].selectedIndex; },
-    set selectedIndex(v) { panels[activePanel].selectedIndex = v; },
-    get selectionAnchor() { return panels[activePanel].selectionAnchor; },
-    set selectionAnchor(v) { panels[activePanel].selectionAnchor = v; },
-    get selectedItems() { return panels[activePanel].selectedItems; },
-    set selectedItems(v) { panels[activePanel].selectedItems = v; },
-    get history() { return panels[activePanel].history; },
-    set history(v) { panels[activePanel].history = v; },
-    get historyIndex() { return panels[activePanel].historyIndex; },
-    set historyIndex(v) { panels[activePanel].historyIndex = v; },
-    get searchQuery() { return panels[activePanel].searchQuery; },
-    set searchQuery(v) { panels[activePanel].searchQuery = v; },
-    get isSearchingRecursive() { return panels[activePanel].isSearchingRecursive; },
-    set isSearchingRecursive(v) { panels[activePanel].isSearchingRecursive = v; },
-    get activeSherlockFilter() { return panels[activePanel].activeSherlockFilter; },
-    set activeSherlockFilter(v) { panels[activePanel].activeSherlockFilter = v; },
-    get sherlockResults() { return panels[activePanel].sherlockResults; },
-    set sherlockResults(v) { panels[activePanel].sherlockResults = v; },
-    get searchItems() { return panels[activePanel].searchItems; },
-    set searchItems(v) { panels[activePanel].searchItems = v; },
-    get freeSpaceBytes() { return panels[activePanel].freeSpaceBytes; },
-    set freeSpaceBytes(v) { panels[activePanel].freeSpaceBytes = v; },
-    get totalSpaceBytes() { return panels[activePanel].totalSpaceBytes; },
-    set totalSpaceBytes(v) { panels[activePanel].totalSpaceBytes = v; }
+    get currentDirectory() { return getActiveTabObj().currentDirectory; },
+    set currentDirectory(v) {
+      const tab = getActiveTabObj();
+      tab.currentDirectory = v;
+      tab.name = v ? getDirBaseName(v) : 'Inicio';
+      renderTabs();
+    },
+    get items() { return getActiveTabObj().items; },
+    set items(v) { getActiveTabObj().items = v; },
+    get filteredItems() { return getActiveTabObj().filteredItems; },
+    set filteredItems(v) { getActiveTabObj().filteredItems = v; },
+    get selectedIndex() { return getActiveTabObj().selectedIndex; },
+    set selectedIndex(v) { getActiveTabObj().selectedIndex = v; },
+    get selectionAnchor() { return getActiveTabObj().selectionAnchor; },
+    set selectionAnchor(v) { getActiveTabObj().selectionAnchor = v; },
+    get selectedItems() { return getActiveTabObj().selectedItems; },
+    set selectedItems(v) { getActiveTabObj().selectedItems = v; },
+    get history() { return getActiveTabObj().history; },
+    set history(v) { getActiveTabObj().history = v; },
+    get historyIndex() { return getActiveTabObj().historyIndex; },
+    set historyIndex(v) { getActiveTabObj().historyIndex = v; },
+    get searchQuery() { return getActiveTabObj().searchQuery; },
+    set searchQuery(v) { getActiveTabObj().searchQuery = v; },
+    get isSearchingRecursive() { return getActiveTabObj().isSearchingRecursive; },
+    set isSearchingRecursive(v) { getActiveTabObj().isSearchingRecursive = v; },
+    get activeSherlockFilter() { return getActiveTabObj().activeSherlockFilter; },
+    set activeSherlockFilter(v) { getActiveTabObj().activeSherlockFilter = v; },
+    get sherlockResults() { return getActiveTabObj().sherlockResults; },
+    set sherlockResults(v) { getActiveTabObj().sherlockResults = v; },
+    get searchItems() { return getActiveTabObj().searchItems; },
+    set searchItems(v) { getActiveTabObj().searchItems = v; },
+    get freeSpaceBytes() { return getActiveTabObj().freeSpaceBytes; },
+    set freeSpaceBytes(v) { getActiveTabObj().freeSpaceBytes = v; },
+    get totalSpaceBytes() { return getActiveTabObj().totalSpaceBytes; },
+    set totalSpaceBytes(v) { getActiveTabObj().totalSpaceBytes = v; },
+    get expandedDirs() { return getActiveTabObj().expandedDirs; }
   };
+
+  function getDirBaseName(p) {
+    if (!p) return 'Carpeta';
+    const isWindows = /^[a-zA-Z]:[\\\/]/.test(p) || p.startsWith('\\\\');
+    const sep = isWindows ? '\\' : '/';
+    const clean = isWindows ? p.replace(/\//g, '\\').replace(/\\+$/, '') : p.replace(/\\+$/, '');
+    const idx = clean.lastIndexOf(sep);
+    if (idx >= 0) {
+      const name = clean.substring(idx + 1);
+      return name || clean;
+    }
+    return clean;
+  }
 
   // DOM Elements
   const elPanels = [
@@ -110,6 +225,11 @@
     panelB: document.getElementById('panelB'),
     pathIndicatorA: document.getElementById('pathIndicatorA'),
     pathIndicatorB: document.getElementById('pathIndicatorB'),
+    tabBar: document.getElementById('tabBar'),
+    tabList: document.getElementById('tabList'),
+    btnNewTab: document.getElementById('btnNewTab'),
+    tagLinks: document.getElementById('tagLinks'),
+    btnClearActiveTagFilter: document.getElementById('btnClearActiveTagFilter'),
     breadcrumbs: document.getElementById('breadcrumbs'),
     quickLinks: document.getElementById('quickLinks'),
     favoriteLinks: document.getElementById('favoriteLinks'),
@@ -790,22 +910,75 @@ modalSherlock: document.getElementById('modalSherlock'),
     if (!state.showHiddenFiles) {
       res = res.filter(item => !item.is_hidden);
     }
+    if (state.activeTagFilter) {
+      res = res.filter(item => getItemTags(item.path).includes(state.activeTagFilter));
+    }
     if (q) {
       res = res.filter(item => item.name.toLowerCase().includes(q));
     }
     state.filteredItems = sortItems([...res]);
   }
 
+  // Flatten filteredItems taking into account expandedDirs (collapsible tree)
+  function buildDisplayItemList() {
+    const list = [];
+    const expandedMap = state.expandedDirs || new Map();
+
+    function recurse(items, depth = 0) {
+      for (const item of items) {
+        const itemCopy = { ...item, _depth: depth };
+        list.push(itemCopy);
+        if (item.is_directory && expandedMap.has(item.path)) {
+          const children = expandedMap.get(item.path) || [];
+          recurse(children, depth + 1);
+        }
+      }
+    }
+
+    recurse(state.filteredItems, 0);
+    return list;
+  }
+
+  async function toggleExpandDir(item) {
+    if (!item || !item.is_directory) return;
+    const expandedMap = state.expandedDirs;
+    if (expandedMap.has(item.path)) {
+      expandedMap.delete(item.path);
+      renderFileList();
+    } else {
+      try {
+        const res = await invoke('read_directory', { path: item.path });
+        if (res && res.items) {
+          let childItems = res.items;
+          if (!state.showHiddenFiles) {
+            childItems = childItems.filter(ci => !ci.is_hidden);
+          }
+          childItems = sortItems([...childItems]);
+          expandedMap.set(item.path, childItems);
+        } else {
+          expandedMap.set(item.path, []);
+        }
+        renderFileList();
+      } catch (err) {
+        console.warn('Error expanding dir:', err);
+      }
+    }
+  }
+
   // File List Rendering
   function renderFileList() {
     el.fileList.innerHTML = '';
-    if (state.filteredItems.length === 0) {
+    const displayList = buildDisplayItemList();
+
+    if (displayList.length === 0) {
       el.fileList.innerHTML = `<div class="p-8 text-center text-xs text-gnome-textDim">Directorio vacío o sin coincidencias</div>`;
       return;
     }
 
+    const expandedMap = state.expandedDirs || new Map();
     const fragment = document.createDocumentFragment();
-    state.filteredItems.forEach((item, idx) => {
+
+    displayList.forEach((item, idx) => {
       const isSelected = state.selectedItems.has(item.path);
       const isFocused = idx === state.selectedIndex;
 
@@ -825,8 +998,37 @@ modalSherlock: document.getElementById('modalSherlock'),
 
       // 1. Name & Icon (col-span-6)
       const colName = document.createElement('div');
-      colName.className = 'col-span-6 flex items-center gap-2.5 min-w-0 pointer-events-none';
+      colName.className = 'col-span-6 flex items-center gap-1.5 min-w-0 pointer-events-none';
+      const depthPadding = (item._depth || 0) * 18;
+      colName.style.paddingLeft = `${depthPadding}px`;
       const fontClass = state.normalFontWeight ? 'font-normal' : 'font-medium';
+
+      // Tree expand/collapse arrow
+      let expandToggleHtml = '';
+      if (item.is_directory) {
+        const isExpanded = expandedMap.has(item.path);
+        expandToggleHtml = `
+          <button type="button" class="btn-expand-tree pointer-events-auto p-0.5 rounded hover:bg-gnome-hover text-gnome-textDim hover:text-white transition-colors text-[10px] w-4 h-4 flex items-center justify-center shrink-0" data-path="${escapeHtml(item.path)}" title="${isExpanded ? 'Contraer' : 'Expandir'}">
+            ${isExpanded ? '▼' : '▶'}
+          </button>
+        `;
+      } else {
+        expandToggleHtml = '<span class="w-4 shrink-0 inline-block"></span>';
+      }
+
+      // Color Tag indicator dots
+      const itemTags = getItemTags(item.path);
+      let tagsHtml = '';
+      if (itemTags.length > 0) {
+        tagsHtml = `
+          <span class="inline-flex items-center gap-1 shrink-0 ml-1">
+            ${itemTags.map(c => {
+              const def = TAG_COLOR_DEFS[c] || { hex: '#9ca3af', name: c };
+              return `<span class="w-2 h-2 rounded-full inline-block shadow-sm" style="background-color: ${def.hex}" title="Etiqueta: ${def.name}"></span>`;
+            }).join('')}
+          </span>
+        `;
+      }
       
       let parentPathHtml = '';
       if (state.isSearchingRecursive && item.path) {
@@ -849,8 +1051,10 @@ modalSherlock: document.getElementById('modalSherlock'),
       }
 
       colName.innerHTML = `
+        ${expandToggleHtml}
         <span class="shrink-0 select-none item-icon">${getFileIcon(item)}</span>
         <span class="truncate select-none ${fontClass}">${escapeHtml(item.name)}</span>
+        ${tagsHtml}
         ${parentPathHtml}
       `;
 
@@ -886,6 +1090,12 @@ modalSherlock: document.getElementById('modalSherlock'),
 
       // Click Events
       row.addEventListener('click', (e) => {
+        const btnExpand = e.target.closest('.btn-expand-tree');
+        if (btnExpand) {
+          e.stopPropagation();
+          toggleExpandDir(item);
+          return;
+        }
         const btnParent = e.target.closest('.btn-goto-parent');
         if (btnParent && btnParent.dataset.parentDir) {
           e.stopPropagation();
@@ -895,6 +1105,8 @@ modalSherlock: document.getElementById('modalSherlock'),
         handleRowClick(e, idx);
       });
       row.addEventListener('dblclick', (e) => {
+        const btnExpand = e.target.closest('.btn-expand-tree');
+        if (btnExpand) return;
         const btnParent = e.target.closest('.btn-goto-parent');
         if (btnParent) return;
         activateItem(item);
@@ -1869,10 +2081,33 @@ modalSherlock: document.getElementById('modalSherlock'),
       return;
     }
 
-    if ((e.ctrlKey || e.metaKey) && (e.key === 't' || e.key === 'T')) {
+    // Tabs & Terminal Shortcuts
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 't' || e.key === 'T')) {
       e.preventDefault();
       openCurrentTerminal();
       return;
+    }
+
+    if ((e.ctrlKey || e.metaKey) && (e.key === 't' || e.key === 'T')) {
+      e.preventDefault();
+      createTab();
+      return;
+    }
+
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'w' || e.key === 'W')) {
+      e.preventDefault();
+      closeTab(panels[activePanel].activeTab);
+      return;
+    }
+
+    if ((e.ctrlKey || e.metaKey) && e.key >= '1' && e.key <= '9') {
+      const tabNum = parseInt(e.key, 10) - 1;
+      const p = panels[activePanel];
+      if (p.tabs && tabNum < p.tabs.length) {
+        e.preventDefault();
+        switchTab(tabNum);
+        return;
+      }
     }
 
     if (e.key === 'F5' || (e.ctrlKey && (e.key === 'r' || e.key === 'R'))) {
@@ -3284,6 +3519,159 @@ async function startTransferOperation(action, sources, targetDir) {
     el.fileList.focus();
   }
 
+
+  // Tab Management Implementation
+  function renderTabs() {
+    if (!el.tabList) return;
+    el.tabList.innerHTML = '';
+    const panel = panels[activePanel];
+    if (!panel.tabs) return;
+
+    panel.tabs.forEach((t, idx) => {
+      const isActive = idx === panel.activeTab;
+      const tabEl = document.createElement('div');
+      tabEl.className = `group h-6 px-2 rounded flex items-center gap-1.5 text-xs select-none cursor-pointer transition-colors max-w-[160px] ${
+        isActive 
+          ? 'bg-gnome-surface text-white font-medium border-t-2 border-gnome-active shadow-sm' 
+          : 'bg-gnome-sidebar hover:bg-gnome-hover/70 text-gnome-textDim hover:text-gnome-text'
+      }`;
+      tabEl.title = t.currentDirectory || 'Inicio';
+      tabEl.innerHTML = `
+        <span class="text-[11px] opacity-70">📁</span>
+        <span class="truncate flex-1">${escapeHtml(t.name || 'Carpeta')}</span>
+        <button type="button" class="btn-close-tab w-3.5 h-3.5 rounded-full flex items-center justify-center text-[10px] opacity-40 group-hover:opacity-100 hover:bg-white/20 hover:text-white transition-opacity" title="Cerrar pestaña (Ctrl+W)">✕</button>
+      `;
+
+      tabEl.onclick = (e) => {
+        if (e.target.closest('.btn-close-tab')) return;
+        switchTab(idx);
+      };
+
+      tabEl.onauxclick = (e) => {
+        if (e.button === 1) { // Middle click closes tab
+          e.preventDefault();
+          closeTab(idx);
+        }
+      };
+
+      const btnClose = tabEl.querySelector('.btn-close-tab');
+      if (btnClose) {
+        btnClose.onclick = (e) => {
+          e.stopPropagation();
+          closeTab(idx);
+        };
+      }
+
+      el.tabList.appendChild(tabEl);
+    });
+  }
+
+  async function createTab(dir = '') {
+    const p = panels[activePanel];
+    const initialDir = dir || p.currentDirectory || state.currentDirectory || 'C:\\';
+    const newTab = createTabState(initialDir);
+    p.tabs.push(newTab);
+    p.activeTab = p.tabs.length - 1;
+    renderTabs();
+    await loadDirectory(initialDir, true);
+  }
+
+  function closeTab(index) {
+    const p = panels[activePanel];
+    if (p.tabs.length <= 1) {
+      // Don't close last tab, just reset it to home or refresh
+      return;
+    }
+    p.tabs.splice(index, 1);
+    if (p.activeTab >= p.tabs.length) {
+      p.activeTab = p.tabs.length - 1;
+    }
+    renderTabs();
+    const curTab = p.tabs[p.activeTab];
+    if (curTab.currentDirectory) {
+      loadDirectory(curTab.currentDirectory, false);
+    } else {
+      renderFileList();
+      updateStatusBar();
+      renderBreadcrumbs();
+    }
+  }
+
+  function switchTab(index) {
+    const p = panels[activePanel];
+    if (index < 0 || index >= p.tabs.length) return;
+    p.activeTab = index;
+    renderTabs();
+    const curTab = p.tabs[p.activeTab];
+    if (curTab.currentDirectory) {
+      loadDirectory(curTab.currentDirectory, false);
+    } else {
+      renderFileList();
+      updateStatusBar();
+      renderBreadcrumbs();
+    }
+  }
+
+  // Color Tags Sidebar Rendering
+  function renderTagSidebar() {
+    if (!el.tagLinks) return;
+    el.tagLinks.innerHTML = '';
+
+    // Calculate count per tag
+    const tagCounts = {};
+    for (const key of Object.keys(TAG_COLOR_DEFS)) {
+      tagCounts[key] = 0;
+    }
+    for (const tags of Object.values(fileTagsMap)) {
+      if (Array.isArray(tags)) {
+        tags.forEach(t => {
+          if (tagCounts[t] !== undefined) tagCounts[t]++;
+        });
+      }
+    }
+
+    if (el.btnClearActiveTagFilter) {
+      if (state.activeTagFilter) {
+        el.btnClearActiveTagFilter.classList.remove('hidden');
+      } else {
+        el.btnClearActiveTagFilter.classList.add('hidden');
+      }
+    }
+
+    for (const [colorKey, def] of Object.entries(TAG_COLOR_DEFS)) {
+      const count = tagCounts[colorKey] || 0;
+      const isActive = state.activeTagFilter === colorKey;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `w-full flex items-center justify-between gap-2 px-2 py-1 rounded-md text-xs transition-colors select-none ${
+        isActive 
+          ? 'bg-gnome-active text-white font-medium' 
+          : 'text-gnome-text hover:bg-gnome-hover'
+      }`;
+      btn.innerHTML = `
+        <div class="flex items-center gap-2 min-w-0">
+          <span class="w-2.5 h-2.5 rounded-full inline-block shadow-sm" style="background-color: ${def.hex}"></span>
+          <span class="truncate">${escapeHtml(def.name)}</span>
+        </div>
+        <span class="text-[10px] font-mono ${isActive ? 'text-white/80' : 'text-gnome-textDim'}">${count}</span>
+      `;
+
+      btn.onclick = () => {
+        if (state.activeTagFilter === colorKey) {
+          state.activeTagFilter = null;
+        } else {
+          state.activeTagFilter = colorKey;
+        }
+        applyFilter();
+        renderFileList();
+        updateStatusBar();
+        renderTagSidebar();
+      };
+
+      el.tagLinks.appendChild(btn);
+    }
+  }
+
   // Favorites Management
   function loadFavorites() {
     try {
@@ -3820,6 +4208,10 @@ async function startTransferOperation(action, sources, targetDir) {
 
     // 4. Frequent Locations
     renderFrequentLinks();
+
+    // 5. File Tags & Tabs
+    renderTagSidebar();
+    renderTabs();
   }
 
   // Setup Menu Dropdowns (Auto-open on hover once active)
@@ -4437,6 +4829,56 @@ async function startTransferOperation(action, sources, targetDir) {
         duplicateSelectedItem(target);
       };
     }
+    // Color Tags Context Menu Buttons
+    document.querySelectorAll('.tag-color-btn').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const color = btn.dataset.color;
+        const target = state.contextTargetItem || (state.selectedIndex >= 0 ? state.filteredItems[state.selectedIndex] : null);
+        if (target) {
+          if (state.selectedItems.size > 1) {
+            state.selectedItems.forEach(p => toggleItemTag(p, color));
+          } else {
+            toggleItemTag(target.path, color);
+          }
+          renderFileList();
+          renderTagSidebar();
+        }
+        closeFileContextMenu();
+      };
+    });
+
+    if (el.ctxMenuClearTags) {
+      el.ctxMenuClearTags.onclick = (e) => {
+        e.stopPropagation();
+        const target = state.contextTargetItem || (state.selectedIndex >= 0 ? state.filteredItems[state.selectedIndex] : null);
+        if (target) {
+          if (state.selectedItems.size > 1) {
+            state.selectedItems.forEach(p => clearItemTags(p));
+          } else {
+            clearItemTags(target.path);
+          }
+          renderFileList();
+          renderTagSidebar();
+        }
+        closeFileContextMenu();
+      };
+    }
+
+    if (el.btnClearActiveTagFilter) {
+      el.btnClearActiveTagFilter.onclick = () => {
+        state.activeTagFilter = null;
+        applyFilter();
+        renderFileList();
+        updateStatusBar();
+        renderTagSidebar();
+      };
+    }
+
+    if (el.btnNewTab) {
+      el.btnNewTab.onclick = () => createTab();
+    }
+
     if (el.ctxMenuAddFavorite) {
       el.ctxMenuAddFavorite.onclick = () => {
         const item = state.contextTargetItem;
