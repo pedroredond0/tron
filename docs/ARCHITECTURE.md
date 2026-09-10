@@ -239,6 +239,7 @@ La aplicación soporta un modelo jerárquico de paneles y pestañas (`panels[act
 ### 5.5. Máquina de Estados de Navegación por Teclado y Detección de Plataforma
 El frontend detecta la plataforma (`isMac`) de manera transparente para proporcionar la experiencia idónea:
 - **Adaptación macOS (`Cmd` vs `Ctrl`)**: En macOS, la tecla modificadora principal cambia automáticamente a `metaKey` (`⌘ / Cmd`), permitiendo que `Cmd + C`, `Cmd + V`, `Cmd + P`, `Cmd + T`, `Cmd + W`, etc. funcionen de forma idiomática. En Windows y Linux se utiliza `ctrlKey` (`Ctrl`). Asimismo, la interfaz y la guía modal de ayuda (`adaptShortcutsForMac`) adaptan dinámicamente las etiquetas de texto `Ctrl +` por `Cmd +` en tiempo de ejecución.
+- **Barra de Menús Nativa vs Integrada**: Dado que macOS dispone de la barra de menús global en la parte superior del monitor, la aplicación detecta el entorno macOS (`.is-mac`) y oculta automáticamente la barra interna `#menuBar` en la ventana para evitar menús duplicados ("Archivo", "Edición", etc.) y maximizar el área de trabajo vertical. En Windows y Linux se mantiene la barra integrada clásica.
 
 El controlador `handleGlobalKeyDown` intercepta y gestiona los eventos de teclado de manera inteligente:
 1. **Trampa de Modales y Campos de Texto**: Si el foco se encuentra en un `<input>` o `<textarea>`, las teclas alfanuméricas escriben normalmente y `Enter`/`Escape` confirman o cancelan el modal actual.
@@ -308,6 +309,7 @@ Al presionar la barra espaciadora sobre un elemento seleccionado, se activa el c
 | **Propiedades** | `SHObjectProperties` nativo | Diálogo de información | Diálogo de información |
 | **Papelera** | Win32 `IFileOperation` | FreeDesktop Trash Spec (`~/.local/share/Trash`) | macOS Trash API |
 | **Unidades de Disco** | Letras de unidad (`C:\`, `D:\`) | `/`, `/mnt`, `/media`, `/run/media` | `/`, `/Volumes` |
+| **Barra de Menús** | Integrada en ventana (`#menuBar`) | Integrada en ventana (`#menuBar`) | Menú superior nativo del sistema (oculta `#menuBar` interna) |
 | **Atajos de Teclado** | `Ctrl` | `Ctrl` | `Cmd` (`⌘`) dinámico |
 | **Seguridad / Permisos**| UAC Estándar | Polkit / Permisos POSIX | Desbloqueo Gatekeeper (`xattr -d com.apple.quarantine` / `xattr -cr`) |
 | **Distribución** | `.exe` portable / instalador | `.deb`, `AppImage`, binario nativo Arch | `.app`, `.dmg` |

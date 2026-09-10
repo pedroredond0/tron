@@ -19,6 +19,10 @@
   function adaptShortcutsForMac() {
     if (!isMac) return;
     try {
+      document.documentElement.classList.add('is-mac');
+      const mb = document.getElementById('menuBar');
+      if (mb) mb.style.display = 'none';
+
       const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
       let node;
       while ((node = walker.nextNode())) {

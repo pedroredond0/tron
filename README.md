@@ -211,6 +211,8 @@ Al descargar la aplicación en macOS fuera de la Mac App Store, el sistema de se
 
 *(Si la aplicación está en otra ubicación como `~/Downloads/Tron.app`, ajusta la ruta en el comando).*
 
+> **Integración nativa con macOS:** En macOS, la aplicación utiliza la barra de menús superior nativa del sistema operativo y oculta automáticamente la barra interna de la ventana para evitar duplicidades de menús y ofrecer una experiencia 100% limpia e integrada.
+
 ---
 
 ## 🐧 Clonar y Compilar en Arch Linux / Manjaro
