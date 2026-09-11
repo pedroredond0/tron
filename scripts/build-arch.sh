@@ -190,7 +190,7 @@ if [ "$DO_INSTALL" = true ]; then
 [Desktop Entry]
 Name=Tron Explorer
 Comment=Gestor de archivos moderno y ligero con QuickView
-Exec=$HOME/.local/bin/tron %U
+Exec=env WEBKIT_DISABLE_DMABUF_RENDERER=1 $HOME/.local/bin/tron %U
 Icon=tron
 Terminal=false
 Type=Application
