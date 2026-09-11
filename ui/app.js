@@ -514,6 +514,20 @@
     aboutBuildUnix: document.getElementById('aboutBuildUnix'),
     aboutBuildDate: document.getElementById('aboutBuildDate'),
     linkAboutGithub: document.getElementById('linkAboutGithub'),
+    btnCheckUpdates: document.getElementById('btnCheckUpdates'),
+    btnCheckUpdatesSpinner: document.getElementById('btnCheckUpdatesSpinner'),
+    btnCheckUpdatesText: document.getElementById('btnCheckUpdatesText'),
+    updateStatusBox: document.getElementById('updateStatusBox'),
+    updateStatusMsg: document.getElementById('updateStatusMsg'),
+    updateReleaseNotesBox: document.getElementById('updateReleaseNotesBox'),
+    updateProgressContainer: document.getElementById('updateProgressContainer'),
+    updateProgressText: document.getElementById('updateProgressText'),
+    updateProgressPercent: document.getElementById('updateProgressPercent'),
+    updateProgressBar: document.getElementById('updateProgressBar'),
+    updateActionsContainer: document.getElementById('updateActionsContainer'),
+    btnApplyUpdate: document.getElementById('btnApplyUpdate'),
+    btnDownloadManual: document.getElementById('btnDownloadManual'),
+    btnRestartApp: document.getElementById('btnRestartApp'),
     menuNewFile: document.getElementById('menuNewFile'),
     menuNewFolder: document.getElementById('menuNewFolder'),
     menuRename: document.getElementById('menuRename'),
@@ -3734,7 +3748,193 @@ async function startTransferOperation(action, sources, targetDir) {
     el.fileList.focus();
   }
 
+  let currentUpdateData = null;
+
+  function resetUpdateUI() {
+    currentUpdateData = null;
+    if (el.btnCheckUpdates) {
+      el.btnCheckUpdates.disabled = false;
+      el.btnCheckUpdates.classList.remove('opacity-60', 'pointer-events-none');
+    }
+    if (el.btnCheckUpdatesSpinner) el.btnCheckUpdatesSpinner.classList.add('hidden');
+    if (el.btnCheckUpdatesText) el.btnCheckUpdatesText.textContent = '🔍 Buscar actualizaciones';
+    if (el.updateStatusBox) el.updateStatusBox.classList.add('hidden');
+    if (el.updateReleaseNotesBox) {
+      el.updateReleaseNotesBox.classList.add('hidden');
+      el.updateReleaseNotesBox.textContent = '';
+    }
+    if (el.updateProgressContainer) el.updateProgressContainer.classList.add('hidden');
+    if (el.updateProgressBar) el.updateProgressBar.style.width = '0%';
+    if (el.updateProgressPercent) el.updateProgressPercent.textContent = '';
+    if (el.updateActionsContainer) el.updateActionsContainer.classList.add('hidden');
+    if (el.btnApplyUpdate) {
+      el.btnApplyUpdate.classList.add('hidden');
+      el.btnApplyUpdate.disabled = false;
+      el.btnApplyUpdate.textContent = '⬇️ Descargar e Instalar ahora';
+    }
+    if (el.btnDownloadManual) el.btnDownloadManual.classList.add('hidden');
+    if (el.btnRestartApp) el.btnRestartApp.classList.add('hidden');
+  }
+
+  async function handleCheckForUpdates() {
+    if (!el.btnCheckUpdates) return;
+    el.btnCheckUpdates.disabled = true;
+    if (el.btnCheckUpdatesSpinner) el.btnCheckUpdatesSpinner.classList.remove('hidden');
+    if (el.btnCheckUpdatesText) el.btnCheckUpdatesText.textContent = 'Comprobando con GitHub...';
+
+    if (el.updateStatusBox) el.updateStatusBox.classList.remove('hidden');
+    if (el.updateStatusMsg) {
+      el.updateStatusMsg.className = 'font-medium text-gnome-textDim';
+      el.updateStatusMsg.textContent = 'Consultando últimas versiones publicadas...';
+    }
+    if (el.updateReleaseNotesBox) el.updateReleaseNotesBox.classList.add('hidden');
+    if (el.updateActionsContainer) el.updateActionsContainer.classList.add('hidden');
+
+    try {
+      const res = await invoke('check_app_updates', {
+        repoOwner: 'pedroredond0',
+        repoName: 'tron'
+      });
+
+      if (el.btnCheckUpdatesSpinner) el.btnCheckUpdatesSpinner.classList.add('hidden');
+      if (el.btnCheckUpdatesText) el.btnCheckUpdatesText.textContent = '🔍 Buscar actualizaciones';
+      el.btnCheckUpdates.disabled = false;
+
+      if (!res) {
+        if (el.updateStatusMsg) {
+          el.updateStatusMsg.className = 'font-medium text-amber-400';
+          el.updateStatusMsg.textContent = 'No se pudo obtener información de la versión.';
+        }
+        return;
+      }
+
+      currentUpdateData = res;
+
+      if (!res.has_update) {
+        if (el.updateStatusMsg) {
+          el.updateStatusMsg.className = 'font-medium text-emerald-400 flex items-center gap-1.5';
+          el.updateStatusMsg.innerHTML = `<span>✅</span> Estás en la última versión (v${escapeHtml(res.current_version)})`;
+        }
+        if (el.updateReleaseNotesBox) el.updateReleaseNotesBox.classList.add('hidden');
+        if (el.updateActionsContainer) el.updateActionsContainer.classList.add('hidden');
+      } else {
+        // Update available
+        if (el.updateStatusMsg) {
+          el.updateStatusMsg.className = 'font-medium text-cyan-400 flex items-center gap-1.5';
+          el.updateStatusMsg.innerHTML = `<span>✨</span> ¡Nueva versión v${escapeHtml(res.latest_version)} disponible!`;
+        }
+
+        if (res.release_notes && el.updateReleaseNotesBox) {
+          el.updateReleaseNotesBox.textContent = res.release_notes.trim();
+          el.updateReleaseNotesBox.classList.remove('hidden');
+        }
+
+        if (el.updateActionsContainer) {
+          el.updateActionsContainer.classList.remove('hidden');
+        }
+
+        const isWin = res.os === 'windows' || (!isMac && navigator.platform?.toLowerCase().includes('win'));
+
+        if (isWin && res.download_url && res.asset_name?.toLowerCase().endsWith('.exe')) {
+          // Windows: Hot automatic install
+          if (el.btnApplyUpdate) {
+            el.btnApplyUpdate.classList.remove('hidden');
+            const sizeMb = res.asset_size ? ` (${(res.asset_size / (1024 * 1024)).toFixed(1)} MB)` : '';
+            el.btnApplyUpdate.textContent = `⬇️ Descargar e Instalar ahora${sizeMb}`;
+          }
+          if (el.btnDownloadManual) el.btnDownloadManual.classList.add('hidden');
+        } else {
+          // Linux / macOS: Direct release or asset download link
+          if (el.btnApplyUpdate) el.btnApplyUpdate.classList.add('hidden');
+          if (el.btnDownloadManual) {
+            el.btnDownloadManual.classList.remove('hidden');
+            el.btnDownloadManual.href = res.download_url || `https://github.com/pedroredond0/tron/releases/tag/v${res.latest_version}`;
+            const label = res.asset_name ? `🌐 Descargar ${res.asset_name}` : '🌐 Descargar release';
+            el.btnDownloadManual.textContent = label;
+          }
+        }
+      }
+    } catch (err) {
+      if (el.btnCheckUpdatesSpinner) el.btnCheckUpdatesSpinner.classList.add('hidden');
+      if (el.btnCheckUpdatesText) el.btnCheckUpdatesText.textContent = '🔍 Buscar actualizaciones';
+      el.btnCheckUpdates.disabled = false;
+      if (el.updateStatusMsg) {
+        el.updateStatusMsg.className = 'font-medium text-rose-400';
+        el.updateStatusMsg.textContent = `Error al comprobar: ${err}`;
+      }
+    }
+  }
+
+  async function handleApplyUpdate() {
+    if (!currentUpdateData || !currentUpdateData.download_url) return;
+
+    if (el.btnApplyUpdate) {
+      el.btnApplyUpdate.disabled = true;
+      el.btnApplyUpdate.classList.add('opacity-50', 'pointer-events-none');
+    }
+    if (el.btnCheckUpdates) {
+      el.btnCheckUpdates.disabled = true;
+    }
+
+    if (el.updateProgressContainer) el.updateProgressContainer.classList.remove('hidden');
+    if (el.updateProgressBar) el.updateProgressBar.style.width = '40%';
+    if (el.updateProgressText) el.updateProgressText.textContent = 'Descargando y preparando binario...';
+    if (el.updateProgressPercent) el.updateProgressPercent.textContent = '';
+
+    try {
+      // Small simulated progress step for visual feedback
+      let pct = 40;
+      const progressTimer = setInterval(() => {
+        if (pct < 85) {
+          pct += 5;
+          if (el.updateProgressBar) el.updateProgressBar.style.width = `${pct}%`;
+        }
+      }, 300);
+
+      await invoke('apply_app_update', {
+        downloadUrl: currentUpdateData.download_url,
+        assetName: currentUpdateData.asset_name || 'Tron.exe'
+      });
+
+      clearInterval(progressTimer);
+
+      if (el.updateProgressBar) el.updateProgressBar.style.width = '100%';
+      if (el.updateProgressText) el.updateProgressText.textContent = '¡Actualización completada!';
+
+      if (el.updateStatusMsg) {
+        el.updateStatusMsg.className = 'font-medium text-emerald-400 flex items-center gap-1.5';
+        el.updateStatusMsg.innerHTML = '<span>✅</span> Actualización lista. Reinicia la aplicación para aplicar los cambios.';
+      }
+
+      if (el.btnApplyUpdate) el.btnApplyUpdate.classList.add('hidden');
+      if (el.btnRestartApp) el.btnRestartApp.classList.remove('hidden');
+
+    } catch (err) {
+      if (el.updateProgressContainer) el.updateProgressContainer.classList.add('hidden');
+      if (el.updateStatusMsg) {
+        el.updateStatusMsg.className = 'font-medium text-rose-400';
+        el.updateStatusMsg.textContent = `Error al instalar: ${err}`;
+      }
+      if (el.btnApplyUpdate) {
+        el.btnApplyUpdate.disabled = false;
+        el.btnApplyUpdate.classList.remove('opacity-50', 'pointer-events-none');
+      }
+      if (el.btnCheckUpdates) {
+        el.btnCheckUpdates.disabled = false;
+      }
+    }
+  }
+
+  function handleRestartApp() {
+    try {
+      invoke('force_exit_app');
+    } catch (_) {
+      window.close();
+    }
+  }
+
   async function openAboutModal() {
+    resetUpdateUI();
     try {
       const info = await invoke('get_app_info');
       if (info) {
@@ -4680,6 +4880,17 @@ async function startTransferOperation(action, sources, targetDir) {
       el.linkAboutGithub.onclick = (e) => {
         e.preventDefault();
         invoke('open_file_default', { path: 'https://github.com/pedroredond0/tron' }).catch(console.error);
+      };
+    }
+    if (el.btnCheckUpdates) el.btnCheckUpdates.onclick = handleCheckForUpdates;
+    if (el.btnApplyUpdate) el.btnApplyUpdate.onclick = handleApplyUpdate;
+    if (el.btnRestartApp) el.btnRestartApp.onclick = handleRestartApp;
+    if (el.btnDownloadManual) {
+      el.btnDownloadManual.onclick = (e) => {
+        e.preventDefault();
+        if (el.btnDownloadManual.href && el.btnDownloadManual.href !== '#') {
+          invoke('open_file_default', { path: el.btnDownloadManual.href }).catch(console.error);
+        }
       };
     }
 
