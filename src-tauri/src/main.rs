@@ -3560,6 +3560,17 @@ fn build_app_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Result<tauri:
 }
 
 fn main() {
+    #[cfg(target_os = "linux")]
+    {
+        // En Linux bajo Wayland (GNOME, KDE Plasma, Hyprland, Sway), WebKitGTK 2.42+
+        // activa por defecto el renderizador DMABUF, lo que causa el error fatal:
+        // "Gdk-Message: Error 71 (Error de protocolo) dispatching to Wayland display".
+        // Configurar WEBKIT_DISABLE_DMABUF_RENDERER=1 previene este fallo.
+        if std::env::var("WEBKIT_DISABLE_DMABUF_RENDERER").is_err() {
+            std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+        }
+    }
+
     std::panic::set_hook(Box::new(|info| {
         let msg = format!("PANIC: {:?}\n", info);
         eprintln!("{}", msg);
