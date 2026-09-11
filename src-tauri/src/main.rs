@@ -1819,9 +1819,7 @@ fn copy_items(
                 let res = if src_path.is_dir() {
                     copy_dir_recursive_with_progress(&src_path, &dest_path, &mut |_| {})
                 } else {
-                    std::fs::copy(&src_path, &dest_path)
-                        .map(|_| ())
-                        .map_err(|e| format!("{}", e))
+                    std::fs::copy(&src_path, &dest_path).map(|_| ())
                 };
                 if let Err(e) = res {
                     err_msg = Some(format!("Error al copiar: {}", e));
@@ -1923,15 +1921,19 @@ fn move_items(
                     valid_sources += 1;
                     continue;
                 }
-                let res = fs::rename(&src_path, &dest_path).or_else(|_| {
-                    if src_path.is_dir() {
-                        copy_dir_recursive_with_progress(&src_path, &dest_path, &mut |_| {})?;
-                        fs::remove_dir_all(&src_path)
-                    } else {
-                        std::fs::copy(&src_path, &dest_path)?;
-                        fs::remove_file(&src_path)
+                let res = if fs::rename(&src_path, &dest_path).is_ok() {
+                    Ok(())
+                } else if src_path.is_dir() {
+                    match copy_dir_recursive_with_progress(&src_path, &dest_path, &mut |_| {}) {
+                        Ok(_) => fs::remove_dir_all(&src_path),
+                        Err(e) => Err(e),
                     }
-                });
+                } else {
+                    match std::fs::copy(&src_path, &dest_path) {
+                        Ok(_) => fs::remove_file(&src_path),
+                        Err(e) => Err(e),
+                    }
+                };
                 if let Err(e) = res {
                     err_msg = Some(format!("Error al mover: {}", e));
                     break;

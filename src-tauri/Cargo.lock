@@ -4038,7 +4038,7 @@ dependencies = [
 
 [[package]]
 name = "tron"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "base64 0.23.1",
  "serde",
