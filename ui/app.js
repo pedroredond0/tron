@@ -217,6 +217,7 @@
     terminalCustomPath: localStorage.getItem('tron_terminal_custom') || '',
     monochromeIcons: localStorage.getItem('tron_monochrome_icons') === 'true',
     iconPack: localStorage.getItem('tron_icon_pack') || 'default',
+    showMenuBar: localStorage.getItem('tron_show_menu_bar') !== 'false',
     externalAppsConfig: null,
     draggedInternalPaths: [],
 
@@ -304,10 +305,15 @@
     panelBHeader: document.getElementById('panelBHeader'),
     panelABadge: document.getElementById('panelABadge'),
     panelBBadge: document.getElementById('panelBBadge'),
+    panelAPathBox: document.getElementById('panelAPathBox'),
+    panelBPathBox: document.getElementById('panelBPathBox'),
     panelACount: document.getElementById('panelACount'),
     panelBCount: document.getElementById('panelBCount'),
     pathIndicatorA: document.getElementById('pathIndicatorA'),
     pathIndicatorB: document.getElementById('pathIndicatorB'),
+    menuBar: document.getElementById('menuBar'),
+    chkShowMenuBar: document.getElementById('chkShowMenuBar'),
+    menuToggleMenuBar: document.getElementById('menuToggleMenuBar'),
     tabBar: document.getElementById('tabBar'),
     tabList: document.getElementById('tabList'),
     btnNewTab: document.getElementById('btnNewTab'),
@@ -2074,6 +2080,13 @@ modalSherlock: document.getElementById('modalSherlock'),
       return; // Do not process normal list navigation while QuickView is open
     }
 
+    // Toggle menu bar visibility
+    if (e.altKey && (e.key === 'm' || e.key === 'M')) {
+      e.preventDefault();
+      toggleMenuBar();
+      return;
+    }
+
     // Normal Window Navigation (Mac Cmd / Win-Linux Ctrl)
     if (isModKey(e) && (e.key === 'a' || e.key === 'A')) {
       e.preventDefault();
@@ -2820,20 +2833,20 @@ async function startTransferOperation(action, sources, targetDir) {
     if (activePanel === 0) {
       el.panelA.classList.add('ring-1', 'ring-inset', 'ring-gnome-active/40');
       el.panelB.classList.remove('ring-1', 'ring-inset', 'ring-gnome-active/40');
-      if (el.panelABadge) {
-        el.panelABadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-gnome-active text-white shrink-0 shadow-sm';
+      if (el.panelAPathBox) {
+        el.panelAPathBox.className = 'flex items-center gap-1.5 min-w-0 flex-1 px-2.5 py-0.5 rounded text-xs transition-colors bg-gnome-active text-white font-semibold shadow-sm';
       }
-      if (el.panelBBadge) {
-        el.panelBBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-gnome-sidebar border border-gnome-border text-gnome-textDim shrink-0';
+      if (el.panelBPathBox) {
+        el.panelBPathBox.className = 'flex items-center gap-1.5 min-w-0 flex-1 px-2.5 py-0.5 rounded text-xs transition-colors bg-gnome-sidebar/50 border border-gnome-border/60 text-gnome-textDim hover:text-gnome-text';
       }
     } else {
       el.panelB.classList.add('ring-1', 'ring-inset', 'ring-gnome-active/40');
       el.panelA.classList.remove('ring-1', 'ring-inset', 'ring-gnome-active/40');
-      if (el.panelBBadge) {
-        el.panelBBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-gnome-active text-white shrink-0 shadow-sm';
+      if (el.panelBPathBox) {
+        el.panelBPathBox.className = 'flex items-center gap-1.5 min-w-0 flex-1 px-2.5 py-0.5 rounded text-xs transition-colors bg-gnome-active text-white font-semibold shadow-sm';
       }
-      if (el.panelABadge) {
-        el.panelABadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-gnome-sidebar border border-gnome-border text-gnome-textDim shrink-0';
+      if (el.panelAPathBox) {
+        el.panelAPathBox.className = 'flex items-center gap-1.5 min-w-0 flex-1 px-2.5 py-0.5 rounded text-xs transition-colors bg-gnome-sidebar/50 border border-gnome-border/60 text-gnome-textDim hover:text-gnome-text';
       }
     }
   }
@@ -3674,6 +3687,14 @@ async function startTransferOperation(action, sources, targetDir) {
     el.tabList.innerHTML = '';
     const panel = panels[activePanel];
     if (!panel.tabs) return;
+
+    if (el.tabBar) {
+      if (panel.tabs.length <= 1) {
+        el.tabBar.classList.add('hidden');
+      } else {
+        el.tabBar.classList.remove('hidden');
+      }
+    }
 
     panel.tabs.forEach((t, idx) => {
       const isActive = idx === panel.activeTab;
@@ -4743,6 +4764,19 @@ async function startTransferOperation(action, sources, targetDir) {
       closeAppearanceModal();
     };
     if (el.btnConfirmAppearance) el.btnConfirmAppearance.onclick = saveAppearanceSettings;
+    if (el.chkShowMenuBar) {
+      el.chkShowMenuBar.onchange = (e) => {
+        state.showMenuBar = e.target.checked;
+        localStorage.setItem('tron_show_menu_bar', state.showMenuBar ? 'true' : 'false');
+        applyMenuBarVisibility();
+      };
+    }
+    if (el.menuToggleMenuBar) {
+      el.menuToggleMenuBar.onclick = () => {
+        closeAllMenus();
+        toggleMenuBar();
+      };
+    }
 
     // Preferences Tabs Switching
     const prefTabButtons = document.querySelectorAll('.pref-tab-btn');
@@ -5436,6 +5470,7 @@ async function startTransferOperation(action, sources, targetDir) {
     if (el.selectTheme) el.selectTheme.value = theme;
     if (el.selectIconPack) el.selectIconPack.value = iconPack;
     if (el.chkMonochromeIcons) el.chkMonochromeIcons.checked = monochromeIcons;
+    if (el.chkShowMenuBar) el.chkShowMenuBar.checked = (localStorage.getItem('tron_show_menu_bar') !== 'false');
     if (el.chkPrefShowHidden) el.chkPrefShowHidden.checked = state.showHiddenFiles;
     if (el.chkPrefRecursiveSearch) el.chkPrefRecursiveSearch.checked = recursiveSearch;
 
@@ -5530,6 +5565,10 @@ async function startTransferOperation(action, sources, targetDir) {
     localStorage.setItem('tron_monochrome_icons', monochromeIcons ? 'true' : 'false');
     localStorage.setItem('tron_show_hidden', showHidden ? 'true' : 'false');
     localStorage.setItem('tron_recursive_search', recursiveSearch ? 'true' : 'false');
+    const showMenuBar = el.chkShowMenuBar ? el.chkShowMenuBar.checked : true;
+    localStorage.setItem('tron_show_menu_bar', showMenuBar ? 'true' : 'false');
+    state.showMenuBar = showMenuBar;
+    applyMenuBarVisibility();
 
     state.iconPack = iconPack;
     state.textEditor = textEditor;
@@ -5576,6 +5615,7 @@ async function startTransferOperation(action, sources, targetDir) {
       .filter(Boolean);
 
     applyAppearanceSettings(theme, density, fontSize, normalWeight, uiScale, monochromeIcons, iconPack);
+    applyMenuBarVisibility();
   }
 
   function applyAppearanceSettings(theme, density, fontSize, normalWeight, uiScale = '14', monochromeIcons = false, iconPack = 'default') {
@@ -5617,6 +5657,29 @@ async function startTransferOperation(action, sources, targetDir) {
     updateToolbarIcons();
     loadSidebar();
     renderFileList();
+  }
+
+  function applyMenuBarVisibility() {
+    if (!el.menuBar) return;
+    if (isMac) {
+      el.menuBar.style.display = 'none';
+      return;
+    }
+    const show = state.showMenuBar !== false;
+    el.menuBar.style.display = show ? 'flex' : 'none';
+    if (el.chkShowMenuBar) {
+      el.chkShowMenuBar.checked = show;
+    }
+    if (el.menuToggleMenuBar) {
+      const span = el.menuToggleMenuBar.querySelector('span');
+      if (span) span.textContent = show ? 'Ocultar barra de menús' : 'Mostrar barra de menús';
+    }
+  }
+
+  function toggleMenuBar() {
+    state.showMenuBar = !state.showMenuBar;
+    localStorage.setItem('tron_show_menu_bar', state.showMenuBar ? 'true' : 'false');
+    applyMenuBarVisibility();
   }
 
   // --- Directory Size Calculation ---
