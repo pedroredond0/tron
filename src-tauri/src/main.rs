@@ -3466,6 +3466,7 @@ fn force_exit_app() {
     std::process::exit(0);
 }
 
+#[allow(dead_code)]
 fn build_app_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Result<tauri::menu::Menu<R>, Box<dyn std::error::Error>> {
     use tauri::menu::*;
 
@@ -3579,18 +3580,26 @@ fn main() {
 
     start_streaming_server();
 
-    let result = tauri::Builder::default()
-        .plugin(tauri_plugin_opener::init())
-        .menu(|app| {
-            build_app_menu(app).map_err(|e| {
-                eprintln!("Error building menu: {}", e);
-                tauri::Error::UnknownPath
+    #[allow(unused_mut)]
+    let mut builder = tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init());
+
+    #[cfg(target_os = "macos")]
+    {
+        builder = builder
+            .menu(|app| {
+                build_app_menu(app).map_err(|e| {
+                    eprintln!("Error building menu: {}", e);
+                    tauri::Error::UnknownPath
+                })
             })
-        })
-        .on_menu_event(|app, event| {
-            let id = event.id().as_ref();
-            let _ = app.emit("menu-action", id);
-        })
+            .on_menu_event(|app, event| {
+                let id = event.id().as_ref();
+                let _ = app.emit("menu-action", id);
+            });
+    }
+
+    let result = builder
         .invoke_handler(tauri::generate_handler![
             get_user_places,
             get_system_drives,

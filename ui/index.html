@@ -499,6 +499,9 @@
         <button id="menuAppearance" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between font-medium text-gnome-active">
           <span>Personalizar aspecto...</span>
         </button>
+        <button id="menuToggleMenuBar" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+          <span>Ocultar barra de menús</span><span class="text-gnome-textDim text-[11px]">Alt+M</span>
+        </button>
       </div>
     </div>
 
@@ -516,8 +519,8 @@
     </div>
   </div>
 
-  <!-- Tab Bar -->
-  <div id="tabBar" class="h-8 bg-gnome-sidebar border-b border-gnome-border flex items-center px-2 shrink-0 gap-1 select-none overflow-x-auto scrollbar-none z-20">
+  <!-- Tab Bar (Solo visible con 2 o más pestañas) -->
+  <div id="tabBar" class="hidden h-8 bg-gnome-sidebar border-b border-gnome-border flex items-center px-2 shrink-0 gap-1 select-none overflow-x-auto scrollbar-none z-20">
     <div id="tabList" class="flex items-center gap-1 min-w-0">
       <!-- Tabs generated dynamically -->
     </div>
@@ -780,10 +783,10 @@
         <div id="panelA" class="flex-1 flex flex-col min-w-0 transition-colors" tabindex="-1">
           <!-- Symmetric Location & Header Bar (Panel A) -->
           <div id="panelAHeader" class="hidden h-8 px-3 flex items-center justify-between bg-gnome-surface/90 border-b border-gnome-border text-xs shrink-0 select-none cursor-pointer">
-            <div class="flex items-center gap-2 min-w-0 flex-1">
-              <span id="panelABadge" class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-gnome-active text-white shrink-0 shadow-sm">Panel 1</span>
-              <span class="text-xs opacity-70">📁</span>
-              <span id="pathIndicatorA" class="font-mono text-[11px] text-gnome-text truncate flex-1" title="Ruta del Panel 1"></span>
+            <div id="panelAPathBox" class="flex items-center gap-1.5 min-w-0 flex-1 px-2.5 py-0.5 rounded text-xs transition-colors bg-gnome-active text-white font-semibold shadow-sm">
+              <span id="panelABadge" class="hidden"></span>
+              <span class="text-xs opacity-90 shrink-0">📁</span>
+              <span id="pathIndicatorA" class="font-mono text-[11px] truncate flex-1" title="Ruta del Panel 1"></span>
             </div>
             <div class="flex items-center gap-1 shrink-0 text-gnome-textDim pl-2">
               <span id="panelACount" class="text-[10px] font-mono"></span>
@@ -820,10 +823,10 @@
         <div id="panelB" class="hidden flex-1 flex flex-col min-w-0 border-l border-gnome-border transition-colors" tabindex="-1">
           <!-- Symmetric Location & Header Bar (Panel B) -->
           <div id="panelBHeader" class="hidden h-8 px-3 flex items-center justify-between bg-gnome-surface/90 border-b border-gnome-border text-xs shrink-0 select-none cursor-pointer">
-            <div class="flex items-center gap-2 min-w-0 flex-1">
-              <span id="panelBBadge" class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-gnome-sidebar border border-gnome-border text-gnome-textDim shrink-0">Panel 2</span>
-              <span class="text-xs opacity-70">📁</span>
-              <span id="pathIndicatorB" class="font-mono text-[11px] text-gnome-text truncate flex-1" title="Ruta del Panel 2"></span>
+            <div id="panelBPathBox" class="flex items-center gap-1.5 min-w-0 flex-1 px-2.5 py-0.5 rounded text-xs transition-colors bg-gnome-sidebar/50 border border-gnome-border/60 text-gnome-textDim hover:text-gnome-text">
+              <span id="panelBBadge" class="hidden"></span>
+              <span class="text-xs opacity-90 shrink-0">📁</span>
+              <span id="pathIndicatorB" class="font-mono text-[11px] truncate flex-1" title="Ruta del Panel 2"></span>
             </div>
             <div class="flex items-center gap-1 shrink-0 text-gnome-textDim pl-2">
               <span id="panelBCount" class="text-[10px] font-mono"></span>
@@ -1168,6 +1171,17 @@
               <div>
                 <span class="font-normal text-gnome-text block">Iconos monocromáticos (estilo minimalista)</span>
                 <span class="text-[10px] text-gnome-textDim">Convierte todos los iconos a escala de grises para una interfaz más uniforme y sobria.</span>
+              </div>
+            </label>
+          </div>
+
+          <!-- Barra de menús integrada -->
+          <div class="p-3 bg-gnome-sidebar/40 rounded-lg border border-gnome-border">
+            <label class="flex items-center gap-2.5 cursor-pointer select-none">
+              <input id="chkShowMenuBar" type="checkbox" checked class="w-4 h-4 rounded bg-gnome-sidebar border-gnome-border text-gnome-active focus:ring-0">
+              <div>
+                <span class="font-normal text-gnome-text block">Mostrar barra de menús integrada (Archivo, Edición, Ver...)</span>
+                <span class="text-[10px] text-gnome-textDim">Muestra u oculta la barra superior de menús desplegables para un diseño más despejado. Puedes alternarla también con Alt+M.</span>
               </div>
             </label>
           </div>
