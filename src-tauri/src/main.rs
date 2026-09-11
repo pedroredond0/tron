@@ -2749,17 +2749,283 @@ pub struct AppInfo {
     pub version: String,
     pub build_timestamp: u64,
     pub github_url: String,
+    pub os: String,
 }
 
 #[tauri::command]
 fn get_app_info() -> AppInfo {
     let ts: u64 = env!("BUILD_UNIX_TIMESTAMP").parse().unwrap_or(0);
+    let os_str = if cfg!(target_os = "windows") {
+        "windows"
+    } else if cfg!(target_os = "macos") {
+        "macos"
+    } else {
+        "linux"
+    };
     AppInfo {
         name: "Tron".into(),
         version: env!("CARGO_PKG_VERSION").into(),
         build_timestamp: ts,
         github_url: "https://github.com/pedroredond0/tron".into(),
+        os: os_str.into(),
     }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UpdateCheckResult {
+    pub current_version: String,
+    pub latest_version: String,
+    pub has_update: bool,
+    pub release_notes: String,
+    pub download_url: Option<String>,
+    pub asset_name: Option<String>,
+    pub asset_size: u64,
+    pub os: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct GithubReleaseAsset {
+    name: String,
+    size: u64,
+    browser_download_url: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct GithubRelease {
+    tag_name: String,
+    body: Option<String>,
+    assets: Vec<GithubReleaseAsset>,
+    html_url: Option<String>,
+}
+
+fn parse_version_numbers(v: &str) -> Vec<u64> {
+    v.trim_start_matches(|c: char| c == 'v' || c == 'V')
+        .split('.')
+        .filter_map(|s| s.trim().parse::<u64>().ok())
+        .collect()
+}
+
+fn is_newer_version(latest: &str, current: &str) -> bool {
+    let lat = parse_version_numbers(latest);
+    let cur = parse_version_numbers(current);
+    lat > cur
+}
+
+#[tauri::command]
+async fn check_app_updates(repo_owner: String, repo_name: String) -> Result<UpdateCheckResult, String> {
+    let current_version = env!("CARGO_PKG_VERSION").to_string();
+    let url = format!("https://api.github.com/repos/{}/{}/releases/latest", repo_owner, repo_name);
+
+    let client = reqwest::Client::builder()
+        .user_agent("tronExplorer")
+        .build()
+        .map_err(|e| format!("Error al crear cliente HTTP: {}", e))?;
+
+    let resp = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| format!("Error conectando con GitHub: {}", e))?;
+
+    if !resp.status().is_success() {
+        return Err(format!("GitHub API respondió con código: {}", resp.status()));
+    }
+
+    let release: GithubRelease = resp
+        .json()
+        .await
+        .map_err(|e| format!("Error al procesar respuesta de GitHub: {}", e))?;
+
+    let latest_version = release.tag_name.trim_start_matches(|c: char| c == 'v' || c == 'V').to_string();
+    let has_update = is_newer_version(&latest_version, &current_version);
+    let release_notes = release.body.unwrap_or_default();
+
+    let os_str = if cfg!(target_os = "windows") {
+        "windows"
+    } else if cfg!(target_os = "macos") {
+        "macos"
+    } else {
+        "linux"
+    };
+
+    // Locate the best asset matching the current platform
+    let mut chosen_url: Option<String> = None;
+    let mut chosen_name: Option<String> = None;
+    let mut chosen_size: u64 = 0;
+
+    #[cfg(target_os = "windows")]
+    {
+        // On Windows, prioritize portable standalone .exe or installer .exe
+        let win_exe = release.assets.iter().find(|a| {
+            let n = a.name.to_lowercase();
+            n.ends_with(".exe") && (n == "tron.exe" || (n.contains("windows") && n.contains("x64") && !n.contains("setup")))
+        }).or_else(|| {
+            release.assets.iter().find(|a| {
+                let n = a.name.to_lowercase();
+                n.ends_with(".exe") && !n.contains("setup")
+            })
+        }).or_else(|| {
+            release.assets.iter().find(|a| a.name.to_lowercase().ends_with(".exe"))
+        });
+
+        if let Some(asset) = win_exe {
+            chosen_url = Some(asset.browser_download_url.clone());
+            chosen_name = Some(asset.name.clone());
+            chosen_size = asset.size;
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let lin_asset = release.assets.iter().find(|a| {
+            let n = a.name.to_lowercase();
+            n.ends_with(".appimage")
+        }).or_else(|| {
+            release.assets.iter().find(|a| {
+                let n = a.name.to_lowercase();
+                n.ends_with(".tar.gz") && n.contains("linux")
+            })
+        }).or_else(|| {
+            release.assets.iter().find(|a| a.name.to_lowercase().ends_with(".deb"))
+        });
+
+        if let Some(asset) = lin_asset {
+            chosen_url = Some(asset.browser_download_url.clone());
+            chosen_name = Some(asset.name.clone());
+            chosen_size = asset.size;
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let mac_asset = release.assets.iter().find(|a| {
+            let n = a.name.to_lowercase();
+            n.ends_with(".dmg")
+        }).or_else(|| {
+            release.assets.iter().find(|a| {
+                let n = a.name.to_lowercase();
+                n.ends_with(".tar.gz")
+            })
+        });
+
+        if let Some(asset) = mac_asset {
+            chosen_url = Some(asset.browser_download_url.clone());
+            chosen_name = Some(asset.name.clone());
+            chosen_size = asset.size;
+        }
+    }
+
+    // Fallback URL if no specific asset matched
+    if chosen_url.is_none() {
+        chosen_url = release.html_url.or_else(|| Some(format!("https://github.com/{}/{}/releases/tag/{}", repo_owner, repo_name, release.tag_name)));
+    }
+
+    Ok(UpdateCheckResult {
+        current_version,
+        latest_version,
+        has_update,
+        release_notes,
+        download_url: chosen_url,
+        asset_name: chosen_name,
+        asset_size: chosen_size,
+        os: os_str.to_string(),
+    })
+}
+
+#[tauri::command]
+async fn apply_app_update(download_url: String, _asset_name: String) -> Result<(), String> {
+    if download_url.trim().is_empty() {
+        return Err("URL de descarga vacía".into());
+    }
+
+    let client = reqwest::Client::builder()
+        .user_agent("tronExplorer")
+        .build()
+        .map_err(|e| format!("Error al crear cliente HTTP: {}", e))?;
+
+    let resp = client
+        .get(&download_url)
+        .send()
+        .await
+        .map_err(|e| format!("Error al iniciar descarga: {}", e))?;
+
+    if !resp.status().is_success() {
+        return Err(format!("El servidor de descargas respondió con error: {}", resp.status()));
+    }
+
+    let bytes = resp
+        .bytes()
+        .await
+        .map_err(|e| format!("Error durante la descarga del binario: {}", e))?;
+
+    if bytes.is_empty() {
+        return Err("El archivo descargado está vacío".into());
+    }
+
+    let current_exe = std::env::current_exe()
+        .map_err(|e| format!("No se pudo determinar la ruta del ejecutable actual: {}", e))?;
+
+    let exe_dir = current_exe.parent()
+        .ok_or_else(|| "No se pudo obtener el directorio del ejecutable actual".to_string())?;
+
+    let temp_name = format!("tron_update_{}.tmp", std::time::SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis());
+    let temp_path = std::env::temp_dir().join(&temp_name);
+
+    // Save downloaded bytes to temp path first
+    if let Err(e) = std::fs::write(&temp_path, &bytes) {
+        return Err(format!("Error guardando temporal en {:?}: {}", temp_path, e));
+    }
+
+    // Windows in-place hot replacement
+    #[cfg(target_os = "windows")]
+    {
+        let old_exe = exe_dir.join("Tron.exe.old");
+        if old_exe.exists() {
+            let _ = std::fs::remove_file(&old_exe);
+        }
+
+        // Rename current exe to Tron.exe.old
+        if let Err(e) = std::fs::rename(&current_exe, &old_exe) {
+            let _ = std::fs::remove_file(&temp_path);
+            return Err(format!("No se pudo renombrar el ejecutable actual: {}", e));
+        }
+
+        // Copy new binary into current_exe location
+        if let Err(e) = std::fs::copy(&temp_path, &current_exe) {
+            // Rollback rename if copy fails
+            let _ = std::fs::rename(&old_exe, &current_exe);
+            let _ = std::fs::remove_file(&temp_path);
+            return Err(format!("No se pudo colocar el nuevo ejecutable: {}", e));
+        }
+
+        let _ = std::fs::remove_file(&temp_path);
+    }
+
+    // Non-windows (Linux / macOS) replacement
+    #[cfg(not(target_os = "windows"))]
+    {
+        let old_exe = exe_dir.join("tron.old");
+        if old_exe.exists() {
+            let _ = std::fs::remove_file(&old_exe);
+        }
+        let _ = std::fs::rename(&current_exe, &old_exe);
+
+        if let Err(e) = std::fs::copy(&temp_path, &current_exe) {
+            let _ = std::fs::rename(&old_exe, &current_exe);
+            let _ = std::fs::remove_file(&temp_path);
+            return Err(format!("No se pudo colocar el nuevo binario: {}", e));
+        }
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let _ = std::fs::set_permissions(&current_exe, std::fs::Permissions::from_mode(0o755));
+        }
+
+        let _ = std::fs::remove_file(&temp_path);
+    }
+
+    Ok(())
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -3630,7 +3896,9 @@ fn main() {
             extract_zip_archive,
             list_zip_contents,
             generate_directory_listing,
-            get_disk_free_space
+            get_disk_free_space,
+            check_app_updates,
+            apply_app_update
         ])
         .run(tauri::generate_context!());
 
