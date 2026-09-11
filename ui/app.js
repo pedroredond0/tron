@@ -157,17 +157,57 @@
     return p.replace(/\\/g, '/').toLowerCase();
   }
 
-  function getItemTags(p) {
-    const norm = normalizeTagPath(p);
-    return fileTagsMap[norm] || [];
+  function isSubpath(parent, child) {
+    if (!parent || !child) return false;
+    let p = parent.replace(/\\/g, '/').toLowerCase();
+    let c = child.replace(/\\/g, '/').toLowerCase();
+    if (!p.endsWith('/')) p += '/';
+    if (!c.endsWith('/')) c += '/';
+    return c.startsWith(p);
   }
 
-  function setItemTags(p, tags) {
+  function createFileItemFromPath(fullPath, isDir = false) {
+    if (!fullPath) return null;
+    const isWindows = /^[a-zA-Z]:[\\\/]/.test(fullPath) || fullPath.startsWith('\\\\');
+    const sep = isWindows ? '\\' : '/';
+    const clean = fullPath.replace(/[\/\\]+$/, '');
+    const lastSlash = clean.lastIndexOf(sep);
+    const name = lastSlash >= 0 ? clean.substring(lastSlash + 1) : clean;
+    const dotIdx = name.lastIndexOf('.');
+    const ext = (dotIdx > 0 && !isDir) ? name.substring(dotIdx + 1).toLowerCase() : '';
+    return {
+      name: name,
+      path: fullPath,
+      is_directory: isDir,
+      size: 0,
+      modified: 0,
+      extension: ext,
+      file_type: isDir ? 'folder' : 'text',
+      is_hidden: name.startsWith('.')
+    };
+  }
+
+  function getItemTags(p) {
+    const norm = normalizeTagPath(p);
+    const val = fileTagsMap[norm];
+    if (!val) return [];
+    if (Array.isArray(val)) return val;
+    return val.tags || [];
+  }
+
+  function setItemTags(p, tags, fileItem = null) {
     const norm = normalizeTagPath(p);
     if (!tags || tags.length === 0) {
       delete fileTagsMap[norm];
     } else {
-      fileTagsMap[norm] = Array.from(new Set(tags));
+      const existing = fileTagsMap[norm];
+      const existingItem = (existing && typeof existing === 'object' && !Array.isArray(existing)) ? existing.item : null;
+      const itemData = fileItem || existingItem || createFileItemFromPath(p);
+      fileTagsMap[norm] = {
+        path: p,
+        item: itemData,
+        tags: Array.from(new Set(tags))
+      };
     }
     try {
       localStorage.setItem('tron_file_tags', JSON.stringify(fileTagsMap));
@@ -175,7 +215,9 @@
     renderTagSidebar();
   }
 
-  function toggleItemTag(p, color) {
+  function toggleItemTag(targetOrPath, color) {
+    const p = (targetOrPath && typeof targetOrPath === 'object' && targetOrPath.path) ? targetOrPath.path : targetOrPath;
+    const fileItem = (targetOrPath && typeof targetOrPath === 'object' && targetOrPath.name) ? targetOrPath : null;
     const norm = normalizeTagPath(p);
     const cur = getItemTags(norm);
     let next;
@@ -184,7 +226,7 @@
     } else {
       next = [...cur, color];
     }
-    setItemTags(norm, next);
+    setItemTags(p, next, fileItem);
   }
 
   function clearItemTags(p) {
@@ -218,6 +260,7 @@
     monochromeIcons: localStorage.getItem('tron_monochrome_icons') === 'true',
     iconPack: localStorage.getItem('tron_icon_pack') || 'default',
     showMenuBar: localStorage.getItem('tron_show_menu_bar') !== 'false',
+    recursiveTagSearch: localStorage.getItem('tron_recursive_tag_search') !== 'false',
     externalAppsConfig: null,
     draggedInternalPaths: [],
 
@@ -424,6 +467,7 @@
     chkNormalFontWeight: document.getElementById('chkNormalFontWeight'),
     chkPrefShowHidden: document.getElementById('chkPrefShowHidden'),
     chkPrefRecursiveSearch: document.getElementById('chkPrefRecursiveSearch'),
+    chkPrefRecursiveTags: document.getElementById('chkPrefRecursiveTags'),
     inputCustomTextExts: document.getElementById('inputCustomTextExts'),
     btnCancelAppearance: document.getElementById('btnCancelAppearance'),
     btnConfirmAppearance: document.getElementById('btnConfirmAppearance'),
@@ -883,6 +927,7 @@ modalSherlock: document.getElementById('modalSherlock'),
       }
       renderFileList();
       updateStatusBar();
+      renderTagSidebar();
       if (isSplitView) updatePanelHighlights();
       recordFrequentLocation(state.currentDirectory);
       el.fileList.focus();
@@ -1000,7 +1045,36 @@ modalSherlock: document.getElementById('modalSherlock'),
       res = res.filter(item => !item.is_hidden);
     }
     if (state.activeTagFilter) {
-      res = res.filter(item => getItemTags(item.path).includes(state.activeTagFilter));
+      if (state.recursiveTagSearch) {
+        const tagMap = new Map();
+        // 1. Direct children in the current directory matching the tag
+        res.forEach(item => {
+          if (getItemTags(item.path).includes(state.activeTagFilter)) {
+            tagMap.set(normalizeTagPath(item.path), item);
+          }
+        });
+        // 2. Any tagged items from subdirectories under currentDirectory
+        const curDir = state.currentDirectory || '';
+        for (const [normPath, val] of Object.entries(fileTagsMap)) {
+          const tags = Array.isArray(val) ? val : (val.tags || []);
+          if (tags.includes(state.activeTagFilter) && isSubpath(curDir, normPath)) {
+            if (!tagMap.has(normPath)) {
+              const fullPath = (val && typeof val === 'object' && !Array.isArray(val) && val.path) ? val.path : normPath;
+              const fileItem = (val && typeof val === 'object' && !Array.isArray(val) && val.item)
+                ? val.item
+                : createFileItemFromPath(fullPath);
+              if (fileItem) {
+                if (state.showHiddenFiles || !fileItem.is_hidden) {
+                  tagMap.set(normPath, fileItem);
+                }
+              }
+            }
+          }
+        }
+        res = Array.from(tagMap.values());
+      } else {
+        res = res.filter(item => getItemTags(item.path).includes(state.activeTagFilter));
+      }
     }
     if (q) {
       res = res.filter(item => item.name.toLowerCase().includes(q));
@@ -1120,22 +1194,26 @@ modalSherlock: document.getElementById('modalSherlock'),
       }
       
       let parentPathHtml = '';
-      if (state.isSearchingRecursive && item.path) {
+      if (item.path) {
         const isWindows = /^[a-zA-Z]:[\\\/]/.test(item.path) || item.path.startsWith('\\\\');
         const sep = isWindows ? '\\' : '/';
         const normalized = isWindows ? item.path.replace(/\//g, '\\') : item.path.replace(/\\/g, '/');
         const lastSlash = normalized.lastIndexOf(sep);
         if (lastSlash > 0) {
           const parentDir = normalized.substring(0, lastSlash);
-          let displayParent = parentDir;
-          if (state.currentDirectory && parentDir.toLowerCase().startsWith(state.currentDirectory.toLowerCase())) {
-            displayParent = '.' + parentDir.substring(state.currentDirectory.length);
+          const curNorm = isWindows ? (state.currentDirectory || '').replace(/\//g, '\\') : (state.currentDirectory || '').replace(/\\/g, '/');
+          const isSubdir = parentDir.toLowerCase().replace(/[\/\\]+$/, '') !== curNorm.toLowerCase().replace(/[\/\\]+$/, '');
+          if ((state.isSearchingRecursive || (state.activeTagFilter && isSubdir)) && isSubdir) {
+            let displayParent = parentDir;
+            if (curNorm && parentDir.toLowerCase().startsWith(curNorm.toLowerCase())) {
+              displayParent = '.' + parentDir.substring(curNorm.length);
+            }
+            parentPathHtml = `
+              <button type="button" class="btn-goto-parent shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-gnome-sidebar/80 border border-gnome-border hover:border-gnome-active hover:text-gnome-active text-gnome-textDim transition-colors truncate max-w-[160px] pointer-events-auto" title="Ir a la ubicación: ${escapeHtml(parentDir)}" data-parent-dir="${escapeHtml(parentDir)}">
+                📁 ${escapeHtml(displayParent)}
+              </button>
+            `;
           }
-          parentPathHtml = `
-            <button type="button" class="btn-goto-parent shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-gnome-sidebar/80 border border-gnome-border hover:border-gnome-active hover:text-gnome-active text-gnome-textDim transition-colors truncate max-w-[150px] pointer-events-auto" title="Ir a la carpeta: ${escapeHtml(parentDir)}" data-parent-dir="${escapeHtml(parentDir)}">
-              📁 ${escapeHtml(displayParent)}
-            </button>
-          `;
         }
       }
 
@@ -1188,6 +1266,7 @@ modalSherlock: document.getElementById('modalSherlock'),
         const btnParent = e.target.closest('.btn-goto-parent');
         if (btnParent && btnParent.dataset.parentDir) {
           e.stopPropagation();
+          state.activeTagFilter = null;
           loadDirectory(btnParent.dataset.parentDir);
           return;
         }
@@ -3791,12 +3870,24 @@ async function startTransferOperation(action, sources, targetDir) {
     for (const key of Object.keys(TAG_COLOR_DEFS)) {
       tagCounts[key] = 0;
     }
-    for (const tags of Object.values(fileTagsMap)) {
-      if (Array.isArray(tags)) {
-        tags.forEach(t => {
-          if (tagCounts[t] !== undefined) tagCounts[t]++;
-        });
+    const curDir = state.currentDirectory || '';
+    for (const [normPath, val] of Object.entries(fileTagsMap)) {
+      const tags = Array.isArray(val) ? val : (val.tags || []);
+      if (!tags || tags.length === 0) continue;
+
+      if (state.recursiveTagSearch) {
+        if (!isSubpath(curDir, normPath)) continue;
+      } else {
+        // Only count if item is directly inside curDir
+        const lastSlash = normPath.lastIndexOf('/');
+        const parentNorm = lastSlash >= 0 ? normPath.substring(0, lastSlash) : '';
+        const curNorm = curDir.replace(/\\/g, '/').toLowerCase().replace(/\/+$/, '');
+        if (parentNorm !== curNorm) continue;
       }
+
+      tags.forEach(t => {
+        if (tagCounts[t] !== undefined) tagCounts[t]++;
+      });
     }
 
     if (el.btnClearActiveTagFilter) {
@@ -4771,6 +4862,18 @@ async function startTransferOperation(action, sources, targetDir) {
         applyMenuBarVisibility();
       };
     }
+    if (el.chkPrefRecursiveTags) {
+      el.chkPrefRecursiveTags.onchange = (e) => {
+        state.recursiveTagSearch = e.target.checked;
+        localStorage.setItem('tron_recursive_tag_search', state.recursiveTagSearch ? 'true' : 'false');
+        renderTagSidebar();
+        if (state.activeTagFilter) {
+          applyFilter();
+          renderFileList();
+          updateStatusBar();
+        }
+      };
+    }
     if (el.menuToggleMenuBar) {
       el.menuToggleMenuBar.onclick = () => {
         closeAllMenus();
@@ -5473,6 +5576,7 @@ async function startTransferOperation(action, sources, targetDir) {
     if (el.chkShowMenuBar) el.chkShowMenuBar.checked = (localStorage.getItem('tron_show_menu_bar') !== 'false');
     if (el.chkPrefShowHidden) el.chkPrefShowHidden.checked = state.showHiddenFiles;
     if (el.chkPrefRecursiveSearch) el.chkPrefRecursiveSearch.checked = recursiveSearch;
+    if (el.chkPrefRecursiveTags) el.chkPrefRecursiveTags.checked = (localStorage.getItem('tron_recursive_tag_search') !== 'false');
 
     if (el.selectTextEditor) {
       el.selectTextEditor.value = textEditor;
@@ -5541,6 +5645,7 @@ async function startTransferOperation(action, sources, targetDir) {
     const monochromeIcons = el.chkMonochromeIcons ? el.chkMonochromeIcons.checked : false;
     const showHidden = el.chkPrefShowHidden ? el.chkPrefShowHidden.checked : state.showHiddenFiles;
     const recursiveSearch = el.chkPrefRecursiveSearch ? el.chkPrefRecursiveSearch.checked : true;
+    const recursiveTags = el.chkPrefRecursiveTags ? el.chkPrefRecursiveTags.checked : true;
 
     let density = 'normal';
     const selectedDensity = document.querySelector('input[name="density"]:checked');
@@ -5565,6 +5670,8 @@ async function startTransferOperation(action, sources, targetDir) {
     localStorage.setItem('tron_monochrome_icons', monochromeIcons ? 'true' : 'false');
     localStorage.setItem('tron_show_hidden', showHidden ? 'true' : 'false');
     localStorage.setItem('tron_recursive_search', recursiveSearch ? 'true' : 'false');
+    localStorage.setItem('tron_recursive_tag_search', recursiveTags ? 'true' : 'false');
+    state.recursiveTagSearch = recursiveTags;
     const showMenuBar = el.chkShowMenuBar ? el.chkShowMenuBar.checked : true;
     localStorage.setItem('tron_show_menu_bar', showMenuBar ? 'true' : 'false');
     state.showMenuBar = showMenuBar;
@@ -5604,6 +5711,7 @@ async function startTransferOperation(action, sources, targetDir) {
     if (el.chkRecursiveSearch) {
       el.chkRecursiveSearch.checked = savedRec !== 'false';
     }
+    state.recursiveTagSearch = localStorage.getItem('tron_recursive_tag_search') !== 'false';
 
     state.iconPack = iconPack;
     state.terminalApp = localStorage.getItem('tron_terminal_app') || 'default';
@@ -6210,6 +6318,7 @@ async function startTransferOperation(action, sources, targetDir) {
         const lastSlash = norm.lastIndexOf(sep);
         if (lastSlash > 0) {
           const parentDir = norm.substring(0, lastSlash);
+          state.activeTagFilter = null;
           await loadDirectory(parentDir);
           const targetName = item.name.toLowerCase();
           const targetPath = item.path.toLowerCase();
