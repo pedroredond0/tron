@@ -13,7 +13,9 @@ use std::collections::BinaryHeap;
 use tauri::Emitter;
 #[cfg(target_os = "windows")]
 use std::os::windows::ffi::OsStrExt;
+#[cfg(target_os = "windows")]
 use std::ffi::OsStr;
+#[cfg(target_os = "windows")]
 use std::ptr;
 
 #[cfg(target_os = "windows")]
@@ -2722,6 +2724,7 @@ fn open_in_editor(file_path: String, editor: String) -> Result<(), String> {
         return Err("Editor no especificado".into());
     }
 
+    #[allow(unused_mut)]
     let mut res = std::process::Command::new(&editor)
         .arg(&file_path)
         .spawn();
