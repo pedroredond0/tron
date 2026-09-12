@@ -1193,10 +1193,17 @@ modalSherlock: document.getElementById('modalSherlock'),
         targetPanel.selectedIndex = foundIndex;
         targetPanel.selectionAnchor = foundIndex;
       } else {
-        targetPanel.selectedIndex = targetPanel.filteredItems.length > 0 ? 0 : -1;
-        targetPanel.selectionAnchor = targetPanel.selectedIndex;
-        if (targetPanel.selectedIndex >= 0) {
-          targetPanel.selectedItems.add(targetPanel.filteredItems[targetPanel.selectedIndex].path);
+        // If the previously selected item was deleted, stay at the closest neighboring index instead of resetting to 0
+        const prevIdx = typeof targetPanel.selectedIndex === 'number' && targetPanel.selectedIndex >= 0
+          ? targetPanel.selectedIndex
+          : 0;
+        const fallbackIdx = targetPanel.filteredItems.length > 0
+          ? Math.min(prevIdx, targetPanel.filteredItems.length - 1)
+          : -1;
+        targetPanel.selectedIndex = fallbackIdx;
+        targetPanel.selectionAnchor = fallbackIdx;
+        if (fallbackIdx >= 0 && targetPanel.filteredItems[fallbackIdx]) {
+          targetPanel.selectedItems.add(targetPanel.filteredItems[fallbackIdx].path);
         }
       }
 
@@ -2836,11 +2843,18 @@ modalSherlock: document.getElementById('modalSherlock'),
     const pathsToDelete = getSelectedOrFocusedPaths();
     if (pathsToDelete.length === 0) return;
 
+    // Remember the index before deletion so we don't jump to the beginning
+    const p = panels[activePanel] || state;
+    const currentIdx = p.selectedIndex >= 0 ? p.selectedIndex : 0;
+
     try {
       cleanupMedia();
       for (const path of pathsToDelete) {
         await invoke('delete_file_item', { path });
       }
+
+      // Preserve the intended focus index before reloading
+      p.selectedIndex = currentIdx;
 
       await reloadBothPanelsIfNeeded();
 
@@ -3900,7 +3914,7 @@ async function startTransferOperation(action, sources, targetDir) {
       updateStatusBar();
     }
 
-    closeDirContextMenu();
+    closeDirContextMenu(true);
     closeFrequentContextMenu();
 
     if (!el.fileContextMenu) return;
@@ -4047,7 +4061,8 @@ async function startTransferOperation(action, sources, targetDir) {
     el.fileContextMenu.style.visibility = 'visible';
   }
 
-  function closeFileContextMenu() {
+  function closeFileContextMenu(force = false) {
+    if (isOpeningContextMenu && !force) return;
     if (el.ctxMenuPdfToolsSub) el.ctxMenuPdfToolsSub.classList.add('hidden');
     if (el.fileContextMenu) {
       el.fileContextMenu.classList.add('hidden');
@@ -4059,7 +4074,7 @@ async function startTransferOperation(action, sources, targetDir) {
   function openDirContextMenu(e) {
     e.preventDefault();
     e.stopPropagation();
-    closeFileContextMenu();
+    closeFileContextMenu(true);
     closeFrequentContextMenu();
 
     if (!el.dirContextMenu) return;
@@ -4095,7 +4110,8 @@ async function startTransferOperation(action, sources, targetDir) {
     el.dirContextMenu.style.visibility = 'visible';
   }
 
-  function closeDirContextMenu() {
+  function closeDirContextMenu(force = false) {
+    if (isOpeningContextMenu && !force) return;
     if (el.dirContextMenu) {
       el.dirContextMenu.classList.add('hidden');
     }
@@ -6375,7 +6391,10 @@ async function startTransferOperation(action, sources, targetDir) {
     });
 
     // Close on outside click
-    document.addEventListener('click', () => closeAllMenus());
+    document.addEventListener('click', (e) => {
+      if (e.button !== 0) return;
+      closeAllMenus();
+    });
   }
 
   function closeAllMenus(resetFlag = true) {
@@ -7429,8 +7448,9 @@ async function startTransferOperation(action, sources, targetDir) {
       if (inDirBg) {
         openDirContextMenu(e);
       } else {
-        closeFileContextMenu();
-        closeDirContextMenu();
+        e.preventDefault();
+        closeFileContextMenu(true);
+        closeDirContextMenu(true);
         closeFrequentContextMenu();
       }
     });
