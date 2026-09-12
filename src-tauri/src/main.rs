@@ -246,6 +246,8 @@ impl Ord for SizeItem {
 pub struct DriveItem {
     pub name: String,
     pub path: String,
+    #[serde(default)]
+    pub is_ejectable: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -975,6 +977,7 @@ fn get_system_drives() -> Vec<DriveItem> {
                 drives.push(DriveItem {
                     name: format!("Unidad ({}:)", letter as char),
                     path: drive_root,
+                    is_ejectable: false,
                 });
             }
         }
@@ -985,6 +988,7 @@ fn get_system_drives() -> Vec<DriveItem> {
         drives.push(DriveItem {
             name: "Sistema (/)".into(),
             path: "/".into(),
+            is_ejectable: false,
         });
 
         #[cfg(target_os = "macos")]
@@ -993,9 +997,14 @@ fn get_system_drives() -> Vec<DriveItem> {
                 for entry in entries.flatten() {
                     let p = entry.path();
                     if p.is_dir() {
+                        let name = entry.file_name().to_string_lossy().to_string();
+                        let is_ejectable = !name.eq_ignore_ascii_case("Macintosh HD")
+                            && p != Path::new("/")
+                            && p != Path::new("/Volumes/Macintosh HD");
                         drives.push(DriveItem {
-                            name: entry.file_name().to_string_lossy().to_string(),
+                            name,
                             path: p.to_string_lossy().to_string(),
+                            is_ejectable,
                         });
                     }
                 }
@@ -1012,6 +1021,7 @@ fn get_system_drives() -> Vec<DriveItem> {
                             drives.push(DriveItem {
                                 name: entry.file_name().to_string_lossy().to_string(),
                                 path: p.to_string_lossy().to_string(),
+                                is_ejectable: true,
                             });
                         }
                     }
@@ -1021,6 +1031,58 @@ fn get_system_drives() -> Vec<DriveItem> {
     }
 
     drives
+}
+
+#[tauri::command]
+fn eject_volume(path: String) -> Result<String, String> {
+    let p = PathBuf::from(&path);
+    if !p.exists() {
+        return Err("La unidad no existe o ya fue desconectada".into());
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let output = std::process::Command::new("diskutil")
+            .arg("unmount")
+            .arg(&path)
+            .output()
+            .map_err(|e| format!("Error al ejecutar diskutil: {}", e))?;
+
+        if output.status.success() {
+            Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+        } else {
+            let eject_output = std::process::Command::new("diskutil")
+                .arg("eject")
+                .arg(&path)
+                .output()
+                .map_err(|e| format!("Error al expulsar unidad: {}", e))?;
+            if eject_output.status.success() {
+                Ok(String::from_utf8_lossy(&eject_output.stdout).trim().to_string())
+            } else {
+                let err_msg = String::from_utf8_lossy(&output.stderr);
+                Err(format!("No se pudo expulsar la unidad: {}", err_msg.trim()))
+            }
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let output = std::process::Command::new("umount")
+            .arg(&path)
+            .output()
+            .map_err(|e| format!("Error al desmontar unidad: {}", e))?;
+        if output.status.success() {
+            Ok("Unidad desmontada correctamente".into())
+        } else {
+            let err_msg = String::from_utf8_lossy(&output.stderr);
+            Err(format!("No se pudo desmontar la unidad: {}", err_msg.trim()))
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        Ok("Expulsión no requerida en esta unidad".into())
+    }
 }
 
 #[cfg(target_os = "windows")]
@@ -2839,22 +2901,104 @@ fn open_terminal(path: String, terminal: Option<String>) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
         match term.as_str() {
-            "alacritty" => {
-                let _ = std::process::Command::new("alacritty")
-                    .arg("--working-directory")
-                    .arg(&dir)
-                    .spawn();
-            }
             "kitty" => {
-                let _ = std::process::Command::new("kitty")
-                    .arg("--directory")
-                    .arg(&dir)
-                    .spawn();
+                let kitty_paths = [
+                    "/Applications/kitty.app/Contents/MacOS/kitty",
+                    "/Applications/Kitty.app/Contents/MacOS/kitty",
+                    "/opt/homebrew/bin/kitty",
+                    "/usr/local/bin/kitty",
+                    "kitty",
+                ];
+                let mut launched = false;
+                for kp in &kitty_paths {
+                    if std::path::Path::new(kp).exists() || *kp == "kitty" {
+                        if let Ok(_) = std::process::Command::new(kp)
+                            .arg("--directory")
+                            .arg(&dir)
+                            .spawn()
+                        {
+                            launched = true;
+                            break;
+                        }
+                    }
+                }
+                if !launched {
+                    let res = std::process::Command::new("open")
+                        .arg("-a")
+                        .arg("kitty")
+                        .arg(&dir)
+                        .spawn();
+                    if res.is_err() {
+                        let _ = std::process::Command::new("open")
+                            .arg("-a")
+                            .arg("Kitty")
+                            .arg(&dir)
+                            .spawn();
+                    }
+                }
             }
             "ghostty" => {
-                let _ = std::process::Command::new("ghostty")
-                    .arg(format!("--working-directory={}", dir.to_string_lossy()))
-                    .spawn();
+                let ghostty_paths = [
+                    "/Applications/Ghostty.app/Contents/MacOS/ghostty",
+                    "/Applications/ghostty.app/Contents/MacOS/ghostty",
+                    "/opt/homebrew/bin/ghostty",
+                    "/usr/local/bin/ghostty",
+                    "ghostty",
+                ];
+                let mut launched = false;
+                for gp in &ghostty_paths {
+                    if std::path::Path::new(gp).exists() || *gp == "ghostty" {
+                        if let Ok(_) = std::process::Command::new(gp)
+                            .arg(format!("--working-directory={}", dir.to_string_lossy()))
+                            .spawn()
+                        {
+                            launched = true;
+                            break;
+                        }
+                    }
+                }
+                if !launched {
+                    let res = std::process::Command::new("open")
+                        .arg("-a")
+                        .arg("Ghostty")
+                        .arg(&dir)
+                        .spawn();
+                    if res.is_err() {
+                        let _ = std::process::Command::new("open")
+                            .arg("-a")
+                            .arg("ghostty")
+                            .arg(&dir)
+                            .spawn();
+                    }
+                }
+            }
+            "alacritty" => {
+                let alacritty_paths = [
+                    "/Applications/Alacritty.app/Contents/MacOS/alacritty",
+                    "/opt/homebrew/bin/alacritty",
+                    "/usr/local/bin/alacritty",
+                    "alacritty",
+                ];
+                let mut launched = false;
+                for ap in &alacritty_paths {
+                    if std::path::Path::new(ap).exists() || *ap == "alacritty" {
+                        if let Ok(_) = std::process::Command::new(ap)
+                            .arg("--working-directory")
+                            .arg(&dir)
+                            .spawn()
+                        {
+                            launched = true;
+                            break;
+                        }
+                    }
+                }
+                if !launched {
+                    let _ = std::process::Command::new("open")
+                        .arg("-a")
+                        .arg("Alacritty")
+                        .arg(&dir)
+                        .spawn();
+                }
             }
             "iterm" | "iterm2" => {
                 let _ = std::process::Command::new("open")
@@ -2871,10 +3015,17 @@ fn open_terminal(path: String, terminal: Option<String>) -> Result<(), String> {
                     .spawn();
             }
             custom => {
-                let _ = std::process::Command::new(custom)
+                let mut res = std::process::Command::new(custom)
                     .current_dir(&dir)
-                    .spawn()
-                    .map_err(|e| format!("No se pudo iniciar la terminal '{}': {}", custom, e))?;
+                    .spawn();
+                if res.is_err() {
+                    res = std::process::Command::new("open")
+                        .arg("-a")
+                        .arg(custom)
+                        .arg(&dir)
+                        .spawn();
+                }
+                res.map_err(|e| format!("No se pudo iniciar la terminal '{}': {}", custom, e))?;
             }
         }
     }
@@ -2946,22 +3097,142 @@ fn open_in_editor(file_path: String, editor: String) -> Result<(), String> {
         return Err("Editor no especificado".into());
     }
 
-    #[allow(unused_mut)]
-    let mut res = std::process::Command::new(&editor)
-        .arg(&file_path)
-        .spawn();
-
     #[cfg(target_os = "windows")]
-    if res.is_err() {
-        // Fallback with cmd /c for .cmd / batch files like code.cmd or codium.cmd or path with spaces
-        res = std::process::Command::new("cmd")
-            .args(["/c", &editor, &file_path])
+    {
+        let mut res = std::process::Command::new(&editor)
+            .arg(&file_path)
             .spawn();
+
+        if res.is_err() {
+            // Fallback with cmd /c for .cmd / batch files like code.cmd or codium.cmd or path with spaces
+            res = std::process::Command::new("cmd")
+                .args(["/c", &editor, &file_path])
+                .spawn();
+        }
+
+        match res {
+            Ok(_) => Ok(()),
+            Err(e) => Err(format!("No se pudo abrir {}: {}", editor, e)),
+        }
     }
 
-    match res {
-        Ok(_) => Ok(()),
-        Err(e) => Err(format!("No se pudo abrir {}: {}", editor, e)),
+    #[cfg(target_os = "macos")]
+    {
+        let ed = editor.trim();
+        if ed.eq_ignore_ascii_case("notepad") || ed.eq_ignore_ascii_case("TextEdit") {
+            let res = std::process::Command::new("open")
+                .arg("-a")
+                .arg("TextEdit")
+                .arg(&file_path)
+                .spawn();
+            if res.is_ok() {
+                return Ok(());
+            }
+            let res_e = std::process::Command::new("open")
+                .arg("-e")
+                .arg(&file_path)
+                .spawn();
+            return res_e
+                .map(|_| ())
+                .map_err(|e| format!("No se pudo abrir TextEdit: {}", e));
+        }
+
+        if ed.eq_ignore_ascii_case("code") {
+            let vs_paths = [
+                "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code",
+                "/opt/homebrew/bin/code",
+                "/usr/local/bin/code",
+                "code",
+            ];
+            for vp in &vs_paths {
+                if std::path::Path::new(vp).exists() || *vp == "code" {
+                    if let Ok(_) = std::process::Command::new(vp).arg(&file_path).spawn() {
+                        return Ok(());
+                    }
+                }
+            }
+            let res = std::process::Command::new("open")
+                .args(["-a", "Visual Studio Code", &file_path])
+                .spawn();
+            if res.is_ok() {
+                return Ok(());
+            }
+        }
+
+        if ed.eq_ignore_ascii_case("codium") || ed.eq_ignore_ascii_case("vscodium") {
+            let codium_paths = [
+                "/Applications/VSCodium.app/Contents/Resources/app/bin/codium",
+                "/opt/homebrew/bin/codium",
+                "/usr/local/bin/codium",
+                "codium",
+            ];
+            for cp in &codium_paths {
+                if std::path::Path::new(cp).exists() || *cp == "codium" {
+                    if let Ok(_) = std::process::Command::new(cp).arg(&file_path).spawn() {
+                        return Ok(());
+                    }
+                }
+            }
+            let res = std::process::Command::new("open")
+                .args(["-a", "VSCodium", &file_path])
+                .spawn();
+            if res.is_ok() {
+                return Ok(());
+            }
+        }
+
+        if ed.eq_ignore_ascii_case("subl") || ed.eq_ignore_ascii_case("sublime_text") {
+            let subl_paths = [
+                "/Applications/Sublime Text.app/Contents/SharedSupport/bin/subl",
+                "/opt/homebrew/bin/subl",
+                "/usr/local/bin/subl",
+                "subl",
+            ];
+            for sp in &subl_paths {
+                if std::path::Path::new(sp).exists() || *sp == "subl" {
+                    if let Ok(_) = std::process::Command::new(sp).arg(&file_path).spawn() {
+                        return Ok(());
+                    }
+                }
+            }
+            let res = std::process::Command::new("open")
+                .args(["-a", "Sublime Text", &file_path])
+                .spawn();
+            if res.is_ok() {
+                return Ok(());
+            }
+        }
+
+        // Generic macOS app or binary: try direct command, then open -a, then open -e fallback
+        if let Ok(_) = std::process::Command::new(ed).arg(&file_path).spawn() {
+            return Ok(());
+        }
+        if let Ok(_) = std::process::Command::new("open").args(["-a", ed, &file_path]).spawn() {
+            return Ok(());
+        }
+        std::process::Command::new("open")
+            .args(["-e", &file_path])
+            .spawn()
+            .map(|_| ())
+            .map_err(|e| format!("No se pudo abrir con {}: {}", editor, e))
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let mut res = std::process::Command::new(&editor)
+            .arg(&file_path)
+            .spawn();
+
+        if res.is_err() {
+            res = std::process::Command::new("xdg-open")
+                .arg(&file_path)
+                .spawn();
+        }
+
+        match res {
+            Ok(_) => Ok(()),
+            Err(e) => Err(format!("No se pudo abrir {}: {}", editor, e)),
+        }
     }
 }
 
@@ -4281,7 +4552,8 @@ fn main() {
             window_toggle_maximize,
             window_close,
             is_window_maximized,
-            connect_network_share
+            connect_network_share,
+            eject_volume
         ])
         .run(tauri::generate_context!());
 

@@ -1,6 +1,6 @@
 [package]
 name = "tron"
-version = "1.0.6"
+version = "1.0.7"
 description = "Tron - Gestor de archivos moderno, ligero y multiplataforma"
 edition = "2021"
 
