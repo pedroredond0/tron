@@ -1,6 +1,8 @@
 use std::fs;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
 use lopdf::{Document, Object, ObjectId, Stream, Dictionary};
 use lopdf::content::{Content, Operation};
 use image::{GenericImageView, ImageFormat};
@@ -367,36 +369,59 @@ pub async fn pdf_extract_text(pdf_path: String, output_format: String) -> Result
     let output_file = parent_dir.join(format!("{}.{}", stem, ext));
 
     let mut output_content = String::new();
-    if is_markdown {
-        output_content.push_str(&format!("# Documento: {}\n\n*Páginas totales: {}*\n\n---\n\n", stem, total_pages));
+    
+    let mut pdftotext_cmd = std::process::Command::new("pdftotext");
+    #[cfg(target_os = "windows")]
+    {
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        pdftotext_cmd.creation_flags(CREATE_NO_WINDOW);
     }
-
-    for page_num in 1..=total_pages as u32 {
-        let page_text = doc.extract_text(&[page_num]).unwrap_or_default();
-        let clean_text = page_text.trim();
-
-        if is_markdown {
-            output_content.push_str(&format!("## Página {}\n\n", page_num));
-            if clean_text.is_empty() {
-                output_content.push_str("*(Página sin texto reconocible o basada en imágenes)*\n\n");
-            } else {
-                output_content.push_str(clean_text);
-                output_content.push_str("\n\n");
+    pdftotext_cmd.arg("-layout").arg(&pdf_path).arg("-");
+    
+    let has_poppler = if let Ok(output) = pdftotext_cmd.output() {
+        if output.status.success() {
+            let txt = String::from_utf8_lossy(&output.stdout).to_string();
+            if is_markdown {
+                output_content.push_str(&format!("# Documento: {}\n\n*Páginas totales: {}*\n\n---\n\n", stem, total_pages));
             }
-            output_content.push_str("---\n\n");
-        } else {
-            output_content.push_str(&format!("--- PÁGINA {} ---\n\n", page_num));
-            if clean_text.is_empty() {
-                output_content.push_str("[Página sin texto reconocible o basada en imágenes]\n\n");
+            output_content.push_str(&txt);
+            true
+        } else { false }
+    } else { false };
+
+    if !has_poppler {
+        // Fallback to lopdf extraction
+        if is_markdown {
+            output_content.push_str(&format!("# Documento: {}\n\n*Páginas totales: {}*\n\n---\n\n", stem, total_pages));
+        }
+
+        for page_num in 1..=total_pages as u32 {
+            let page_text = doc.extract_text(&[page_num]).unwrap_or_default();
+            let clean_text = page_text.trim();
+
+            if is_markdown {
+                output_content.push_str(&format!("## Página {}\n\n", page_num));
+                if clean_text.is_empty() {
+                    output_content.push_str("*(Página sin texto reconocible o basada en imágenes)*\n\n");
+                } else {
+                    output_content.push_str(clean_text);
+                    output_content.push_str("\n\n");
+                }
+                output_content.push_str("---\n\n");
             } else {
-                output_content.push_str(clean_text);
-                output_content.push_str("\n\n");
+                output_content.push_str(&format!("--- PÁGINA {} ---\n\n", page_num));
+                if clean_text.is_empty() {
+                    output_content.push_str("[Página sin texto reconocible o basada en imágenes]\n\n");
+                } else {
+                    output_content.push_str(clean_text);
+                    output_content.push_str("\n\n");
+                }
             }
         }
     }
 
     fs::write(&output_file, output_content)
-        .map_err(|e| format!("Error al guardar archivo de texto {}: {}", output_file.display(), e))?;
+        .map_err(|e| format!("Error al escribir {}: {}", output_file.display(), e))?;
 
     Ok(output_file.to_string_lossy().to_string())
 }
@@ -539,6 +564,11 @@ pub async fn pdf_to_images(pdf_path: String, pages: Vec<u32>, format: String) ->
 
     // Try executing pdftoppm if available in system PATH
     let mut cmd = std::process::Command::new("pdftoppm");
+    #[cfg(target_os = "windows")]
+    {
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
     if fmt == "png" {
         cmd.arg("-png");
     } else {
