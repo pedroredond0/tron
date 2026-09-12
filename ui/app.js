@@ -1,3 +1,5 @@
+function escapeHtml(text) { const div = document.createElement("div"); div.textContent = text; return div.innerHTML; }
+
   function showToast(message, type = 'info') {
     let toastContainer = document.getElementById('tronToastContainer');
     if (!toastContainer) {
@@ -1449,6 +1451,7 @@ modalSherlock: document.getElementById('modalSherlock'),
     const targetPanel = panels[pIdx];
     const targetListEl = elPanels[pIdx]?.fileList;
     if (!targetListEl || !targetPanel) return;
+    const prevScrollTop = targetListEl.scrollTop;
     targetListEl.innerHTML = '';
     const displayList = buildDisplayItemList(pIdx);
 
@@ -1623,6 +1626,9 @@ modalSherlock: document.getElementById('modalSherlock'),
     });
 
     targetListEl.appendChild(fragment);
+    if (prevScrollTop > 0) {
+      targetListEl.scrollTop = prevScrollTop;
+    }
     ensureVisible(targetPanel.selectedIndex, pIdx);
   }
 
@@ -3451,7 +3457,7 @@ modalSherlock: document.getElementById('modalSherlock'),
         await loadDirectory(panels[1].currentDirectory, false, 1);
       }
     } else if (state.currentDirectory) {
-      await loadDirectory(state.currentDirectory, false, 0);
+      await loadDirectory(state.currentDirectory, false, activePanel);
     }
   }
 
@@ -4721,10 +4727,9 @@ async function startTransferOperation(action, sources, targetDir) {
 
   // --- 1. Convertir PDF a Imágenes ---
   function openPdfToImagesModal() {
+    const target = state.contextTargetItem || (state.selectedIndex >= 0 ? state.filteredItems[state.selectedIndex] : null);
     closePdfToolsSubmenu();
     closeFileContextMenu();
-
-    const target = state.contextTargetItem || (state.selectedIndex >= 0 ? state.filteredItems[state.selectedIndex] : null);
     if (!target) return;
     pdfToImagesTarget = target;
 
@@ -4820,10 +4825,9 @@ async function startTransferOperation(action, sources, targetDir) {
 
   // --- 2. Optimizar / Reducir tamaño PDF ---
   function openPdfOptimizeModal() {
+    const target = state.contextTargetItem || (state.selectedIndex >= 0 ? state.filteredItems[state.selectedIndex] : null);
     closePdfToolsSubmenu();
     closeFileContextMenu();
-
-    const target = state.contextTargetItem || (state.selectedIndex >= 0 ? state.filteredItems[state.selectedIndex] : null);
     if (!target) return;
     pdfOptimizeTarget = target;
 
@@ -4911,10 +4915,9 @@ async function startTransferOperation(action, sources, targetDir) {
 
   // --- 3. Dividir PDF por páginas ---
   async function actionPdfSplit() {
+    const target = state.contextTargetItem || (state.selectedIndex >= 0 ? state.filteredItems[state.selectedIndex] : null);
     closePdfToolsSubmenu();
     closeFileContextMenu();
-
-    const target = state.contextTargetItem || (state.selectedIndex >= 0 ? state.filteredItems[state.selectedIndex] : null);
     if (!target) return;
 
     showToast('Dividiendo PDF en páginas individuales...', 'info');
@@ -4934,10 +4937,9 @@ async function startTransferOperation(action, sources, targetDir) {
 
   // --- 4. Rotar PDF (90° horario) ---
   async function actionPdfRotate() {
+    const target = state.contextTargetItem || (state.selectedIndex >= 0 ? state.filteredItems[state.selectedIndex] : null);
     closePdfToolsSubmenu();
     closeFileContextMenu();
-
-    const target = state.contextTargetItem || (state.selectedIndex >= 0 ? state.filteredItems[state.selectedIndex] : null);
     if (!target) return;
 
     showToast('Rotando PDF 90°...', 'info');
@@ -4956,10 +4958,9 @@ async function startTransferOperation(action, sources, targetDir) {
 
   // --- 5. Extraer texto a Markdown / TXT ---
   function openPdfExtractTextModal() {
+    const target = state.contextTargetItem || (state.selectedIndex >= 0 ? state.filteredItems[state.selectedIndex] : null);
     closePdfToolsSubmenu();
     closeFileContextMenu();
-
-    const target = state.contextTargetItem || (state.selectedIndex >= 0 ? state.filteredItems[state.selectedIndex] : null);
     if (!target) return;
     pdfExtractTarget = target;
 
@@ -5008,13 +5009,12 @@ async function startTransferOperation(action, sources, targetDir) {
 
   // --- 6. Convertir Imágenes a PDF ---
   async function actionPdfImagesToPdf() {
-    closePdfToolsSubmenu();
-    closeFileContextMenu();
-
     const imageExts = ['png', 'jpg', 'jpeg', 'webp'];
     const selected = state.selectedItems.size > 0
       ? state.filteredItems.filter(i => state.selectedItems.has(i.path) && !i.is_directory && imageExts.includes((i.extension || '').toLowerCase()))
       : (state.contextTargetItem ? [state.contextTargetItem] : []);
+    closePdfToolsSubmenu();
+    closeFileContextMenu();
 
     if (selected.length === 0) return;
 

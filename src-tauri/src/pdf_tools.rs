@@ -424,31 +424,34 @@ pub async fn pdf_optimize(pdf_path: String, quality_level: u8, output_path: Stri
 
             if is_image {
                 // Try decompressing and re-encoding with JPEG at target quality
-                if let Ok(decompressed) = stream.decompressed_content() {
-                    if let Ok(dyn_img) = image::load_from_memory(&decompressed) {
-                        let (w, h) = dyn_img.dimensions();
-                        // Downscale very large images if aggressive compression requested
-                        let processed_img = if q < 60 && (w > 1920 || h > 1920) {
-                            dyn_img.resize(1920, 1920, image::imageops::FilterType::Triangle)
-                        } else {
-                            dyn_img
-                        };
+                // lopdf's decompressed_content() returns an error for DCTDecode, so fallback to raw stream content if needed.
+                let dyn_img_opt = stream.decompressed_content()
+                    .and_then(|dec| image::load_from_memory(&dec).map_err(|_| lopdf::Error::Header))
+                    .or_else(|_| image::load_from_memory(&stream.content).map_err(|_| lopdf::Error::Header));
 
-                        let mut jpeg_buf = Cursor::new(Vec::new());
-                        let rgb = processed_img.to_rgb8();
-                        if rgb.write_to(&mut jpeg_buf, ImageFormat::Jpeg).is_ok() {
-                            let new_bytes = jpeg_buf.into_inner();
-                            // Only replace if new bytes are actually smaller
-                            if new_bytes.len() < stream.content.len() || stream.content.len() > 100_000 {
-                                let (new_w, new_h) = processed_img.dimensions();
-                                let mut new_dict = stream.dict.clone();
-                                new_dict.set("Width", Object::Integer(new_w as i64));
-                                new_dict.set("Height", Object::Integer(new_h as i64));
-                                new_dict.set("ColorSpace", Object::Name(b"DeviceRGB".to_vec()));
-                                new_dict.set("BitsPerComponent", Object::Integer(8));
-                                new_dict.set("Filter", Object::Name(b"DCTDecode".to_vec()));
-                                stream_replacements.push((*obj_id, Stream::new(new_dict, new_bytes)));
-                            }
+                if let Ok(dyn_img) = dyn_img_opt {
+                    let (w, h) = dyn_img.dimensions();
+                    // Downscale very large images if aggressive compression requested
+                    let processed_img = if q < 60 && (w > 1920 || h > 1920) {
+                        dyn_img.resize(1920, 1920, image::imageops::FilterType::Triangle)
+                    } else {
+                        dyn_img
+                    };
+
+                    let mut jpeg_buf = Cursor::new(Vec::new());
+                    let rgb = processed_img.to_rgb8();
+                    if rgb.write_to(&mut jpeg_buf, ImageFormat::Jpeg).is_ok() {
+                        let new_bytes = jpeg_buf.into_inner();
+                        // Only replace if new bytes are actually smaller
+                        if new_bytes.len() < stream.content.len() || stream.content.len() > 100_000 {
+                            let (new_w, new_h) = processed_img.dimensions();
+                            let mut new_dict = stream.dict.clone();
+                            new_dict.set("Width", Object::Integer(new_w as i64));
+                            new_dict.set("Height", Object::Integer(new_h as i64));
+                            new_dict.set("ColorSpace", Object::Name(b"DeviceRGB".to_vec()));
+                            new_dict.set("BitsPerComponent", Object::Integer(8));
+                            new_dict.set("Filter", Object::Name(b"DCTDecode".to_vec()));
+                            stream_replacements.push((*obj_id, Stream::new(new_dict, new_bytes)));
                         }
                     }
                 }
@@ -653,9 +656,22 @@ mod tests {
 
             // 6. Optimize test
             let opt_path = temp_dir.join("test_opt.pdf");
+            let orig_size = fs::metadata(&merged_path).unwrap().len();
             let opt_res = pdf_optimize(merged_path.to_string_lossy().to_string(), 60, opt_path.to_string_lossy().to_string()).await;
             assert!(opt_res.is_ok(), "pdf_optimize should succeed: {:?}", opt_res);
+            let new_size = fs::metadata(&opt_path).unwrap().len();
+            println!("OPTIMIZE TEST: orig_size = {}, new_size = {}", orig_size, new_size);
             assert!(opt_path.exists());
+
+            // 7. Split test
+            let split_res = pdf_split(merged_path.to_string_lossy().to_string(), "single".to_string(), None).await;
+            assert!(split_res.is_ok(), "pdf_split should succeed: {:?}", split_res);
+            let split_dir = PathBuf::from(split_res.unwrap());
+            assert!(split_dir.exists(), "split_dir should exist");
+            let pag1 = split_dir.join("test_merged_pag_01.pdf");
+            let pag2 = split_dir.join("test_merged_pag_02.pdf");
+            assert!(pag1.exists(), "pag1 should exist: {:?}", pag1);
+            assert!(pag2.exists(), "pag2 should exist: {:?}", pag2);
 
             // Cleanup
             let _ = fs::remove_dir_all(&temp_dir);
