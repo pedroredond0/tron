@@ -2166,6 +2166,195 @@
         </button>
       </div>
     </div>
+  <!-- Modales de PdfTools -->
+  <!-- Modal: Convertir PDF a Imágenes -->
+  <div id="modalPdfToImages" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div class="bg-gnome-surface border border-gnome-border rounded-xl shadow-2xl w-full max-w-md p-5 flex flex-col gap-4">
+      <div class="flex items-center justify-between border-b border-gnome-border pb-3">
+        <h3 class="text-sm font-semibold text-gnome-text flex items-center gap-2">
+          <span>🖼️</span> Convertir PDF en Imágenes
+        </h3>
+        <button id="btnClosePdfToImagesModal" class="text-gnome-textDim hover:text-white text-xs">✕</button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block text-gnome-textDim font-medium mb-1.5">Páginas a exportar:</label>
+          <div class="space-y-1.5">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name="pdfToImagesPagesMode" value="all" checked class="text-gnome-active" />
+              <span class="text-gnome-text">Todas las páginas</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name="pdfToImagesPagesMode" value="range" class="text-gnome-active" />
+              <span class="text-gnome-text">Páginas específicas:</span>
+            </label>
+            <input id="inputPdfToImagesRange" type="text" placeholder="Ej. 1, 3, 5-8" disabled
+              class="w-full bg-gnome-sidebar border border-gnome-border rounded px-3 py-1.5 text-xs text-gnome-text focus:outline-none focus:border-gnome-active disabled:opacity-40" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-gnome-textDim font-medium mb-1">Formato de salida:</label>
+          <select id="selectPdfToImagesFormat" class="w-full bg-gnome-sidebar border border-gnome-border rounded px-3 py-1.5 text-xs text-gnome-text focus:outline-none focus:border-gnome-active">
+            <option value="jpg">JPEG (.jpg) - Recomendado, rápido y ligero</option>
+            <option value="png">PNG (.png) - Máxima nitidez sin pérdidas</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-gnome-textDim font-medium mb-1">Carpeta de destino:</label>
+          <div id="pdfToImagesOutputDir" class="font-mono text-[11px] text-gnome-textDim bg-gnome-sidebar border border-gnome-border rounded px-2.5 py-1.5 break-all select-all"></div>
+        </div>
+
+        <div id="pdfToImagesStatus" class="hidden text-xs text-gnome-active flex items-center gap-2">
+          <span class="animate-spin">⏳</span> <span id="pdfToImagesStatusText">Procesando páginas...</span>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 border-t border-gnome-border pt-3">
+        <button id="btnCancelPdfToImages" type="button" class="px-4 py-1.5 rounded-md hover:bg-gnome-hover text-gnome-text text-xs transition-colors">Cancelar</button>
+        <button id="btnConfirmPdfToImages" type="button" class="px-4 py-1.5 rounded-md bg-gnome-active hover:bg-gnome-activeHover text-white font-medium text-xs transition-colors flex items-center gap-1.5">
+          <span>Convertir</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Optimizar / Reducir tamaño PDF -->
+  <div id="modalPdfOptimize" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div class="bg-gnome-surface border border-gnome-border rounded-xl shadow-2xl w-full max-w-md p-5 flex flex-col gap-4">
+      <div class="flex items-center justify-between border-b border-gnome-border pb-3">
+        <h3 class="text-sm font-semibold text-gnome-text flex items-center gap-2">
+          <span>🗜️</span> Optimizar y Reducir Tamaño de PDF
+        </h3>
+        <button id="btnClosePdfOptimizeModal" class="text-gnome-textDim hover:text-white text-xs">✕</button>
+      </div>
+
+      <div class="space-y-3.5 text-xs">
+        <div class="flex items-center justify-between p-2.5 bg-gnome-sidebar rounded-lg border border-gnome-border">
+          <div>
+            <div class="text-[11px] text-gnome-textDim">Tamaño original</div>
+            <div id="pdfOptimizeOrigSize" class="text-sm font-semibold text-gnome-text">0 MB</div>
+          </div>
+          <div class="text-right">
+            <div class="text-[11px] text-gnome-textDim">Estimación tras compresión</div>
+            <div id="pdfOptimizeEstimatedSize" class="text-sm font-semibold text-emerald-400">~0 MB</div>
+          </div>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="text-gnome-textDim font-medium">Nivel de Calidad / Compresión:</label>
+            <span id="pdfOptimizeQualityVal" class="font-mono text-gnome-active font-semibold">70%</span>
+          </div>
+          <input id="sliderPdfOptimizeQuality" type="range" min="15" max="95" value="70" step="5" class="w-full accent-gnome-active cursor-pointer" />
+          <div class="flex justify-between text-[10px] text-gnome-textDim mt-0.5">
+            <span>Máxima Compresión</span>
+            <span>Equilibrado</span>
+            <span>Máxima Calidad</span>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-gnome-textDim font-medium mb-1">Archivo de salida:</label>
+          <input id="inputPdfOptimizeOutName" type="text" class="w-full bg-gnome-sidebar border border-gnome-border rounded px-3 py-1.5 text-xs text-gnome-text focus:outline-none focus:border-gnome-active font-mono" />
+        </div>
+
+        <div id="pdfOptimizeStatus" class="hidden text-xs text-gnome-active flex items-center gap-2">
+          <span class="animate-spin">⏳</span> <span>Optimizando PDF...</span>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 border-t border-gnome-border pt-3">
+        <button id="btnCancelPdfOptimize" type="button" class="px-4 py-1.5 rounded-md hover:bg-gnome-hover text-gnome-text text-xs transition-colors">Cancelar</button>
+        <button id="btnConfirmPdfOptimize" type="button" class="px-4 py-1.5 rounded-md bg-gnome-active hover:bg-gnome-activeHover text-white font-medium text-xs transition-colors flex items-center gap-1.5">
+          <span>Optimizar PDF</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Unir en un único PDF (Merge) -->
+  <div id="modalPdfMerge" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div class="bg-gnome-surface border border-gnome-border rounded-xl shadow-2xl w-full max-w-lg p-5 flex flex-col gap-4">
+      <div class="flex items-center justify-between border-b border-gnome-border pb-3">
+        <h3 class="text-sm font-semibold text-gnome-text flex items-center gap-2">
+          <span>📎</span> Unir Documentos e Imágenes en un PDF
+        </h3>
+        <button id="btnClosePdfMergeModal" class="text-gnome-textDim hover:text-white text-xs">✕</button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <span class="text-gnome-textDim font-medium">Orden de páginas / archivos:</span>
+            <span class="text-[11px] text-gnome-textDim">Usa ↑ / ↓ para reordenar</span>
+          </div>
+          <div id="pdfMergeList" class="max-h-56 overflow-y-auto space-y-1 bg-gnome-sidebar border border-gnome-border rounded-lg p-1.5 select-none">
+            <!-- Items populated dynamically -->
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-gnome-textDim font-medium mb-1">Nombre del archivo PDF final:</label>
+          <div class="flex items-center">
+            <input id="inputPdfMergeOutName" type="text" class="flex-1 bg-gnome-sidebar border border-gnome-border rounded-l-md px-3 py-1.5 text-xs text-gnome-text focus:outline-none focus:border-gnome-active font-mono" />
+            <span class="bg-gnome-bg border border-l-0 border-gnome-border px-2.5 py-1.5 text-xs text-gnome-textDim rounded-r-md">.pdf</span>
+          </div>
+        </div>
+
+        <div id="pdfMergeStatus" class="hidden text-xs text-gnome-active flex items-center gap-2">
+          <span class="animate-spin">⏳</span> <span>Generando documento combinado...</span>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 border-t border-gnome-border pt-3">
+        <button id="btnCancelPdfMerge" type="button" class="px-4 py-1.5 rounded-md hover:bg-gnome-hover text-gnome-text text-xs transition-colors">Cancelar</button>
+        <button id="btnConfirmPdfMerge" type="button" class="px-4 py-1.5 rounded-md bg-gnome-active hover:bg-gnome-activeHover text-white font-medium text-xs transition-colors flex items-center gap-1.5">
+          <span>Unir en PDF</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Extraer Texto de PDF -->
+  <div id="modalPdfExtractText" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div class="bg-gnome-surface border border-gnome-border rounded-xl shadow-2xl w-full max-w-md p-5 flex flex-col gap-4">
+      <div class="flex items-center justify-between border-b border-gnome-border pb-3">
+        <h3 class="text-sm font-semibold text-gnome-text flex items-center gap-2">
+          <span>📝</span> Extraer Texto de PDF
+        </h3>
+        <button id="btnClosePdfExtractTextModal" class="text-gnome-textDim hover:text-white text-xs">✕</button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block text-gnome-textDim font-medium mb-1.5">Formato del texto:</label>
+          <div class="space-y-1.5">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name="pdfExtractFormat" value="markdown" checked class="text-gnome-active" />
+              <span class="text-gnome-text">Markdown estructurado (.md) - Con títulos por página</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name="pdfExtractFormat" value="txt" class="text-gnome-active" />
+              <span class="text-gnome-text">Texto plano (.txt)</span>
+            </label>
+          </div>
+        </div>
+
+        <div id="pdfExtractStatus" class="hidden text-xs text-gnome-active flex items-center gap-2">
+          <span class="animate-spin">⏳</span> <span>Extrayendo texto...</span>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 border-t border-gnome-border pt-3">
+        <button id="btnCancelPdfExtractText" type="button" class="px-4 py-1.5 rounded-md hover:bg-gnome-hover text-gnome-text text-xs transition-colors">Cancelar</button>
+        <button id="btnConfirmPdfExtractText" type="button" class="px-4 py-1.5 rounded-md bg-gnome-active hover:bg-gnome-activeHover text-white font-medium text-xs transition-colors flex items-center gap-1.5">
+          <span>Extraer Texto</span>
+        </button>
+      </div>
+    </div>
   </div>
 
   <!-- Styled Context Menu for File Items -->
@@ -2209,6 +2398,44 @@
     <button id="ctxMenuArchiveViewContent" class="hidden w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
       <span>📋 Ver contenido</span>
     </button>
+    <!-- Dedicated PdfTools Submenu -->
+    <div id="ctxMenuPdfTools" class="hidden relative">
+      <button id="btnCtxPdfToolsTrigger" type="button" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between font-medium text-amber-400">
+        <span class="flex items-center gap-1.5">
+          <span class="text-xs">📄</span> <span>PdfTools</span>
+        </span>
+        <span class="text-xs opacity-70">›</span>
+      </button>
+      <div id="ctxMenuPdfToolsSub" class="hidden fixed w-64 bg-gnome-surface border border-gnome-border rounded-lg shadow-2xl py-1 text-xs text-gnome-text select-none z-50">
+        <!-- PDF Actions (visible when single PDF is selected) -->
+        <button id="ctxPdfToImages" class="hidden w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center gap-2">
+          <span>🖼️</span> <span>Convertir PDF en Imágenes...</span>
+        </button>
+        <button id="ctxPdfOptimize" class="hidden w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center gap-2">
+          <span>🗜️</span> <span>Optimizar / Reducir tamaño...</span>
+        </button>
+        <button id="ctxPdfSplit" class="hidden w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center gap-2">
+          <span>✂️</span> <span>Dividir PDF por páginas...</span>
+        </button>
+        <button id="ctxPdfRotate" class="hidden w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center gap-2">
+          <span>🔄</span> <span>Rotar PDF (90° horario)</span>
+        </button>
+        <button id="ctxPdfExtractText" class="hidden w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center gap-2">
+          <span>📝</span> <span>Extraer texto a Markdown / TXT...</span>
+        </button>
+
+        <!-- Image Actions (visible when 1+ images are selected) -->
+        <button id="ctxPdfImagesToPdf" class="hidden w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center gap-2">
+          <span>📑</span> <span>Convertir a PDF</span>
+        </button>
+
+        <!-- Multi Merge Action (visible when multiple PDFs/images are selected) -->
+        <button id="ctxPdfMerge" class="hidden w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center gap-2 font-medium text-gnome-active hover:text-white">
+          <span>📎</span> <span>Unir en un único PDF (Merge)...</span>
+        </button>
+      </div>
+    </div>
+
     <!-- Compression action for standard files/folders -->
     <button id="ctxMenuCompress" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
       <span>🗜️ Comprimir en .zip...</span>
@@ -2277,6 +2504,7 @@
     </button>
   </div>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

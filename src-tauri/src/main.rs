@@ -1,6 +1,18 @@
 // Prevents additional console window on Windows in release
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod pdf_tools;
+use pdf_tools::{
+    pdf_images_to_pdf,
+    pdf_merge,
+    pdf_rotate,
+    pdf_split,
+    pdf_extract_text,
+    pdf_optimize,
+    pdf_to_images,
+    pdf_save_rendered_pages,
+};
+
 use base64::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::fs::{self, File};
@@ -4554,7 +4566,15 @@ fn main() {
             window_close,
             is_window_maximized,
             connect_network_share,
-            eject_volume
+            eject_volume,
+            pdf_images_to_pdf,
+            pdf_merge,
+            pdf_rotate,
+            pdf_split,
+            pdf_extract_text,
+            pdf_optimize,
+            pdf_to_images,
+            pdf_save_rendered_pages
         ])
         .run(tauri::generate_context!());
 
