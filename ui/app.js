@@ -73,94 +73,66 @@
     };
   }
 
-  // Global Unified Tab & Split Panel Architecture
-  let windowTabs = [ createTabState() ];
-  let activeWindowTab = 0;
-
-  function getCurrentWindowTab() {
-    if (!windowTabs || windowTabs.length === 0) {
-      windowTabs = [ createTabState() ];
-      activeWindowTab = 0;
-    }
-    if (activeWindowTab < 0 || activeWindowTab >= windowTabs.length) {
-      activeWindowTab = Math.max(0, windowTabs.length - 1);
-    }
-    return windowTabs[activeWindowTab];
-  }
-
-  function getActiveTabObj(panelIdx = activePanel) {
-    const tab = getCurrentWindowTab();
-    if (!tab.split) {
-      tab.split = createTabState(tab.currentDirectory || '').split || {
-        currentDirectory: tab.currentDirectory || '',
-        items: [],
-        filteredItems: [],
-        selectedIndex: -1,
-        selectionAnchor: -1,
-        selectedItems: new Set(),
-        history: [],
-        historyIndex: -1,
-        searchQuery: '',
-        isSearchingRecursive: false,
-        activeSherlockFilter: null,
-        sherlockResults: null,
-        searchItems: null,
-        freeSpaceBytes: null,
-        totalSpaceBytes: null,
-        scrollTop: 0,
-        expandedDirs: new Map()
-      };
-    }
-    return panelIdx === 0 ? tab : tab.split;
-  }
-
-  function createPanelAccessor(panelIdx) {
+  // Isolated Dual Panel Architecture with Independent Tabs
+  function createPanelState(defaultDir = '') {
     return {
-      get currentTab() { return getActiveTabObj(panelIdx); },
-      get currentDirectory() { return getActiveTabObj(panelIdx).currentDirectory || ''; },
-      set currentDirectory(v) {
-        const target = getActiveTabObj(panelIdx);
-        target.currentDirectory = v;
-        if (panelIdx === 0) {
-          getCurrentWindowTab().name = v ? getDirBaseName(v) : 'Inicio';
+      tabs: [ createTabState(defaultDir) ],
+      activeTab: 0,
+      get currentTab() {
+        if (!this.tabs || this.tabs.length === 0) {
+          this.tabs = [ createTabState() ];
+          this.activeTab = 0;
         }
+        if (this.activeTab < 0 || this.activeTab >= this.tabs.length) {
+          this.activeTab = Math.max(0, this.tabs.length - 1);
+        }
+        return this.tabs[this.activeTab];
+      },
+      get currentDirectory() { return this.currentTab.currentDirectory || ''; },
+      set currentDirectory(v) {
+        this.currentTab.currentDirectory = v;
+        this.currentTab.name = v ? getDirBaseName(v) : 'Inicio';
         renderTabs();
       },
-      get items() { return getActiveTabObj(panelIdx).items || []; },
-      set items(v) { getActiveTabObj(panelIdx).items = v; },
-      get filteredItems() { return getActiveTabObj(panelIdx).filteredItems || []; },
-      set filteredItems(v) { getActiveTabObj(panelIdx).filteredItems = v; },
-      get selectedIndex() { return getActiveTabObj(panelIdx).selectedIndex; },
-      set selectedIndex(v) { getActiveTabObj(panelIdx).selectedIndex = v; },
-      get selectionAnchor() { return getActiveTabObj(panelIdx).selectionAnchor; },
-      set selectionAnchor(v) { getActiveTabObj(panelIdx).selectionAnchor = v; },
-      get selectedItems() { return getActiveTabObj(panelIdx).selectedItems; },
-      set selectedItems(v) { getActiveTabObj(panelIdx).selectedItems = v; },
-      get history() { return getActiveTabObj(panelIdx).history; },
-      set history(v) { getActiveTabObj(panelIdx).history = v; },
-      get historyIndex() { return getActiveTabObj(panelIdx).historyIndex; },
-      set historyIndex(v) { getActiveTabObj(panelIdx).historyIndex = v; },
-      get searchQuery() { return getActiveTabObj(panelIdx).searchQuery; },
-      set searchQuery(v) { getActiveTabObj(panelIdx).searchQuery = v; },
-      get isSearchingRecursive() { return getActiveTabObj(panelIdx).isSearchingRecursive; },
-      set isSearchingRecursive(v) { getActiveTabObj(panelIdx).isSearchingRecursive = v; },
-      get activeSherlockFilter() { return getActiveTabObj(panelIdx).activeSherlockFilter; },
-      set activeSherlockFilter(v) { getActiveTabObj(panelIdx).activeSherlockFilter = v; },
-      get sherlockResults() { return getActiveTabObj(panelIdx).sherlockResults; },
-      set sherlockResults(v) { getActiveTabObj(panelIdx).sherlockResults = v; },
-      get searchItems() { return getActiveTabObj(panelIdx).searchItems; },
-      set searchItems(v) { getActiveTabObj(panelIdx).searchItems = v; },
-      get freeSpaceBytes() { return getActiveTabObj(panelIdx).freeSpaceBytes; },
-      set freeSpaceBytes(v) { getActiveTabObj(panelIdx).freeSpaceBytes = v; },
-      get totalSpaceBytes() { return getActiveTabObj(panelIdx).totalSpaceBytes; },
-      set totalSpaceBytes(v) { getActiveTabObj(panelIdx).totalSpaceBytes = v; },
-      get expandedDirs() { return getActiveTabObj(panelIdx).expandedDirs; }
+      get items() { return this.currentTab.items || []; },
+      set items(v) { this.currentTab.items = v; },
+      get filteredItems() { return this.currentTab.filteredItems || []; },
+      set filteredItems(v) { this.currentTab.filteredItems = v; },
+      get selectedIndex() { return this.currentTab.selectedIndex; },
+      set selectedIndex(v) { this.currentTab.selectedIndex = v; },
+      get selectionAnchor() { return this.currentTab.selectionAnchor; },
+      set selectionAnchor(v) { this.currentTab.selectionAnchor = v; },
+      get selectedItems() { return this.currentTab.selectedItems; },
+      set selectedItems(v) { this.currentTab.selectedItems = v; },
+      get history() { return this.currentTab.history; },
+      set history(v) { this.currentTab.history = v; },
+      get historyIndex() { return this.currentTab.historyIndex; },
+      set historyIndex(v) { this.currentTab.historyIndex = v; },
+      get searchQuery() { return this.currentTab.searchQuery; },
+      set searchQuery(v) { this.currentTab.searchQuery = v; },
+      get isSearchingRecursive() { return this.currentTab.isSearchingRecursive; },
+      set isSearchingRecursive(v) { this.currentTab.isSearchingRecursive = v; },
+      get activeSherlockFilter() { return this.currentTab.activeSherlockFilter; },
+      set activeSherlockFilter(v) { this.currentTab.activeSherlockFilter = v; },
+      get sherlockResults() { return this.currentTab.sherlockResults; },
+      set sherlockResults(v) { this.currentTab.sherlockResults = v; },
+      get searchItems() { return this.currentTab.searchItems; },
+      set searchItems(v) { this.currentTab.searchItems = v; },
+      get freeSpaceBytes() { return this.currentTab.freeSpaceBytes; },
+      set freeSpaceBytes(v) { this.currentTab.freeSpaceBytes = v; },
+      get totalSpaceBytes() { return this.currentTab.totalSpaceBytes; },
+      set totalSpaceBytes(v) { this.currentTab.totalSpaceBytes = v; },
+      get expandedDirs() { return this.currentTab.expandedDirs; }
     };
   }
 
-  const panels = [ createPanelAccessor(0), createPanelAccessor(1) ];
+  const panels = [ createPanelState(), createPanelState() ];
   let activePanel = 0;
   let isSplitView = false;
+
+  function getActiveTabObj(panelIdx = activePanel) {
+    return panels[panelIdx].currentTab;
+  }
 
   // File Color Tags Store: { [normalizedPath]: [color1, color2, ...] }
   let fileTagsMap = {};
@@ -378,6 +350,8 @@
     panelBBadge: document.getElementById('panelBBadge'),
     panelAPathBox: document.getElementById('panelAPathBox'),
     panelBPathBox: document.getElementById('panelBPathBox'),
+    panelATabsContainer: document.getElementById('panelATabsContainer'),
+    panelBTabsContainer: document.getElementById('panelBTabsContainer'),
     panelACount: document.getElementById('panelACount'),
     panelBCount: document.getElementById('panelBCount'),
     pathIndicatorA: document.getElementById('pathIndicatorA'),
@@ -939,49 +913,74 @@ modalSherlock: document.getElementById('modalSherlock'),
     updateStatusBar();
   }
 
-  // Directory Loading
-  async function loadDirectory(path, addToHistory = true) {
-    try {
-      el.fileList.innerHTML = `<div class="p-4 text-xs text-gnome-textDim">Cargando directorio...</div>`;
-      const res = await invoke('read_directory', { path });
-      if (!res) return;
+  // Directory Loading (Strictly Isolated by Panel Index)
+  async function loadDirectory(path, addToHistory = true, targetPanelIdx = activePanel) {
+    const pIdx = targetPanelIdx;
+    const targetPanel = panels[pIdx];
+    const targetFileListEl = elPanels[pIdx]?.fileList;
+    if (!targetPanel) return;
 
-      state.currentDirectory = res.current_path;
-      state.items = res.items || [];
-      state.freeSpaceBytes = res.free_space_bytes ?? null;
-      state.totalSpaceBytes = res.total_space_bytes ?? null;
-      state.searchQuery = '';
-      state.isSearchingRecursive = false;
-      state.sherlockResults = null;
-      state.searchItems = null;
-      if (el.sherlockBanner) el.sherlockBanner.classList.add('hidden');
-      state.activeSherlockFilter = null;
-      el.searchInput.value = '';
-      el.btnClearSearch.classList.add('hidden');
-      applyFilter();
+    if (targetFileListEl) {
+      targetFileListEl.innerHTML = `<div class="p-4 text-xs text-gnome-textDim">Cargando directorio...</div>`;
+    }
+
+    try {
+      const res = await invoke('read_directory', { path });
+      if (!res) {
+        if (targetFileListEl) targetFileListEl.innerHTML = `<div class="p-4 text-xs text-gnome-textDim">Directorio vacío</div>`;
+        return;
+      }
+
+      targetPanel.currentDirectory = res.current_path;
+      targetPanel.items = res.items || [];
+      targetPanel.freeSpaceBytes = res.free_space_bytes ?? null;
+      targetPanel.totalSpaceBytes = res.total_space_bytes ?? null;
+      targetPanel.searchQuery = '';
+      targetPanel.isSearchingRecursive = false;
+      targetPanel.sherlockResults = null;
+      targetPanel.searchItems = null;
+
+      if (pIdx === activePanel) {
+        if (el.sherlockBanner) el.sherlockBanner.classList.add('hidden');
+        targetPanel.activeSherlockFilter = null;
+        if (el.searchInput) el.searchInput.value = '';
+        if (el.btnClearSearch) el.btnClearSearch.classList.add('hidden');
+      }
+
+      applyFilter(pIdx);
 
       if (addToHistory) {
-        if (state.historyIndex < state.history.length - 1) {
-          state.history = state.history.slice(0, state.historyIndex + 1);
+        if (targetPanel.historyIndex < targetPanel.history.length - 1) {
+          targetPanel.history = targetPanel.history.slice(0, targetPanel.historyIndex + 1);
         }
-        state.history.push(state.currentDirectory);
-        state.historyIndex = state.history.length - 1;
+        targetPanel.history.push(targetPanel.currentDirectory);
+        targetPanel.historyIndex = targetPanel.history.length - 1;
       }
-      updateHistoryButtons();
-      renderBreadcrumbs();
-      state.selectedIndex = state.filteredItems.length > 0 ? 0 : -1;
-      state.selectedItems.clear();
-      if (state.selectedIndex >= 0) {
-        state.selectedItems.add(state.filteredItems[state.selectedIndex].path);
+
+      targetPanel.selectedIndex = targetPanel.filteredItems.length > 0 ? 0 : -1;
+      targetPanel.selectedItems.clear();
+      if (targetPanel.selectedIndex >= 0) {
+        targetPanel.selectedItems.add(targetPanel.filteredItems[targetPanel.selectedIndex].path);
       }
-      renderFileList();
-      updateStatusBar();
-      renderTagSidebar();
+
+      renderFileList(pIdx);
+
+      if (pIdx === activePanel) {
+        updateHistoryButtons();
+        renderBreadcrumbs();
+        updateStatusBar();
+        renderTagSidebar();
+      }
+      renderTabs();
       if (isSplitView) updatePanelHighlights();
-      recordFrequentLocation(state.currentDirectory);
-      el.fileList.focus();
+      recordFrequentLocation(targetPanel.currentDirectory);
+      if (pIdx === activePanel && targetFileListEl) {
+        targetFileListEl.focus();
+      }
     } catch (err) {
-      alert('Error al acceder al directorio: ' + err);
+      if (targetFileListEl) {
+        targetFileListEl.innerHTML = `<div class="p-4 text-xs text-red-400">Error al acceder: ${escapeHtml(String(err))}</div>`;
+      }
     }
   }
 
@@ -1069,17 +1068,19 @@ modalSherlock: document.getElementById('modalSherlock'),
   }
 
   // File Filtering & Sorting
-  function applyFilter() {
-    if (state.activeSherlockFilter && state.sherlockResults) {
+  function applyFilter(pIdx = activePanel) {
+    const targetPanel = panels[pIdx];
+    if (!targetPanel) return;
+    if (targetPanel.activeSherlockFilter && targetPanel.sherlockResults) {
       let res = state.sherlockResults;
       if (!state.showHiddenFiles) {
         res = res.filter(item => !item.is_hidden);
       }
-      state.filteredItems = sortItems([...res]);
+      targetPanel.filteredItems = sortItems([...res]);
       return;
     }
 
-    if (state.isSearchingRecursive && state.searchItems) {
+    if (targetPanel.isSearchingRecursive && targetPanel.searchItems) {
       let res = state.searchItems;
       if (!state.showHiddenFiles) {
         res = res.filter(item => !item.is_hidden);
@@ -1088,8 +1089,8 @@ modalSherlock: document.getElementById('modalSherlock'),
       return;
     }
 
-    const q = state.searchQuery.toLowerCase().trim();
-    let res = state.items;
+    const q = (targetPanel.searchQuery || '').toLowerCase().trim();
+    let res = targetPanel.items || [];
     if (!state.showHiddenFiles) {
       res = res.filter(item => !item.is_hidden);
     }
@@ -1132,7 +1133,8 @@ modalSherlock: document.getElementById('modalSherlock'),
   }
 
   // Flatten filteredItems taking into account expandedDirs (collapsible tree)
-  function buildDisplayItemList() {
+  function buildDisplayItemList(pIdx = activePanel) {
+    const p = panels[pIdx];
     const list = [];
     const expandedMap = state.expandedDirs || new Map();
 
@@ -1178,12 +1180,14 @@ modalSherlock: document.getElementById('modalSherlock'),
   }
 
   // File List Rendering
-  function renderFileList() {
-    el.fileList.innerHTML = '';
-    const displayList = buildDisplayItemList();
+  function renderFileList(pIdx = activePanel) {
+    const targetListEl = elPanels[pIdx]?.fileList;
+    if (!targetListEl) return;
+    targetListEl.innerHTML = '';
+    const displayList = buildDisplayItemList(pIdx);
 
     if (displayList.length === 0) {
-      el.fileList.innerHTML = `<div class="p-8 text-center text-xs text-gnome-textDim">Directorio vacío o sin coincidencias</div>`;
+      targetListEl.innerHTML = `<div class="p-8 text-center text-xs text-gnome-textDim">Directorio vacío o sin coincidencias</div>`;
       return;
     }
 
@@ -1342,7 +1346,7 @@ modalSherlock: document.getElementById('modalSherlock'),
       fragment.appendChild(row);
     });
 
-    el.fileList.appendChild(fragment);
+    targetListEl.appendChild(fragment);
     ensureVisible(state.selectedIndex);
   }
 
@@ -2403,14 +2407,14 @@ modalSherlock: document.getElementById('modalSherlock'),
 
     if (isModKey(e) && (e.key === 'w' || e.key === 'W')) {
       e.preventDefault();
-      closeTab(activeWindowTab);
+      closeTab(panels[activePanel].activeTab, activePanel);
       return;
     }
 
     if (isModKey(e) && e.key >= '1' && e.key <= '9') {
       const tabNum = parseInt(e.key, 10) - 1;
       const p = panels[activePanel];
-      if (tabNum < windowTabs.length) {
+      if (tabNum < panels[activePanel].tabs.length) {
         e.preventDefault();
         switchTab(tabNum);
         return;
@@ -2710,21 +2714,14 @@ modalSherlock: document.getElementById('modalSherlock'),
   
   async function reloadBothPanelsIfNeeded() {
     if (isSplitView) {
-      const cur = activePanel;
-      if (panels[cur].currentDirectory) {
-        await loadDirectory(panels[cur].currentDirectory, false);
+      if (panels[0].currentDirectory) {
+        await loadDirectory(panels[0].currentDirectory, false, 0);
       }
-      const other = cur === 0 ? 1 : 0;
-      if (panels[other].currentDirectory) {
-        activePanel = other;
-        await loadDirectory(panels[other].currentDirectory, false);
-        activePanel = cur;
-        updatePanelHighlights();
-        renderBreadcrumbs();
-        renderFileList();
+      if (panels[1].currentDirectory) {
+        await loadDirectory(panels[1].currentDirectory, false, 1);
       }
     } else if (state.currentDirectory) {
-      await loadDirectory(state.currentDirectory, false);
+      await loadDirectory(state.currentDirectory, false, 0);
     }
   }
 
@@ -2977,36 +2974,33 @@ async function startTransferOperation(action, sources, targetDir) {
     if (isSplitView) {
       el.panelB.classList.remove('hidden');
       if (el.btnToggleSplitView) el.btnToggleSplitView.classList.add('bg-gnome-active/20', 'text-gnome-active');
-      
-      // If panel 1 has no directory or empty, clone panel 0's current directory
+
       if (!panels[1].currentDirectory) {
-        const sourceDir = panels[0].currentDirectory || state.currentDirectory || state.userHomeDir || '/';
+        const sourceDir = panels[0].currentDirectory || state.userHomeDir || '/';
         panels[1].currentDirectory = sourceDir;
       }
-      
-      const prevActive = activePanel;
-      activePanel = 1;
-      await loadDirectory(panels[1].currentDirectory, false);
-      activePanel = prevActive;
-      
+
+      await loadDirectory(panels[1].currentDirectory, false, 1);
+
       renderBreadcrumbs();
-      renderFileList();
+      renderFileList(0);
+      renderFileList(1);
       updateSortHeaderUI();
       updateStatusBar();
       updatePanelHighlights();
       renderTabs();
-      el.fileList.focus();
+      elPanels[activePanel].fileList.focus();
     } else {
       el.panelB.classList.add('hidden');
       if (el.btnToggleSplitView) el.btnToggleSplitView.classList.remove('bg-gnome-active/20', 'text-gnome-active');
       activePanel = 0;
       renderBreadcrumbs();
-      renderFileList();
+      renderFileList(0);
       updateSortHeaderUI();
       updateStatusBar();
       updatePanelHighlights();
       renderTabs();
-      el.fileList.focus();
+      elPanels[0].fileList.focus();
     }
   }
 
@@ -3866,20 +3860,18 @@ async function startTransferOperation(action, sources, targetDir) {
     el.fileList.focus();
   }
 
-  function confirmNetwork() {
-    let path = el.inputNetworkPath.value.trim();
+  async function confirmNetwork() {
+    const path = el.inputNetworkPath.value.trim();
     if (path) {
       closeNetworkModal();
-      if (/^smb:\/\//i.test(path)) {
-        if (!isMac && !navigator.platform?.includes('Linux')) {
-          path = path.replace(/^smb:\/\//i, '\\\\').replace(/\//g, '\\');
+      try {
+        const resolved = await invoke('connect_network_share', { path });
+        if (resolved) {
+          await loadDirectory(resolved);
         }
-      } else if (path.startsWith('\\\\')) {
-        if (isMac || navigator.platform?.includes('Linux')) {
-          path = 'smb://' + path.replace(/^\\\\/, '').replace(/\\/g, '/');
-        }
+      } catch (err) {
+        alert('Error al conectar con el recurso de red: ' + err);
       }
-      loadDirectory(path);
     }
   }
 
@@ -4105,111 +4097,152 @@ async function startTransferOperation(action, sources, targetDir) {
   }
 
 
-  // Unified Tab Management Implementation
+  // Completely Isolated Per-Panel Tab Management Implementation
+  function createTabElement(t, idx, panelIdx, isActive) {
+    const tabEl = document.createElement('div');
+    const isPanelActive = panelIdx === activePanel;
+    tabEl.className = `group h-6 px-2.5 rounded flex items-center gap-1.5 text-xs select-none cursor-pointer transition-colors max-w-[170px] shrink-0 ${
+      isActive
+        ? (isPanelActive ? 'bg-gnome-active text-white font-semibold shadow-sm' : 'bg-gnome-surface text-white font-medium border border-gnome-active/50 shadow-sm')
+        : 'bg-gnome-sidebar hover:bg-gnome-hover/70 text-gnome-textDim hover:text-gnome-text'
+    }`;
+    tabEl.title = t.currentDirectory || 'Inicio';
+    tabEl.innerHTML = `
+      <span class="text-[11px] opacity-80">📁</span>
+      <span class="truncate flex-1">${escapeHtml(t.name || 'Carpeta')}</span>
+      ${panels[panelIdx].tabs.length > 1 ? '<button type="button" class="btn-close-tab w-3.5 h-3.5 rounded-full flex items-center justify-center text-[10px] opacity-40 group-hover:opacity-100 hover:bg-white/20 hover:text-white transition-opacity" title="Cerrar pestaña">✕</button>' : ''}
+    `;
+
+    tabEl.onclick = (e) => {
+      if (e.target.closest('.btn-close-tab')) return;
+      if (activePanel !== panelIdx) {
+        switchActivePanel(panelIdx);
+      }
+      switchTab(idx, panelIdx);
+    };
+
+    tabEl.onauxclick = (e) => {
+      if (e.button === 1) {
+        e.preventDefault();
+        closeTab(idx, panelIdx);
+      }
+    };
+
+    const btnClose = tabEl.querySelector('.btn-close-tab');
+    if (btnClose) {
+      btnClose.onclick = (e) => {
+        e.stopPropagation();
+        closeTab(idx, panelIdx);
+      };
+    }
+
+    return tabEl;
+  }
+
   function renderTabs() {
-    if (!el.tabList) return;
-    el.tabList.innerHTML = '';
-    if (!windowTabs || windowTabs.length === 0) return;
-
-    if (el.tabBar) {
-      if (windowTabs.length <= 1) {
-        el.tabBar.classList.add('hidden');
-      } else {
-        el.tabBar.classList.remove('hidden');
-      }
-    }
-
-    windowTabs.forEach((t, idx) => {
-      const isActive = idx === activeWindowTab;
-      const tabEl = document.createElement('div');
-      tabEl.className = `group h-6 px-2.5 rounded flex items-center gap-1.5 text-xs select-none cursor-pointer transition-colors max-w-[170px] ${
-        isActive 
-          ? 'bg-gnome-surface text-white font-medium border-t-2 border-gnome-active shadow-sm' 
-          : 'bg-gnome-sidebar hover:bg-gnome-hover/70 text-gnome-textDim hover:text-gnome-text'
-      }`;
-      tabEl.title = t.currentDirectory || 'Inicio';
-      tabEl.innerHTML = `
-        <span class="text-[11px] opacity-70">📁</span>
-        <span class="truncate flex-1">${escapeHtml(t.name || 'Carpeta')}</span>
-        <button type="button" class="btn-close-tab w-3.5 h-3.5 rounded-full flex items-center justify-center text-[10px] opacity-40 group-hover:opacity-100 hover:bg-white/20 hover:text-white transition-opacity" title="Cerrar pestaña (${isMac ? 'Cmd+W' : 'Ctrl+W'})">✕</button>
-      `;
-
-      tabEl.onclick = (e) => {
-        if (e.target.closest('.btn-close-tab')) return;
-        switchTab(idx);
-      };
-
-      tabEl.onauxclick = (e) => {
-        if (e.button === 1) { // Middle click closes tab
-          e.preventDefault();
-          closeTab(idx);
+    if (!isSplitView) {
+      // Single panel: render panels[0].tabs in top tabBar
+      if (el.tabBar) {
+        if (panels[0].tabs.length <= 1) {
+          el.tabBar.classList.add('hidden');
+        } else {
+          el.tabBar.classList.remove('hidden');
         }
-      };
+      }
+      if (el.tabList) {
+        el.tabList.innerHTML = '';
+        panels[0].tabs.forEach((t, idx) => {
+          const isActive = idx === panels[0].activeTab;
+          const tabEl = createTabElement(t, idx, 0, isActive);
+          el.tabList.appendChild(tabEl);
+        });
+      }
+    } else {
+      // Split view: hide top tabBar, render each panel's tabs directly in its header
+      if (el.tabBar) el.tabBar.classList.add('hidden');
 
-      const btnClose = tabEl.querySelector('.btn-close-tab');
-      if (btnClose) {
-        btnClose.onclick = (e) => {
+      // Render Panel A tabs
+      if (el.panelATabsContainer) {
+        el.panelATabsContainer.innerHTML = '';
+        panels[0].tabs.forEach((t, idx) => {
+          const isActive = idx === panels[0].activeTab;
+          const tabEl = createTabElement(t, idx, 0, isActive);
+          el.panelATabsContainer.appendChild(tabEl);
+        });
+        const btnAddA = document.createElement('button');
+        btnAddA.type = 'button';
+        btnAddA.className = 'p-1 px-1.5 rounded hover:bg-gnome-hover text-gnome-textDim hover:text-white transition-colors text-xs flex items-center justify-center shrink-0 font-bold';
+        btnAddA.title = 'Nueva pestaña en Panel 1';
+        btnAddA.textContent = '+';
+        btnAddA.onclick = (e) => {
           e.stopPropagation();
-          closeTab(idx);
+          createTab('', 0);
         };
+        el.panelATabsContainer.appendChild(btnAddA);
       }
 
-      el.tabList.appendChild(tabEl);
-    });
+      // Render Panel B tabs
+      if (el.panelBTabsContainer) {
+        el.panelBTabsContainer.innerHTML = '';
+        panels[1].tabs.forEach((t, idx) => {
+          const isActive = idx === panels[1].activeTab;
+          const tabEl = createTabElement(t, idx, 1, isActive);
+          el.panelBTabsContainer.appendChild(tabEl);
+        });
+        const btnAddB = document.createElement('button');
+        btnAddB.type = 'button';
+        btnAddB.className = 'p-1 px-1.5 rounded hover:bg-gnome-hover text-gnome-textDim hover:text-white transition-colors text-xs flex items-center justify-center shrink-0 font-bold';
+        btnAddB.title = 'Nueva pestaña en Panel 2';
+        btnAddB.textContent = '+';
+        btnAddB.onclick = (e) => {
+          e.stopPropagation();
+          createTab('', 1);
+        };
+        el.panelBTabsContainer.appendChild(btnAddB);
+      }
+    }
   }
 
-  async function createTab(dir = '') {
-    const initialDir = dir || panels[0].currentDirectory || state.currentDirectory || state.userHomeDir || '/';
-    const splitDir = panels[1].currentDirectory || initialDir;
+  async function createTab(dir = '', panelIdx = activePanel) {
+    const p = panels[panelIdx];
+    const initialDir = dir || p.currentDirectory || state.currentDirectory || state.userHomeDir || '/';
     const newTab = createTabState(initialDir);
-    newTab.split = createTabState(splitDir);
-    windowTabs.push(newTab);
-    activeWindowTab = windowTabs.length - 1;
+    p.tabs.push(newTab);
+    p.activeTab = p.tabs.length - 1;
     renderTabs();
-    await loadDirectory(initialDir, true);
-    if (isSplitView && splitDir) {
-      const prev = activePanel;
-      activePanel = 1;
-      await loadDirectory(splitDir, false);
-      activePanel = prev;
-      updatePanelHighlights();
+    await loadDirectory(initialDir, true, panelIdx);
+  }
+
+  function closeTab(index, panelIdx = activePanel) {
+    const p = panels[panelIdx];
+    if (p.tabs.length <= 1) return;
+    p.tabs.splice(index, 1);
+    if (p.activeTab >= p.tabs.length) {
+      p.activeTab = p.tabs.length - 1;
+    }
+    renderTabs();
+    const curTab = p.tabs[p.activeTab];
+    if (curTab.currentDirectory) {
+      loadDirectory(curTab.currentDirectory, false, panelIdx);
+    } else {
+      renderFileList(panelIdx);
+      if (panelIdx === activePanel) {
+        updateStatusBar();
+        renderBreadcrumbs();
+      }
     }
   }
 
-  function closeTab(index) {
-    if (windowTabs.length <= 1) return;
-    windowTabs.splice(index, 1);
-    if (activeWindowTab >= windowTabs.length) {
-      activeWindowTab = windowTabs.length - 1;
-    }
+  async function switchTab(index, panelIdx = activePanel) {
+    const p = panels[panelIdx];
+    if (!p || index < 0 || index >= p.tabs.length) return;
+    p.activeTab = index;
     renderTabs();
-    const curTab = windowTabs[activeWindowTab];
+    const curTab = p.tabs[p.activeTab];
     if (curTab.currentDirectory) {
-      loadDirectory(curTab.currentDirectory, false);
-    }
-    if (isSplitView && curTab.split && curTab.split.currentDirectory) {
-      const prev = activePanel;
-      activePanel = 1;
-      loadDirectory(curTab.split.currentDirectory, false);
-      activePanel = prev;
-      updatePanelHighlights();
-    }
-  }
-
-  function switchTab(index) {
-    if (index < 0 || index >= windowTabs.length) return;
-    activeWindowTab = index;
-    renderTabs();
-    const curTab = windowTabs[activeWindowTab];
-    if (curTab.currentDirectory) {
-      loadDirectory(curTab.currentDirectory, false);
-    }
-    if (isSplitView && curTab.split && curTab.split.currentDirectory) {
-      const prev = activePanel;
-      activePanel = 1;
-      loadDirectory(curTab.split.currentDirectory, false);
-      activePanel = prev;
-      updatePanelHighlights();
+      await loadDirectory(curTab.currentDirectory, false, panelIdx);
+    } else {
+      renderFileList(panelIdx);
     }
   }
 
