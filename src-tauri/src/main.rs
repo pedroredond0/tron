@@ -3732,6 +3732,32 @@ fn force_exit_app() {
     std::process::exit(0);
 }
 
+#[tauri::command]
+fn window_minimize(window: tauri::Window) -> Result<(), String> {
+    window.minimize().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn window_toggle_maximize(window: tauri::Window) -> Result<(), String> {
+    let is_max = window.is_maximized().map_err(|e| e.to_string())?;
+    if is_max {
+        window.unmaximize().map_err(|e| e.to_string())?;
+    } else {
+        window.maximize().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn window_close(window: tauri::Window) -> Result<(), String> {
+    window.close().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn is_window_maximized(window: tauri::Window) -> Result<bool, String> {
+    window.is_maximized().map_err(|e| e.to_string())
+}
+
 #[allow(dead_code)]
 fn build_app_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Result<tauri::menu::Menu<R>, Box<dyn std::error::Error>> {
     use tauri::menu::*;
@@ -3898,7 +3924,11 @@ fn main() {
             generate_directory_listing,
             get_disk_free_space,
             check_app_updates,
-            apply_app_update
+            apply_app_update,
+            window_minimize,
+            window_toggle_maximize,
+            window_close,
+            is_window_maximized
         ])
         .run(tauri::generate_context!());
 

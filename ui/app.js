@@ -73,66 +73,94 @@
     };
   }
 
-  // State Management with Panel & Tab Architecture
-  function createPanelState() {
+  // Global Unified Tab & Split Panel Architecture
+  let windowTabs = [ createTabState() ];
+  let activeWindowTab = 0;
+
+  function getCurrentWindowTab() {
+    if (!windowTabs || windowTabs.length === 0) {
+      windowTabs = [ createTabState() ];
+      activeWindowTab = 0;
+    }
+    if (activeWindowTab < 0 || activeWindowTab >= windowTabs.length) {
+      activeWindowTab = Math.max(0, windowTabs.length - 1);
+    }
+    return windowTabs[activeWindowTab];
+  }
+
+  function getActiveTabObj(panelIdx = activePanel) {
+    const tab = getCurrentWindowTab();
+    if (!tab.split) {
+      tab.split = createTabState(tab.currentDirectory || '').split || {
+        currentDirectory: tab.currentDirectory || '',
+        items: [],
+        filteredItems: [],
+        selectedIndex: -1,
+        selectionAnchor: -1,
+        selectedItems: new Set(),
+        history: [],
+        historyIndex: -1,
+        searchQuery: '',
+        isSearchingRecursive: false,
+        activeSherlockFilter: null,
+        sherlockResults: null,
+        searchItems: null,
+        freeSpaceBytes: null,
+        totalSpaceBytes: null,
+        scrollTop: 0,
+        expandedDirs: new Map()
+      };
+    }
+    return panelIdx === 0 ? tab : tab.split;
+  }
+
+  function createPanelAccessor(panelIdx) {
     return {
-      tabs: [ createTabState() ],
-      activeTab: 0,
-      get currentTab() {
-        if (!this.tabs || this.tabs.length === 0) {
-          this.tabs = [ createTabState() ];
-          this.activeTab = 0;
-        }
-        if (this.activeTab < 0 || this.activeTab >= this.tabs.length) {
-          this.activeTab = Math.max(0, this.tabs.length - 1);
-        }
-        return this.tabs[this.activeTab];
-      },
-      get currentDirectory() { return this.currentTab.currentDirectory || ''; },
+      get currentTab() { return getActiveTabObj(panelIdx); },
+      get currentDirectory() { return getActiveTabObj(panelIdx).currentDirectory || ''; },
       set currentDirectory(v) {
-        this.currentTab.currentDirectory = v;
-        this.currentTab.name = v ? getDirBaseName(v) : 'Inicio';
+        const target = getActiveTabObj(panelIdx);
+        target.currentDirectory = v;
+        if (panelIdx === 0) {
+          getCurrentWindowTab().name = v ? getDirBaseName(v) : 'Inicio';
+        }
         renderTabs();
       },
-      get items() { return this.currentTab.items || []; },
-      set items(v) { this.currentTab.items = v; },
-      get filteredItems() { return this.currentTab.filteredItems || []; },
-      set filteredItems(v) { this.currentTab.filteredItems = v; },
-      get selectedIndex() { return this.currentTab.selectedIndex; },
-      set selectedIndex(v) { this.currentTab.selectedIndex = v; },
-      get selectionAnchor() { return this.currentTab.selectionAnchor; },
-      set selectionAnchor(v) { this.currentTab.selectionAnchor = v; },
-      get selectedItems() { return this.currentTab.selectedItems; },
-      set selectedItems(v) { this.currentTab.selectedItems = v; },
-      get history() { return this.currentTab.history; },
-      set history(v) { this.currentTab.history = v; },
-      get historyIndex() { return this.currentTab.historyIndex; },
-      set historyIndex(v) { this.currentTab.historyIndex = v; },
-      get searchQuery() { return this.currentTab.searchQuery; },
-      set searchQuery(v) { this.currentTab.searchQuery = v; },
-      get isSearchingRecursive() { return this.currentTab.isSearchingRecursive; },
-      set isSearchingRecursive(v) { this.currentTab.isSearchingRecursive = v; },
-      get activeSherlockFilter() { return this.currentTab.activeSherlockFilter; },
-      set activeSherlockFilter(v) { this.currentTab.activeSherlockFilter = v; },
-      get sherlockResults() { return this.currentTab.sherlockResults; },
-      set sherlockResults(v) { this.currentTab.sherlockResults = v; },
-      get searchItems() { return this.currentTab.searchItems; },
-      set searchItems(v) { this.currentTab.searchItems = v; },
-      get freeSpaceBytes() { return this.currentTab.freeSpaceBytes; },
-      set freeSpaceBytes(v) { this.currentTab.freeSpaceBytes = v; },
-      get totalSpaceBytes() { return this.currentTab.totalSpaceBytes; },
-      set totalSpaceBytes(v) { this.currentTab.totalSpaceBytes = v; },
-      get expandedDirs() { return this.currentTab.expandedDirs; }
+      get items() { return getActiveTabObj(panelIdx).items || []; },
+      set items(v) { getActiveTabObj(panelIdx).items = v; },
+      get filteredItems() { return getActiveTabObj(panelIdx).filteredItems || []; },
+      set filteredItems(v) { getActiveTabObj(panelIdx).filteredItems = v; },
+      get selectedIndex() { return getActiveTabObj(panelIdx).selectedIndex; },
+      set selectedIndex(v) { getActiveTabObj(panelIdx).selectedIndex = v; },
+      get selectionAnchor() { return getActiveTabObj(panelIdx).selectionAnchor; },
+      set selectionAnchor(v) { getActiveTabObj(panelIdx).selectionAnchor = v; },
+      get selectedItems() { return getActiveTabObj(panelIdx).selectedItems; },
+      set selectedItems(v) { getActiveTabObj(panelIdx).selectedItems = v; },
+      get history() { return getActiveTabObj(panelIdx).history; },
+      set history(v) { getActiveTabObj(panelIdx).history = v; },
+      get historyIndex() { return getActiveTabObj(panelIdx).historyIndex; },
+      set historyIndex(v) { getActiveTabObj(panelIdx).historyIndex = v; },
+      get searchQuery() { return getActiveTabObj(panelIdx).searchQuery; },
+      set searchQuery(v) { getActiveTabObj(panelIdx).searchQuery = v; },
+      get isSearchingRecursive() { return getActiveTabObj(panelIdx).isSearchingRecursive; },
+      set isSearchingRecursive(v) { getActiveTabObj(panelIdx).isSearchingRecursive = v; },
+      get activeSherlockFilter() { return getActiveTabObj(panelIdx).activeSherlockFilter; },
+      set activeSherlockFilter(v) { getActiveTabObj(panelIdx).activeSherlockFilter = v; },
+      get sherlockResults() { return getActiveTabObj(panelIdx).sherlockResults; },
+      set sherlockResults(v) { getActiveTabObj(panelIdx).sherlockResults = v; },
+      get searchItems() { return getActiveTabObj(panelIdx).searchItems; },
+      set searchItems(v) { getActiveTabObj(panelIdx).searchItems = v; },
+      get freeSpaceBytes() { return getActiveTabObj(panelIdx).freeSpaceBytes; },
+      set freeSpaceBytes(v) { getActiveTabObj(panelIdx).freeSpaceBytes = v; },
+      get totalSpaceBytes() { return getActiveTabObj(panelIdx).totalSpaceBytes; },
+      set totalSpaceBytes(v) { getActiveTabObj(panelIdx).totalSpaceBytes = v; },
+      get expandedDirs() { return getActiveTabObj(panelIdx).expandedDirs; }
     };
   }
 
-  const panels = [ createPanelState(), createPanelState() ];
+  const panels = [ createPanelAccessor(0), createPanelAccessor(1) ];
   let activePanel = 0;
   let isSplitView = false;
-
-  function getActiveTabObj(panelIdx = activePanel) {
-    return panels[panelIdx].currentTab;
-  }
 
   // File Color Tags Store: { [normalizedPath]: [color1, color2, ...] }
   let fileTagsMap = {};
@@ -355,6 +383,12 @@
     pathIndicatorA: document.getElementById('pathIndicatorA'),
     pathIndicatorB: document.getElementById('pathIndicatorB'),
     menuBar: document.getElementById('menuBar'),
+    menuBarItems: document.getElementById('menuBarItems'),
+    btnWinMinimize: document.getElementById('btnWinMinimize'),
+    btnWinMaximize: document.getElementById('btnWinMaximize'),
+    btnWinClose: document.getElementById('btnWinClose'),
+    iconWinMaximize: document.getElementById('iconWinMaximize'),
+    iconWinRestore: document.getElementById('iconWinRestore'),
     chkShowMenuBar: document.getElementById('chkShowMenuBar'),
     menuToggleMenuBar: document.getElementById('menuToggleMenuBar'),
     tabBar: document.getElementById('tabBar'),
@@ -571,6 +605,7 @@
     ctxMenuAddFavorite: document.getElementById('ctxMenuAddFavorite'),
     ctxMenuDelete: document.getElementById('ctxMenuDelete'),
     ctxMenuProperties: document.getElementById('ctxMenuProperties'),
+    ctxMenuClearTags: document.getElementById('ctxMenuClearTags'),
     modalOpenWith: document.getElementById('modalOpenWith'),
     btnCloseOpenWithModal: document.getElementById('btnCloseOpenWithModal'),
     btnCancelOpenWith: document.getElementById('btnCancelOpenWith'),
@@ -1312,6 +1347,32 @@ modalSherlock: document.getElementById('modalSherlock'),
   }
 
   // Custom Pointer-based Drag & Drop implementation
+  
+  function getVolumeIdentifier(p) {
+    if (!p) return '';
+    p = p.trim();
+    if (p.startsWith('\\\\') || p.startsWith('//')) {
+      const parts = p.replace(/\\/g, '/').split('/').filter(Boolean);
+      if (parts.length >= 2) return '//' + parts[0].toLowerCase() + '/' + parts[1].toLowerCase();
+      return p.toLowerCase();
+    }
+    const m = p.match(/^([a-zA-Z]:)/);
+    if (m) return m[1].toUpperCase();
+    return '/';
+  }
+
+  function isSameVolume(pathA, pathB) {
+    if (!pathA || !pathB) return true;
+    return getVolumeIdentifier(pathA) === getVolumeIdentifier(pathB);
+  }
+
+  function getParentDirPath(p) {
+    if (!p) return '';
+    const clean = p.replace(/[\/\\]+$/, '');
+    const lastSlash = Math.max(clean.lastIndexOf('/'), clean.lastIndexOf('\\'));
+    return lastSlash > 0 ? clean.substring(0, lastSlash) : clean;
+  }
+
   function setupRowDragAndDrop(row, item) {
     let isDragging = false;
     let dragStartX = 0;
@@ -1330,7 +1391,6 @@ modalSherlock: document.getElementById('modalSherlock'),
           const dx = moveEvent.clientX - dragStartX;
           const dy = moveEvent.clientY - dragStartY;
           if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
-            // Start dragging
             isDragging = true;
             let pathsToDrag = [];
             if (state.selectedItems.has(item.path)) {
@@ -1340,16 +1400,12 @@ modalSherlock: document.getElementById('modalSherlock'),
             }
             state.draggedInternalPaths = pathsToDrag;
             
-            // Set global dragging state class
             document.body.classList.add('internal-dragging');
             row.classList.add('opacity-50');
             
-            // Note: We don't create a visual ghost element to keep it simple, 
-            // the system cursor won't change but the targets will highlight.
-            // But let's create a minimal ghost attached to the mouse!
             const ghost = document.createElement('div');
             ghost.id = 'drag-ghost';
-            ghost.className = 'fixed pointer-events-none bg-gnome-active text-white px-3 py-1 rounded shadow-lg z-[9999] opacity-80 whitespace-nowrap text-xs flex items-center gap-2';
+            ghost.className = 'fixed pointer-events-none bg-gnome-active text-white px-3 py-1 rounded shadow-lg z-[9999] opacity-90 whitespace-nowrap text-xs flex items-center gap-2 font-medium';
             ghost.innerHTML = `<span>📄</span> ${pathsToDrag.length} elemento(s)`;
             ghost.style.left = `${moveEvent.clientX + 10}px`;
             ghost.style.top = `${moveEvent.clientY + 10}px`;
@@ -1365,21 +1421,55 @@ modalSherlock: document.getElementById('modalSherlock'),
             ghost.style.top = `${moveEvent.clientY + 10}px`;
           }
           
-          // Find drop target under mouse (temporarily hiding ghost is not needed if pointer-events-none)
+          // Find drop target under mouse
           const targetElement = document.elementFromPoint(moveEvent.clientX, moveEvent.clientY);
-          const dropTarget = targetElement ? targetElement.closest('.drop-target') : null;
+          let dropTarget = targetElement ? targetElement.closest('.drop-target') : null;
+          let resolvedTargetDir = null;
+
+          if (dropTarget) {
+            resolvedTargetDir = dropTarget.dataset.path || dropTarget.dataset.targetDir;
+          } else if (targetElement) {
+            const pB = targetElement.closest('#panelB, #fileListB');
+            const pA = targetElement.closest('#panelA, #fileList');
+            if (pB && isSplitView && panels[1].currentDirectory) {
+              dropTarget = pB;
+              resolvedTargetDir = panels[1].currentDirectory;
+            } else if (pA && panels[0].currentDirectory) {
+              dropTarget = pA;
+              resolvedTargetDir = panels[0].currentDirectory;
+            }
+          }
           
+          // Determine action: Ctrl forces copy, Shift forces move, otherwise volume detection
+          let actionType = 'move';
+          const firstSource = state.draggedInternalPaths[0];
+          if (moveEvent.ctrlKey) {
+            actionType = 'copy';
+          } else if (moveEvent.shiftKey) {
+            actionType = 'move';
+          } else if (resolvedTargetDir && !isSameVolume(firstSource, resolvedTargetDir)) {
+            actionType = 'copy';
+          } else {
+            actionType = 'move';
+          }
+
+          if (ghost) {
+            const icon = actionType === 'copy' ? '📋 Copiar' : '🚚 Mover';
+            ghost.innerHTML = `<span>${icon}</span> ${state.draggedInternalPaths.length} elemento(s)`;
+          }
+
           // Clear previous highlights
           document.querySelectorAll('.drop-highlight').forEach(el => {
             if (el !== dropTarget) el.classList.remove('drop-highlight', 'ring-2', 'ring-gnome-active', 'bg-gnome-hover');
           });
           
-          // Add highlight to current target
-          if (dropTarget) {
-            const targetPath = dropTarget.dataset.path || dropTarget.dataset.targetDir;
-            // Prevent dropping into itself
-            if (!state.draggedInternalPaths.includes(targetPath)) {
-              dropTarget.classList.add('drop-highlight', 'ring-2', 'ring-gnome-active', 'bg-gnome-hover');
+          if (dropTarget && resolvedTargetDir) {
+            const isSameParent = state.draggedInternalPaths.some(src => {
+              const parent = getParentDirPath(src);
+              return parent.toLowerCase().replace(/\\/g, '/') === resolvedTargetDir.toLowerCase().replace(/\\/g, '/');
+            });
+            if (!state.draggedInternalPaths.includes(resolvedTargetDir) && (!isSameParent || actionType === 'copy')) {
+              dropTarget.classList.add('drop-highlight', 'ring-2', 'ring-gnome-active');
             }
           }
         }
@@ -1396,21 +1486,49 @@ modalSherlock: document.getElementById('modalSherlock'),
           const ghost = document.getElementById('drag-ghost');
           if (ghost) ghost.remove();
           
-          // Find drop target
           const targetElement = document.elementFromPoint(upEvent.clientX, upEvent.clientY);
-          const dropTarget = targetElement ? targetElement.closest('.drop-target') : null;
+          let dropTarget = targetElement ? targetElement.closest('.drop-target') : null;
+          let resolvedTargetDir = null;
+
+          if (dropTarget) {
+            resolvedTargetDir = dropTarget.dataset.path || dropTarget.dataset.targetDir;
+          } else if (targetElement) {
+            const pB = targetElement.closest('#panelB, #fileListB');
+            const pA = targetElement.closest('#panelA, #fileList');
+            if (pB && isSplitView && panels[1].currentDirectory) {
+              resolvedTargetDir = panels[1].currentDirectory;
+            } else if (pA && panels[0].currentDirectory) {
+              resolvedTargetDir = panels[0].currentDirectory;
+            }
+          }
           
           document.querySelectorAll('.drop-highlight').forEach(el => {
              el.classList.remove('drop-highlight', 'ring-2', 'ring-gnome-active', 'bg-gnome-hover');
           });
           
-          if (dropTarget) {
-             const targetPath = dropTarget.dataset.path || dropTarget.dataset.targetDir;
+          if (resolvedTargetDir) {
              const sources = [...state.draggedInternalPaths];
-             const validSources = sources.filter(s => s !== targetPath);
-             if (validSources.length > 0) {
-               const action = upEvent.ctrlKey ? 'copy' : 'move';
-               startTransferOperation(action, validSources, targetPath);
+             const validSources = sources.filter(s => s !== resolvedTargetDir);
+             
+             let action = 'move';
+             if (upEvent.ctrlKey) {
+               action = 'copy';
+             } else if (upEvent.shiftKey) {
+               action = 'move';
+             } else if (!isSameVolume(validSources[0], resolvedTargetDir)) {
+               action = 'copy';
+             } else {
+               action = 'move';
+             }
+
+             // Do not move into same directory
+             const filtered = action === 'move' ? validSources.filter(s => {
+               const p = getParentDirPath(s);
+               return p.toLowerCase().replace(/\\/g, '/') !== resolvedTargetDir.toLowerCase().replace(/\\/g, '/');
+             }) : validSources;
+
+             if (filtered.length > 0) {
+               startTransferOperation(action, filtered, resolvedTargetDir);
              }
           }
           
@@ -2285,14 +2403,14 @@ modalSherlock: document.getElementById('modalSherlock'),
 
     if (isModKey(e) && (e.key === 'w' || e.key === 'W')) {
       e.preventDefault();
-      closeTab(panels[activePanel].activeTab);
+      closeTab(activeWindowTab);
       return;
     }
 
     if (isModKey(e) && e.key >= '1' && e.key <= '9') {
       const tabNum = parseInt(e.key, 10) - 1;
       const p = panels[activePanel];
-      if (p.tabs && tabNum < p.tabs.length) {
+      if (tabNum < windowTabs.length) {
         e.preventDefault();
         switchTab(tabNum);
         return;
@@ -2589,6 +2707,27 @@ modalSherlock: document.getElementById('modalSherlock'),
     renderFileList();
   }
 
+  
+  async function reloadBothPanelsIfNeeded() {
+    if (isSplitView) {
+      const cur = activePanel;
+      if (panels[cur].currentDirectory) {
+        await loadDirectory(panels[cur].currentDirectory, false);
+      }
+      const other = cur === 0 ? 1 : 0;
+      if (panels[other].currentDirectory) {
+        activePanel = other;
+        await loadDirectory(panels[other].currentDirectory, false);
+        activePanel = cur;
+        updatePanelHighlights();
+        renderBreadcrumbs();
+        renderFileList();
+      }
+    } else if (state.currentDirectory) {
+      await loadDirectory(state.currentDirectory, false);
+    }
+  }
+
   async function pasteClipboardItems() {
     if (!state.clipboard.action || state.clipboard.paths.length === 0 || !state.currentDirectory) {
       return;
@@ -2603,7 +2742,8 @@ modalSherlock: document.getElementById('modalSherlock'),
       updateClipboardUI();
     }
 
-    startTransferOperation(action, sources, targetDir);
+    await startTransferOperation(action, sources, targetDir);
+    reloadBothPanelsIfNeeded();
   }
 
   // --- Multi-Task Transfer Progress & Manager ---
@@ -2700,16 +2840,7 @@ async function startTransferOperation(action, sources, targetDir) {
 
     renderAllTransfersUI();
 
-    // Auto-reload current directory if user is inside the target folder OR if it was a move operation
-    if (state.currentDirectory) {
-      const curNorm = state.currentDirectory.toLowerCase().replace(/\\/g, '/');
-      const targetNorm = (payload.target_directory || '').toLowerCase().replace(/\\/g, '/');
-      
-      // If we are in the target directory, or if it was a 'move' operation (where sources were removed from current dir)
-      if (curNorm === targetNorm || payload.action === 'move' || payload.action === 'copy') {
-        loadDirectory(state.currentDirectory, false);
-      }
-    }
+    reloadBothPanelsIfNeeded();
 
     // Auto-remove completed tasks immediately
     setTimeout(() => {
@@ -3698,10 +3829,13 @@ async function startTransferOperation(action, sources, targetDir) {
     el.fileList.focus();
   }
 
+  let isCreatingFolder = false;
   async function confirmNewFolder() {
+    if (isCreatingFolder) return;
     const folderName = el.inputNewFolderName.value.trim();
     if (!folderName) return;
 
+    isCreatingFolder = true;
     try {
       await invoke('create_new_directory', {
         dirPath: state.currentDirectory,
@@ -3715,12 +3849,14 @@ async function startTransferOperation(action, sources, targetDir) {
       if (idx >= 0) setSelectionIndex(idx);
     } catch (err) {
       alert('Error al crear carpeta: ' + err);
+    } finally {
+      isCreatingFolder = false;
     }
   }
 
   // Network Dialog
   function openNetworkModal() {
-    el.inputNetworkPath.value = '\\\\';
+    el.inputNetworkPath.value = isMac || (navigator.platform && navigator.platform.includes('Linux')) ? 'smb://' : '\\\\';
     el.modalNetwork.classList.remove('hidden');
     el.inputNetworkPath.focus();
   }
@@ -3731,9 +3867,18 @@ async function startTransferOperation(action, sources, targetDir) {
   }
 
   function confirmNetwork() {
-    const path = el.inputNetworkPath.value.trim();
+    let path = el.inputNetworkPath.value.trim();
     if (path) {
       closeNetworkModal();
+      if (/^smb:\/\//i.test(path)) {
+        if (!isMac && !navigator.platform?.includes('Linux')) {
+          path = path.replace(/^smb:\/\//i, '\\\\').replace(/\//g, '\\');
+        }
+      } else if (path.startsWith('\\\\')) {
+        if (isMac || navigator.platform?.includes('Linux')) {
+          path = 'smb://' + path.replace(/^\\\\/, '').replace(/\\/g, '/');
+        }
+      }
       loadDirectory(path);
     }
   }
@@ -3960,25 +4105,24 @@ async function startTransferOperation(action, sources, targetDir) {
   }
 
 
-  // Tab Management Implementation
+  // Unified Tab Management Implementation
   function renderTabs() {
     if (!el.tabList) return;
     el.tabList.innerHTML = '';
-    const panel = panels[activePanel];
-    if (!panel.tabs) return;
+    if (!windowTabs || windowTabs.length === 0) return;
 
     if (el.tabBar) {
-      if (panel.tabs.length <= 1) {
+      if (windowTabs.length <= 1) {
         el.tabBar.classList.add('hidden');
       } else {
         el.tabBar.classList.remove('hidden');
       }
     }
 
-    panel.tabs.forEach((t, idx) => {
-      const isActive = idx === panel.activeTab;
+    windowTabs.forEach((t, idx) => {
+      const isActive = idx === activeWindowTab;
       const tabEl = document.createElement('div');
-      tabEl.className = `group h-6 px-2 rounded flex items-center gap-1.5 text-xs select-none cursor-pointer transition-colors max-w-[160px] ${
+      tabEl.className = `group h-6 px-2.5 rounded flex items-center gap-1.5 text-xs select-none cursor-pointer transition-colors max-w-[170px] ${
         isActive 
           ? 'bg-gnome-surface text-white font-medium border-t-2 border-gnome-active shadow-sm' 
           : 'bg-gnome-sidebar hover:bg-gnome-hover/70 text-gnome-textDim hover:text-gnome-text'
@@ -4015,48 +4159,57 @@ async function startTransferOperation(action, sources, targetDir) {
   }
 
   async function createTab(dir = '') {
-    const p = panels[activePanel];
-    const initialDir = dir || p.currentDirectory || state.currentDirectory || state.userHomeDir || '/';
+    const initialDir = dir || panels[0].currentDirectory || state.currentDirectory || state.userHomeDir || '/';
+    const splitDir = panels[1].currentDirectory || initialDir;
     const newTab = createTabState(initialDir);
-    p.tabs.push(newTab);
-    p.activeTab = p.tabs.length - 1;
+    newTab.split = createTabState(splitDir);
+    windowTabs.push(newTab);
+    activeWindowTab = windowTabs.length - 1;
     renderTabs();
     await loadDirectory(initialDir, true);
+    if (isSplitView && splitDir) {
+      const prev = activePanel;
+      activePanel = 1;
+      await loadDirectory(splitDir, false);
+      activePanel = prev;
+      updatePanelHighlights();
+    }
   }
 
   function closeTab(index) {
-    const p = panels[activePanel];
-    if (p.tabs.length <= 1) {
-      // Don't close last tab, just reset it to home or refresh
-      return;
-    }
-    p.tabs.splice(index, 1);
-    if (p.activeTab >= p.tabs.length) {
-      p.activeTab = p.tabs.length - 1;
+    if (windowTabs.length <= 1) return;
+    windowTabs.splice(index, 1);
+    if (activeWindowTab >= windowTabs.length) {
+      activeWindowTab = windowTabs.length - 1;
     }
     renderTabs();
-    const curTab = p.tabs[p.activeTab];
+    const curTab = windowTabs[activeWindowTab];
     if (curTab.currentDirectory) {
       loadDirectory(curTab.currentDirectory, false);
-    } else {
-      renderFileList();
-      updateStatusBar();
-      renderBreadcrumbs();
+    }
+    if (isSplitView && curTab.split && curTab.split.currentDirectory) {
+      const prev = activePanel;
+      activePanel = 1;
+      loadDirectory(curTab.split.currentDirectory, false);
+      activePanel = prev;
+      updatePanelHighlights();
     }
   }
 
   function switchTab(index) {
-    const p = panels[activePanel];
-    if (index < 0 || index >= p.tabs.length) return;
-    p.activeTab = index;
+    if (index < 0 || index >= windowTabs.length) return;
+    activeWindowTab = index;
     renderTabs();
-    const curTab = p.tabs[p.activeTab];
+    const curTab = windowTabs[activeWindowTab];
     if (curTab.currentDirectory) {
       loadDirectory(curTab.currentDirectory, false);
-    } else {
-      renderFileList();
-      updateStatusBar();
-      renderBreadcrumbs();
+    }
+    if (isSplitView && curTab.split && curTab.split.currentDirectory) {
+      const prev = activePanel;
+      activePanel = 1;
+      loadDirectory(curTab.split.currentDirectory, false);
+      activePanel = prev;
+      updatePanelHighlights();
     }
   }
 
@@ -4768,6 +4921,38 @@ async function startTransferOperation(action, sources, targetDir) {
     el.btnActionDelete.onclick = deleteCurrentItem;
     el.btnActionQuickView.onclick = openQuickView;
     if (el.btnToggleSplitView) el.btnToggleSplitView.onclick = toggleSplitView;
+
+    // Window Controls (Minimizar, Maximizar/Restaurar, Cerrar)
+    if (el.btnWinMinimize) {
+      el.btnWinMinimize.onclick = () => invoke('window_minimize');
+    }
+    if (el.btnWinMaximize) {
+      el.btnWinMaximize.onclick = async () => {
+        await invoke('window_toggle_maximize');
+        setTimeout(updateMaximizeIcon, 80);
+      };
+    }
+    if (el.btnWinClose) {
+      el.btnWinClose.onclick = () => invoke('window_close');
+    }
+
+    async function updateMaximizeIcon() {
+      try {
+        const isMax = await invoke('is_window_maximized');
+        if (el.iconWinMaximize && el.iconWinRestore) {
+          if (isMax) {
+            el.iconWinMaximize.classList.add('hidden');
+            el.iconWinRestore.classList.remove('hidden');
+          } else {
+            el.iconWinMaximize.classList.remove('hidden');
+            el.iconWinRestore.classList.add('hidden');
+          }
+        }
+      } catch (e) {}
+    }
+    window.addEventListener('resize', updateMaximizeIcon);
+    setTimeout(updateMaximizeIcon, 250);
+
 
     // Sidebar buttons
     el.btnAddCurrentFav.onclick = addCurrentToFavorites;
@@ -5985,7 +6170,10 @@ async function startTransferOperation(action, sources, targetDir) {
       return;
     }
     const show = state.showMenuBar !== false;
-    el.menuBar.style.display = show ? 'flex' : 'none';
+    if (el.menuBarItems) {
+      el.menuBarItems.style.display = show ? 'flex' : 'none';
+    }
+    el.menuBar.style.display = 'flex';
     if (el.chkShowMenuBar) {
       el.chkShowMenuBar.checked = show;
     }
