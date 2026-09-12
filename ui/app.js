@@ -4848,13 +4848,13 @@ async function startTransferOperation(action, sources, targetDir) {
       el.inputPdfOptimizeOutName.value = defaultOutName;
     }
     if (el.sliderPdfOptimizeQuality) {
-      el.sliderPdfOptimizeQuality.value = '70';
+      el.sliderPdfOptimizeQuality.value = '40';
     }
     if (el.pdfOptimizeQualityVal) {
-      el.pdfOptimizeQualityVal.textContent = '70%';
+      el.pdfOptimizeQualityVal.textContent = '40%';
     }
     if (el.pdfOptimizeEstimatedSize) {
-      const est = Math.round(origSize * 0.55);
+      const est = Math.round(origSize * 0.68);
       el.pdfOptimizeEstimatedSize.textContent = '~' + formatSize(est);
     }
     if (el.pdfOptimizeStatus) {
@@ -6522,7 +6522,7 @@ async function startTransferOperation(action, sources, targetDir) {
         const val = e.target.value;
         if (el.pdfOptimizeQualityVal) el.pdfOptimizeQualityVal.textContent = val + '%';
         if (el.pdfOptimizeEstimatedSize && pdfOptimizeTarget) {
-          const ratio = (val / 100) * 0.75;
+          const ratio = 0.5 + (val / 100) * 0.45;
           const est = Math.round((pdfOptimizeTarget.size || 0) * ratio);
           el.pdfOptimizeEstimatedSize.textContent = '~' + formatSize(est);
         }
