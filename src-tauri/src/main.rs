@@ -561,31 +561,81 @@ fn extract_docx_content(file_path: &Path) -> Result<String, String> {
     }
 
     let mut html = String::new();
-    html.push_str("<div class=\"docx-doc max-w-3xl mx-auto space-y-3 font-sans text-xs leading-relaxed text-gnome-text select-text\">");
+    html.push_str("<div class=\"docx-page-container max-w-2xl mx-auto my-3 p-8 bg-gnome-sidebar border border-gnome-border rounded-xl shadow-xl space-y-4 font-sans text-xs leading-relaxed text-gnome-text select-text\">");
 
-    for p_chunk in doc_xml.split("<w:p ") {
-        let is_heading = p_chunk.contains("val=\"Heading1\"") || p_chunk.contains("val=\"Heading2\"") || p_chunk.contains("val=\"Heading3\"") || p_chunk.contains("val=\"Title\"");
-        let is_bullet = p_chunk.contains("<w:numPr>");
+    // Check for tables in document
+    for tbl_or_chunk in doc_xml.split("<w:tbl>") {
+        let (tbl_part, after_tbl) = if tbl_or_chunk.contains("</w:tbl>") {
+            let mut parts = tbl_or_chunk.splitn(2, "</w:tbl>");
+            (Some(parts.next().unwrap_or("")), parts.next().unwrap_or(""))
+        } else {
+            (None, tbl_or_chunk)
+        };
 
-        let mut p_text = String::new();
-        for t_chunk in p_chunk.split("<w:t") {
-            if let Some(start_bracket) = t_chunk.find('>') {
-                if let Some(close_tag) = t_chunk.find("</w:t>") {
-                    let val = &t_chunk[start_bracket + 1..close_tag];
-                    p_text.push_str(val);
+        if let Some(tbl_content) = tbl_part {
+            html.push_str("<div class=\"overflow-x-auto my-3 border border-gnome-border rounded-lg shadow-sm\"><table class=\"w-full text-xs border-collapse font-sans\">");
+            for tr_chunk in tbl_content.split("<w:tr>") {
+                if !tr_chunk.contains("</w:tr>") { continue; }
+                html.push_str("<tr class=\"border-b border-gnome-border/40 hover:bg-gnome-hover/30\">");
+                for tc_chunk in tr_chunk.split("<w:tc>") {
+                    if !tc_chunk.contains("</w:tc>") { continue; }
+                    let mut cell_text = String::new();
+                    for t_chunk in tc_chunk.split("<w:t") {
+                        if let Some(start_b) = t_chunk.find('>') {
+                            if let Some(close_t) = t_chunk.find("</w:t>") {
+                                cell_text.push_str(&t_chunk[start_b + 1..close_t]);
+                            }
+                        }
+                    }
+                    html.push_str(&format!("<td class=\"px-3 py-1.5 border-r border-gnome-border/30 text-gnome-text\">{}</td>", escape_html_str(cell_text.trim())));
                 }
+                html.push_str("</tr>");
             }
+            html.push_str("</table></div>");
         }
 
-        let trimmed = p_text.trim();
-        if !trimmed.is_empty() {
-            let escaped = escape_html_str(trimmed);
-            if is_heading {
-                html.push_str(&format!("<h2 class=\"text-sm font-bold text-gnome-active border-b border-gnome-border/50 pb-1 mt-4 mb-2\">{}</h2>", escaped));
-            } else if is_bullet {
-                html.push_str(&format!("<div class=\"flex items-start gap-2 pl-4\"><span class=\"text-gnome-active font-bold\">•</span><span>{}</span></div>", escaped));
-            } else {
-                html.push_str(&format!("<p class=\"text-gnome-text/90\">{}</p>", escaped));
+        for p_chunk in after_tbl.split("<w:p ") {
+            let is_title = p_chunk.contains("val=\"Title\"");
+            let is_h1 = p_chunk.contains("val=\"Heading1\"");
+            let is_h2 = p_chunk.contains("val=\"Heading2\"");
+            let is_h3 = p_chunk.contains("val=\"Heading3\"");
+            let is_bullet = p_chunk.contains("<w:numPr>");
+
+            let mut p_text = String::new();
+            for r_chunk in p_chunk.split("<w:r>") {
+                let is_bold = r_chunk.contains("<w:b/>") || r_chunk.contains("<w:b ");
+                let is_italic = r_chunk.contains("<w:i/>") || r_chunk.contains("<w:i ");
+                let is_underline = r_chunk.contains("<w:u ");
+
+                for t_chunk in r_chunk.split("<w:t") {
+                    if let Some(start_bracket) = t_chunk.find('>') {
+                        if let Some(close_tag) = t_chunk.find("</w:t>") {
+                            let val = &t_chunk[start_bracket + 1..close_tag];
+                            let mut seg = escape_html_str(val);
+                            if is_bold { seg = format!("<strong>{}</strong>", seg); }
+                            if is_italic { seg = format!("<em>{}</em>", seg); }
+                            if is_underline { seg = format!("<u>{}</u>", seg); }
+                            p_text.push_str(&seg);
+                        }
+                    }
+                }
+            }
+
+            let trimmed = p_text.trim();
+            if !trimmed.is_empty() {
+                if is_title {
+                    html.push_str(&format!("<h1 class=\"text-lg font-bold text-gnome-active border-b border-gnome-border/60 pb-2 mb-3 mt-2\">{}</h1>", trimmed));
+                } else if is_h1 {
+                    html.push_str(&format!("<h2 class=\"text-sm font-bold text-gnome-active border-b border-gnome-border/50 pb-1 mt-4 mb-2\">{}</h2>", trimmed));
+                } else if is_h2 {
+                    html.push_str(&format!("<h3 class=\"text-xs font-semibold text-gnome-text border-b border-gnome-border/30 pb-0.5 mt-3 mb-1.5\">{}</h3>", trimmed));
+                } else if is_h3 {
+                    html.push_str(&format!("<h4 class=\"text-xs font-medium text-gnome-textDim mt-2 mb-1\">{}</h4>", trimmed));
+                } else if is_bullet {
+                    html.push_str(&format!("<div class=\"flex items-start gap-2 pl-4 py-0.5\"><span class=\"text-gnome-active font-bold\">•</span><span>{}</span></div>", trimmed));
+                } else {
+                    html.push_str(&format!("<p class=\"text-gnome-text/90 leading-relaxed py-0.5\">{}</p>", trimmed));
+                }
             }
         }
     }
@@ -624,12 +674,30 @@ fn extract_xlsx_content(file_path: &Path) -> Result<String, String> {
     }
 
     let mut html = String::new();
-    html.push_str("<div class=\"xlsx-table-wrapper overflow-auto max-h-[65vh] border border-gnome-border rounded-lg shadow bg-gnome-surface\">");
+    html.push_str("<div class=\"xlsx-container flex flex-col h-full max-h-[70vh] border border-gnome-border rounded-xl shadow-lg bg-gnome-surface overflow-hidden\">");
+    
+    // Excel top toolbar header
+    html.push_str("<div class=\"flex items-center justify-between px-3 py-1.5 bg-emerald-700/20 border-b border-emerald-600/30 text-emerald-400 text-xs font-semibold select-none\">");
+    html.push_str("<div class=\"flex items-center gap-1.5\"><span>📊</span><span>Hoja 1</span></div>");
+    html.push_str("<span class=\"text-[10px] text-emerald-400/70 font-mono\">Excel Grid Viewer</span>");
+    html.push_str("</div>");
+
+    html.push_str("<div class=\"xlsx-table-wrapper flex-1 overflow-auto\">");
     html.push_str("<table class=\"w-full text-left text-xs border-collapse font-mono select-text\">");
+
+    // Generate Excel column letters header (A, B, C, ...)
+    html.push_str("<thead class=\"sticky top-0 bg-gnome-sidebar border-b border-gnome-border select-none z-10\"><tr>");
+    html.push_str("<th class=\"w-10 px-2 py-1 bg-gnome-sidebar/90 border-r border-gnome-border text-[10px] text-gnome-textDim text-center font-bold\">#</th>");
+    let col_letters = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P"];
+    for col in col_letters.iter() {
+        html.push_str(&format!("<th class=\"px-3 py-1 border-r border-gnome-border/40 text-[10px] text-gnome-textDim text-center font-bold tracking-wider\">{}</th>", col));
+    }
+    html.push_str("</tr></thead>");
+    html.push_str("<tbody>");
 
     let mut row_count = 0;
     for row_chunk in sheet_xml.split("<row ") {
-        if row_count > 100 { break; }
+        if row_count > 150 { break; }
         if !row_chunk.contains("</row>") { continue; }
 
         let row_num = if let Some(r_pos) = row_chunk.find("r=\"") {
@@ -639,8 +707,8 @@ fn extract_xlsx_content(file_path: &Path) -> Result<String, String> {
             ""
         };
 
-        html.push_str("<tr class=\"border-b border-gnome-border/40 hover:bg-gnome-hover/50\">");
-        html.push_str(&format!("<td class=\"px-2 py-1 bg-gnome-sidebar border-r border-gnome-border text-[10px] text-gnome-textDim text-center select-none font-semibold\">{}</td>", row_num));
+        html.push_str("<tr class=\"border-b border-gnome-border/30 hover:bg-gnome-hover/40 transition-colors\">");
+        html.push_str(&format!("<td class=\"px-2 py-1 bg-gnome-sidebar border-r border-gnome-border text-[10px] text-gnome-textDim text-center select-none font-semibold sticky left-0\">{}</td>", row_num));
 
         for c_chunk in row_chunk.split("<c ") {
             if !c_chunk.contains("</c>") && !c_chunk.contains("/>") { continue; }
@@ -665,14 +733,23 @@ fn extract_xlsx_content(file_path: &Path) -> Result<String, String> {
             };
 
             let escaped = escape_html_str(&cell_val);
-            html.push_str(&format!("<td class=\"px-3 py-1.5 border-r border-gnome-border/30 truncate max-w-xs text-gnome-text\">{}</td>", escaped));
+            let is_num = cell_val.trim().parse::<f64>().is_ok();
+            let align_class = if is_num { "text-right font-mono" } else { "text-left" };
+            html.push_str(&format!("<td class=\"px-3 py-1.5 border-r border-gnome-border/20 truncate max-w-xs text-gnome-text {}\">{}</td>", align_class, escaped));
         }
 
         html.push_str("</tr>");
         row_count += 1;
     }
 
-    html.push_str("</table></div>");
+    html.push_str("</tbody></table></div>");
+    
+    // Bottom Sheet Tabs bar
+    html.push_str("<div class=\"px-3 py-1 bg-gnome-sidebar border-t border-gnome-border flex items-center gap-2 text-[11px] text-gnome-textDim select-none\">");
+    html.push_str("<span class=\"px-2.5 py-0.5 rounded bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 font-medium\">📑 Hoja 1</span>");
+    html.push_str("</div>");
+    
+    html.push_str("</div>");
     Ok(html)
 }
 
@@ -697,7 +774,7 @@ fn extract_pptx_content(file_path: &Path) -> Result<String, String> {
     });
 
     let mut html = String::new();
-    html.push_str("<div class=\"pptx-slides-wrapper space-y-4 max-w-3xl mx-auto overflow-auto max-h-[65vh] p-2 select-text\">");
+    html.push_str("<div class=\"pptx-slides-wrapper space-y-4 max-w-3xl mx-auto overflow-auto max-h-[70vh] p-3 select-text\">");
 
     for (idx, slide_name) in slide_names.iter().enumerate() {
         let mut slide_xml = String::new();
@@ -715,20 +792,20 @@ fn extract_pptx_content(file_path: &Path) -> Result<String, String> {
             }
         }
 
-        html.push_str("<div class=\"slide-card bg-gnome-sidebar border border-gnome-border rounded-xl p-5 shadow-lg space-y-2\">");
-        html.push_str(&format!("<div class=\"text-[11px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5\"><span>📽️</span> Diapositiva {}</div>", idx + 1));
+        html.push_str("<div class=\"slide-card bg-gnome-sidebar border border-gnome-border rounded-xl p-5 shadow-lg space-y-2.5 transition-all hover:border-amber-500/40\">");
+        html.push_str(&format!("<div class=\"text-[11px] font-bold uppercase tracking-wider text-amber-400 flex items-center justify-between pb-1 border-b border-gnome-border/40\"><span>📽️ Diapositiva {}</span><span class=\"px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-[10px]\">Slide {}/{}</span></div>", idx + 1, idx + 1, slide_names.len()));
 
         if let Some((first, rest)) = texts.split_first() {
             html.push_str(&format!("<h3 class=\"text-sm font-bold text-gnome-text\">{}</h3>", escape_html_str(first)));
             if !rest.is_empty() {
-                html.push_str("<ul class=\"space-y-1 text-xs text-gnome-textDim pl-4\">");
+                html.push_str("<ul class=\"space-y-1.5 text-xs text-gnome-textDim pl-4\">");
                 for item in rest {
-                    html.push_str(&format!("<li class=\"list-disc\">{}</li>", escape_html_str(item)));
+                    html.push_str(&format!("<li class=\"list-disc leading-relaxed text-gnome-text/80\">{}</li>", escape_html_str(item)));
                 }
                 html.push_str("</ul>");
             }
         } else {
-            html.push_str("<p class=\"text-xs text-gnome-textDim italic\">(Diapositiva con contenido gráfico/visual)</p>");
+            html.push_str("<p class=\"text-xs text-gnome-textDim italic py-2 flex items-center gap-1.5\"><span>🖼️</span> (Diapositiva con contenido puramente gráfico o visual)</p>");
         }
 
         html.push_str("</div>");
@@ -2976,9 +3053,27 @@ async fn apply_app_update(download_url: String, _asset_name: String) -> Result<(
         return Err(format!("Error guardando temporal en {:?}: {}", temp_path, e));
     }
 
-    // Windows in-place hot replacement
+    // Windows in-place hot replacement or NSIS Setup installer execution
     #[cfg(target_os = "windows")]
     {
+        let is_installer = _asset_name.to_lowercase().contains("setup") 
+            || _asset_name.to_lowercase().ends_with(".msi")
+            || download_url.to_lowercase().contains("setup");
+
+        if is_installer {
+            // It's an NSIS/MSI installer executable. We write it as an .exe in temp, spawn it detached,
+            // and exit Tron immediately so the installer can update files without "application in use" locks.
+            let installer_name = format!("Tron_Update_Setup_{}.exe", std::time::SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis());
+            let installer_path = std::env::temp_dir().join(&installer_name);
+            if let Err(e) = std::fs::write(&installer_path, &bytes) {
+                return Err(format!("Error al escribir el instalador: {}", e));
+            }
+            let _ = std::fs::remove_file(&temp_path);
+            let _ = std::process::Command::new(&installer_path).spawn();
+            std::thread::sleep(std::time::Duration::from_millis(300));
+            std::process::exit(0);
+        }
+
         let old_exe = exe_dir.join("Tron.exe.old");
         if old_exe.exists() {
             let _ = std::fs::remove_file(&old_exe);
@@ -3733,6 +3828,14 @@ fn force_exit_app() {
 }
 
 #[tauri::command]
+fn restart_app() {
+    if let Ok(current_exe) = std::env::current_exe() {
+        let _ = std::process::Command::new(current_exe).spawn();
+    }
+    std::process::exit(0);
+}
+
+#[tauri::command]
 fn window_minimize(window: tauri::Window) -> Result<(), String> {
     window.minimize().map_err(|e| e.to_string())
 }
@@ -3989,6 +4092,7 @@ fn main() {
     let builder = builder.setup(|app| {
         if let Some(window) = app.get_webview_window("main") {
             let _ = window.set_decorations(false);
+            let _ = window.maximize();
         }
         Ok(())
     });
@@ -4027,6 +4131,7 @@ fn main() {
             get_disk_free_space,
             check_app_updates,
             apply_app_update,
+            restart_app,
             window_minimize,
             window_toggle_maximize,
             window_close,

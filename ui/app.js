@@ -142,15 +142,29 @@
     fileTagsMap = {};
   }
 
+  let customTagNames = {};
+  try {
+    customTagNames = JSON.parse(localStorage.getItem('tron_custom_tag_names') || '{}');
+  } catch (e) {
+    customTagNames = {};
+  }
+
   const TAG_COLOR_DEFS = {
-    red: { name: 'Rojo', hex: '#ef4444', class: 'bg-red-500' },
-    orange: { name: 'Naranja', hex: '#f97316', class: 'bg-orange-500' },
-    yellow: { name: 'Amarillo', hex: '#eab308', class: 'bg-yellow-400' },
-    green: { name: 'Verde', hex: '#22c55e', class: 'bg-green-500' },
-    blue: { name: 'Azul', hex: '#3b82f6', class: 'bg-blue-500' },
-    purple: { name: 'Púrpura', hex: '#a855f7', class: 'bg-purple-500' },
-    gray: { name: 'Gris', hex: '#9ca3af', class: 'bg-gray-400' }
+    red: { defaultName: 'Rojo', hex: '#ef4444', class: 'bg-red-500' },
+    orange: { defaultName: 'Naranja', hex: '#f97316', class: 'bg-orange-500' },
+    yellow: { defaultName: 'Amarillo', hex: '#eab308', class: 'bg-yellow-400' },
+    green: { defaultName: 'Verde', hex: '#22c55e', class: 'bg-green-500' },
+    blue: { defaultName: 'Azul', hex: '#3b82f6', class: 'bg-blue-500' },
+    purple: { defaultName: 'Púrpura', hex: '#a855f7', class: 'bg-purple-500' },
+    gray: { defaultName: 'Gris', hex: '#9ca3af', class: 'bg-gray-400' }
   };
+
+  function getTagDisplayName(colorKey) {
+    if (customTagNames && customTagNames[colorKey] && customTagNames[colorKey].trim()) {
+      return customTagNames[colorKey].trim();
+    }
+    return (TAG_COLOR_DEFS[colorKey] && TAG_COLOR_DEFS[colorKey].defaultName) || colorKey;
+  }
 
   function normalizeTagPath(p) {
     if (!p) return '';
@@ -243,6 +257,7 @@
     activeTagFilter: null, // null or color name e.g. 'red'
 
     frequentLocations: JSON.parse(localStorage.getItem('tron_frequent_locations') || '{}'),
+    hiddenFrequentLocations: new Set(JSON.parse(localStorage.getItem('tron_hidden_frequent_locations') || '[]')),
 
     clipboard: { action: null, paths: [] },
     sortField: 'name',
@@ -649,9 +664,21 @@ modalSherlock: document.getElementById('modalSherlock'),
     chkExportListDetails: document.getElementById('chkExportListDetails'),
     exportListDepthContainer: document.getElementById('exportListDepthContainer'),
     exportListDepthLabel: document.getElementById('exportListDepthLabel'),
-    rangeExportListDepth: document.getElementById('rangeExportListDepth'),
     chkExportListFullDepth: document.getElementById('chkExportListFullDepth'),
-    chkExportListOpenAfter: document.getElementById('chkExportListOpenAfter')
+    chkExportListOpenAfter: document.getElementById('chkExportListOpenAfter'),
+
+    // Frequent Context Menu & Preferences
+    ctxMenuFrequent: document.getElementById('ctxMenuFrequent'),
+    ctxMenuFrequentPathHeader: document.getElementById('ctxMenuFrequentPathHeader'),
+    ctxMenuFrequentResetThis: document.getElementById('ctxMenuFrequentResetThis'),
+    ctxMenuFrequentHideThis: document.getElementById('ctxMenuFrequentHideThis'),
+    ctxMenuFrequentResetAll: document.getElementById('ctxMenuFrequentResetAll'),
+    btnResetFrequentStats: document.getElementById('btnResetFrequentStats'),
+    hiddenFrequentContainer: document.getElementById('hiddenFrequentContainer'),
+    hiddenFrequentList: document.getElementById('hiddenFrequentList'),
+    btnUnarchiveAllFrequent: document.getElementById('btnUnarchiveAllFrequent'),
+    customTagInputsContainer: document.getElementById('customTagInputsContainer'),
+    btnResetTagNames: document.getElementById('btnResetTagNames')
   };
 
   const el = new Proxy(baseEl, {
@@ -1239,8 +1266,9 @@ modalSherlock: document.getElementById('modalSherlock'),
         tagsHtml = `
           <span class="inline-flex items-center gap-1 shrink-0 ml-1">
             ${itemTags.map(c => {
-              const def = TAG_COLOR_DEFS[c] || { hex: '#9ca3af', name: c };
-              return `<span class="w-2 h-2 rounded-full inline-block shadow-sm" style="background-color: ${def.hex}" title="Etiqueta: ${def.name}"></span>`;
+              const def = TAG_COLOR_DEFS[c] || { hex: '#9ca3af' };
+              const tagName = getTagDisplayName(c);
+              return `<span class="w-2 h-2 rounded-full inline-block shadow-sm" style="background-color: ${def.hex}" title="Etiqueta: ${escapeHtml(tagName)}"></span>`;
             }).join('')}
           </span>
         `;
@@ -3085,7 +3113,7 @@ async function startTransferOperation(action, sources, targetDir) {
     if (!el.frequentLinks) return;
     el.frequentLinks.innerHTML = '';
     const entries = Object.entries(state.frequentLocations || {})
-      .filter(([p, count]) => p && count > 0)
+      .filter(([p, count]) => p && count > 0 && (!state.hiddenFrequentLocations || !state.hiddenFrequentLocations.has(p)))
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5);
 
@@ -3105,7 +3133,7 @@ async function startTransferOperation(action, sources, targetDir) {
 
       const btn = document.createElement('button');
       btn.className = 'w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-md hover:bg-gnome-hover text-xs text-gnome-text text-left transition-colors group select-none';
-      btn.title = `${cleanPath} (${count} visitas)`;
+      btn.title = `${cleanPath} (${count} visitas) - Clic derecho para opciones`;
       btn.innerHTML = `
         <div class="flex items-center gap-2 min-w-0 flex-1 truncate">
           <span class="ui-icon-box text-amber-400">🕒</span>
@@ -3114,6 +3142,11 @@ async function startTransferOperation(action, sources, targetDir) {
         <span class="text-[10px] px-1.5 py-0.2 rounded bg-gnome-surface text-gnome-textDim font-mono">${count}</span>
       `;
       btn.onclick = () => loadDirectory(cleanPath);
+      btn.oncontextmenu = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        openFrequentContextMenu(e, locPath);
+      };
       setupSidebarDropTarget(btn, cleanPath);
       el.frequentLinks.appendChild(btn);
     });
@@ -3252,6 +3285,46 @@ async function startTransferOperation(action, sources, targetDir) {
       el.fileContextMenu.classList.add('hidden');
     }
     state.contextTargetItem = null;
+  }
+
+  // Frequent Locations Context Menu
+  function openFrequentContextMenu(e, locPath) {
+    state.contextTargetFrequent = locPath;
+    closeFileContextMenu();
+    if (!el.ctxMenuFrequent) return;
+
+    if (el.ctxMenuFrequentPathHeader) {
+      el.ctxMenuFrequentPathHeader.textContent = locPath;
+      el.ctxMenuFrequentPathHeader.title = locPath;
+    }
+
+    el.ctxMenuFrequent.style.visibility = 'hidden';
+    el.ctxMenuFrequent.classList.remove('hidden');
+
+    const menuRect = el.ctxMenuFrequent.getBoundingClientRect();
+    const menuWidth = menuRect.width || 256;
+    const menuHeight = menuRect.height || 140;
+
+    let x = e.clientX;
+    let y = e.clientY;
+
+    if (x + menuWidth > window.innerWidth) {
+      x = Math.max(8, e.clientX - menuWidth);
+    }
+    if (y + menuHeight > window.innerHeight) {
+      y = Math.max(8, e.clientY - menuHeight);
+    }
+
+    el.ctxMenuFrequent.style.left = `${Math.max(5, x)}px`;
+    el.ctxMenuFrequent.style.top = `${Math.max(5, y)}px`;
+    el.ctxMenuFrequent.style.visibility = 'visible';
+  }
+
+  function closeFrequentContextMenu() {
+    if (el.ctxMenuFrequent) {
+      el.ctxMenuFrequent.classList.add('hidden');
+    }
+    state.contextTargetFrequent = null;
   }
 
   // --- Explorer, Properties, Open With, Compress, and Archive Handlers ---
@@ -4064,9 +4137,13 @@ async function startTransferOperation(action, sources, targetDir) {
 
   function handleRestartApp() {
     try {
-      invoke('force_exit_app');
+      invoke('restart_app');
     } catch (_) {
-      window.close();
+      try {
+        invoke('force_exit_app');
+      } catch (__) {
+        window.close();
+      }
     }
   }
 
@@ -4287,6 +4364,7 @@ async function startTransferOperation(action, sources, targetDir) {
     for (const [colorKey, def] of Object.entries(TAG_COLOR_DEFS)) {
       const count = tagCounts[colorKey] || 0;
       const isActive = state.activeTagFilter === colorKey;
+      const displayName = getTagDisplayName(colorKey);
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = `w-full flex items-center justify-between gap-2 px-2 py-1 rounded-md text-xs transition-colors select-none ${
@@ -4294,10 +4372,11 @@ async function startTransferOperation(action, sources, targetDir) {
           ? 'bg-gnome-active text-white font-medium' 
           : 'text-gnome-text hover:bg-gnome-hover'
       }`;
+      btn.title = `${displayName} (clic derecho para renombrar)`;
       btn.innerHTML = `
         <div class="flex items-center gap-2 min-w-0">
           <span class="w-2.5 h-2.5 rounded-full inline-block shadow-sm" style="background-color: ${def.hex}"></span>
-          <span class="truncate">${escapeHtml(def.name)}</span>
+          <span class="truncate">${escapeHtml(displayName)}</span>
         </div>
         <span class="text-[10px] font-mono ${isActive ? 'text-white/80' : 'text-gnome-textDim'}">${count}</span>
       `;
@@ -4314,7 +4393,33 @@ async function startTransferOperation(action, sources, targetDir) {
         renderTagSidebar();
       };
 
+      btn.oncontextmenu = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        renameColorCategoryPrompt(colorKey);
+      };
+
       el.tagLinks.appendChild(btn);
+    }
+  }
+
+  function renameColorCategoryPrompt(colorKey) {
+    const currentName = getTagDisplayName(colorKey);
+    const newName = prompt(`Nuevo nombre para la categoría de color "${(TAG_COLOR_DEFS[colorKey] && TAG_COLOR_DEFS[colorKey].defaultName) || colorKey}":`, currentName);
+    if (newName !== null) {
+      if (!customTagNames) customTagNames = {};
+      const clean = newName.trim();
+      if (clean) {
+        customTagNames[colorKey] = clean;
+      } else {
+        delete customTagNames[colorKey];
+      }
+      try {
+        localStorage.setItem('tron_custom_tag_names', JSON.stringify(customTagNames));
+      } catch (err) {}
+      renderTagSidebar();
+      renderFileList();
+      updateTagInputsInPreferences();
     }
   }
 
@@ -5316,18 +5421,18 @@ async function startTransferOperation(action, sources, targetDir) {
       tabThemes: document.getElementById('panelThemes'),
       tabTypography: document.getElementById('panelTypography'),
       tabFiles: document.getElementById('panelFiles'),
-      tabEditor: document.getElementById('panelEditor'),
-      tabTerminal: document.getElementById('panelTerminal'),
+      tabTags: document.getElementById('panelTags'),
+      tabTools: document.getElementById('panelTools'),
       tabExternalApps: document.getElementById('panelExternalApps')
     };
     prefTabButtons.forEach(btn => {
       btn.onclick = () => {
         prefTabButtons.forEach(b => {
-          b.classList.remove('border-gnome-active', 'text-gnome-active');
+          b.classList.remove('border-gnome-active', 'bg-gnome-active/15', 'text-gnome-active');
           b.classList.add('border-transparent', 'text-gnome-textDim');
         });
         btn.classList.remove('border-transparent', 'text-gnome-textDim');
-        btn.classList.add('border-gnome-active', 'text-gnome-active');
+        btn.classList.add('border-gnome-active', 'bg-gnome-active/15', 'text-gnome-active');
 
         const targetId = btn.dataset.tab;
         Object.keys(prefTabPanels).forEach(k => {
@@ -5656,21 +5761,109 @@ async function startTransferOperation(action, sources, targetDir) {
         }
       });
     }
+    // Frequent Locations Context Menu Actions
+    if (el.ctxMenuFrequentResetThis) {
+      el.ctxMenuFrequentResetThis.onclick = () => {
+        const p = state.contextTargetFrequent;
+        closeFrequentContextMenu();
+        if (p && state.frequentLocations && state.frequentLocations[p]) {
+          delete state.frequentLocations[p];
+          try {
+            localStorage.setItem('tron_frequent_locations', JSON.stringify(state.frequentLocations));
+          } catch (e) {}
+          renderFrequentLinks();
+        }
+      };
+    }
+
+    if (el.ctxMenuFrequentHideThis) {
+      el.ctxMenuFrequentHideThis.onclick = () => {
+        const p = state.contextTargetFrequent;
+        closeFrequentContextMenu();
+        if (p) {
+          if (!state.hiddenFrequentLocations) state.hiddenFrequentLocations = new Set();
+          state.hiddenFrequentLocations.add(p);
+          try {
+            localStorage.setItem('tron_hidden_frequent_locations', JSON.stringify(Array.from(state.hiddenFrequentLocations)));
+          } catch (e) {}
+          renderFrequentLinks();
+          renderHiddenFrequentUI();
+        }
+      };
+    }
+
+    if (el.ctxMenuFrequentResetAll) {
+      el.ctxMenuFrequentResetAll.onclick = () => {
+        closeFrequentContextMenu();
+        if (confirm('¿Deseas restablecer todo el historial de carpetas frecuentes?')) {
+          state.frequentLocations = {};
+          try {
+            localStorage.setItem('tron_frequent_locations', JSON.stringify({}));
+          } catch (e) {}
+          renderFrequentLinks();
+        }
+      };
+    }
+
+    if (el.btnResetFrequentStats) {
+      el.btnResetFrequentStats.onclick = () => {
+        if (confirm('¿Deseas restablecer todo el historial de visitas de carpetas frecuentes?')) {
+          state.frequentLocations = {};
+          try {
+            localStorage.setItem('tron_frequent_locations', JSON.stringify({}));
+          } catch (e) {}
+          renderFrequentLinks();
+          alert('Historial de frecuentes restablecido.');
+        }
+      };
+    }
+
+    if (el.btnUnarchiveAllFrequent) {
+      el.btnUnarchiveAllFrequent.onclick = () => {
+        if (!state.hiddenFrequentLocations) state.hiddenFrequentLocations = new Set();
+        state.hiddenFrequentLocations.clear();
+        try {
+          localStorage.setItem('tron_hidden_frequent_locations', JSON.stringify([]));
+        } catch (e) {}
+        renderFrequentLinks();
+        renderHiddenFrequentUI();
+      };
+    }
+
+    if (el.btnResetTagNames) {
+      el.btnResetTagNames.onclick = () => {
+        if (confirm('¿Restablecer los nombres de las etiquetas de color a sus valores por defecto?')) {
+          customTagNames = {};
+          try {
+            localStorage.setItem('tron_custom_tag_names', JSON.stringify({}));
+          } catch (e) {}
+          renderTagSidebar();
+          renderFileList();
+          updateTagInputsInPreferences();
+        }
+      };
+    }
+
     // Close context menu on outside click or scroll
     document.addEventListener('click', (e) => {
       closeFileContextMenu();
+      closeFrequentContextMenu();
       if (el.pasteDetailsCard && !el.pasteDetailsCard.contains(e.target) && !el.pasteProgressContainer.contains(e.target)) {
         el.pasteDetailsCard.classList.add('hidden');
       }
     });
     document.addEventListener('contextmenu', (e) => {
-      if (!e.target.closest('.file-row')) {
+      if (!e.target.closest('.file-row') && !e.target.closest('#frequentLinks')) {
         closeFileContextMenu();
+        closeFrequentContextMenu();
       }
     });
     if (el.fileList) {
       elPanels.forEach(p => {
-        p.fileList.addEventListener('scroll', () => closeFileContextMenu());
+        p.fileList.addEventListener('scroll', () => {
+          closeFileContextMenu();
+          closeFrequentContextMenu();
+        });
         p.fileList.addEventListener('mousedown', () => {
           const idx = elPanels.indexOf(p);
           if (isSplitView && activePanel !== idx) {
@@ -6039,8 +6232,75 @@ async function startTransferOperation(action, sources, targetDir) {
     });
 
     renderExternalAppsConfigUI();
+    renderHiddenFrequentUI();
+    renderTagInputsInPreferences();
 
     el.modalAppearance.classList.remove('hidden');
+  }
+
+  function renderHiddenFrequentUI() {
+    if (!el.hiddenFrequentContainer || !el.hiddenFrequentList) return;
+    const hiddenArr = state.hiddenFrequentLocations ? Array.from(state.hiddenFrequentLocations) : [];
+    if (hiddenArr.length === 0) {
+      el.hiddenFrequentContainer.classList.add('hidden');
+      el.hiddenFrequentList.innerHTML = '';
+      return;
+    }
+
+    el.hiddenFrequentContainer.classList.remove('hidden');
+    el.hiddenFrequentList.innerHTML = '';
+    hiddenArr.forEach(p => {
+      const row = document.createElement('div');
+      row.className = 'flex items-center justify-between gap-2 p-1.5 rounded bg-gnome-surface border border-gnome-border text-[11px]';
+      row.innerHTML = `
+        <span class="truncate text-gnome-textDim font-mono max-w-[400px]" title="${escapeHtml(p)}">${escapeHtml(p)}</span>
+        <button type="button" class="btn-unhide-frequent text-[10px] px-2 py-0.5 rounded bg-gnome-active/20 hover:bg-gnome-active hover:text-white text-gnome-active font-medium transition-colors" data-path="${escapeHtml(p)}">
+          Mostrar de nuevo
+        </button>
+      `;
+      const btn = row.querySelector('.btn-unhide-frequent');
+      if (btn) {
+        btn.onclick = () => {
+          state.hiddenFrequentLocations.delete(p);
+          try {
+            localStorage.setItem('tron_hidden_frequent_locations', JSON.stringify(Array.from(state.hiddenFrequentLocations)));
+          } catch (e) {}
+          renderFrequentLinks();
+          renderHiddenFrequentUI();
+        };
+      }
+      el.hiddenFrequentList.appendChild(row);
+    });
+  }
+
+  function renderTagInputsInPreferences() {
+    if (!el.customTagInputsContainer) return;
+    el.customTagInputsContainer.innerHTML = '';
+    Object.keys(TAG_COLOR_DEFS).forEach(colorKey => {
+      const def = TAG_COLOR_DEFS[colorKey];
+      const curName = getTagDisplayName(colorKey);
+      const field = document.createElement('div');
+      field.className = 'flex items-center gap-2 p-2 rounded-lg bg-gnome-sidebar border border-gnome-border';
+      field.innerHTML = `
+        <span class="w-4 h-4 rounded-full shrink-0 shadow-sm" style="background-color: ${def.hex}"></span>
+        <div class="flex-1 min-w-0">
+          <label class="block text-[10px] text-gnome-textDim uppercase font-semibold">${def.defaultName}</label>
+          <input type="text" class="input-custom-tag-name w-full bg-gnome-surface border border-gnome-border rounded px-2 py-1 text-xs text-gnome-text focus:outline-none focus:border-gnome-active mt-0.5" data-color-key="${colorKey}" value="${escapeHtml(curName)}" placeholder="${def.defaultName}" />
+        </div>
+      `;
+      el.customTagInputsContainer.appendChild(field);
+    });
+  }
+
+  function updateTagInputsInPreferences() {
+    if (!el.customTagInputsContainer) return;
+    const inputs = el.customTagInputsContainer.querySelectorAll('.input-custom-tag-name');
+    inputs.forEach(inp => {
+      const key = inp.dataset.colorKey;
+      if (key) {
+        inp.value = getTagDisplayName(key);
+      }
+    });
   }
 
   function updateUiScaleLabel(val) {
@@ -6083,6 +6343,25 @@ async function startTransferOperation(action, sources, targetDir) {
     const extAppsConf = readExternalAppsFromUI();
     if (extAppsConf) {
       saveExternalAppsConfig(extAppsConf);
+    }
+
+    // Save custom tag names
+    if (el.customTagInputsContainer) {
+      const tagInputs = el.customTagInputsContainer.querySelectorAll('.input-custom-tag-name');
+      if (!customTagNames) customTagNames = {};
+      tagInputs.forEach(inp => {
+        const k = inp.dataset.colorKey;
+        const val = inp.value.trim();
+        if (val) {
+          customTagNames[k] = val;
+        } else {
+          delete customTagNames[k];
+        }
+      });
+      try {
+        localStorage.setItem('tron_custom_tag_names', JSON.stringify(customTagNames));
+      } catch (e) {}
+      renderTagSidebar();
     }
 
     localStorage.setItem('tron_theme', theme);

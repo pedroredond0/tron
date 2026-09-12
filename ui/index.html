@@ -1099,7 +1099,7 @@
         </div>
         <div class="flex justify-between items-center">
           <span class="text-gnome-textDim font-medium">Versión:</span>
-          <span id="aboutVersion" class="font-mono font-semibold text-gnome-active">1.0.4</span>
+          <span id="aboutVersion" class="font-mono font-semibold text-gnome-active">1.0.5</span>
         </div>
         <div class="flex justify-between items-center">
           <span class="text-gnome-textDim font-medium">Compilación (Unix):</span>
@@ -1170,7 +1170,7 @@
 
   <!-- Styled Modal: Preferencias (Rediseñado con Pestañas Horizontales) -->
   <div id="modalAppearance" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-    <div class="bg-gnome-surface border border-gnome-border rounded-xl shadow-2xl w-full max-w-2xl p-5 flex flex-col gap-4">
+    <div class="bg-gnome-surface border border-gnome-border rounded-xl shadow-2xl w-full max-w-3xl p-5 flex flex-col gap-4">
       <div class="flex items-center justify-between border-b border-gnome-border pb-3">
         <h3 class="text-sm font-semibold text-gnome-text flex items-center gap-2">
           <span>⚙️</span> Preferencias
@@ -1179,29 +1179,29 @@
       </div>
 
       <!-- Horizontal Tabs -->
-      <div class="flex border-b border-gnome-border text-xs gap-1 overflow-x-auto scrollbar-none">
-        <button type="button" class="pref-tab-btn px-4 py-2 border-b-2 border-gnome-active text-gnome-active font-medium flex items-center gap-1.5 transition-all" data-tab="tabThemes">
+      <div class="flex border-b border-gnome-border text-xs gap-1.5 overflow-x-auto scrollbar-none pb-1">
+        <button type="button" class="pref-tab-btn px-3 py-1.5 rounded-lg border border-gnome-active bg-gnome-active/15 text-gnome-active font-medium flex items-center gap-1.5 transition-all whitespace-nowrap" data-tab="tabThemes">
           <span>🎨</span> <span>Temas</span>
         </button>
-        <button type="button" class="pref-tab-btn px-4 py-2 border-b-2 border-transparent text-gnome-textDim hover:text-gnome-text font-medium flex items-center gap-1.5 transition-all" data-tab="tabTypography">
+        <button type="button" class="pref-tab-btn px-3 py-1.5 rounded-lg border border-transparent text-gnome-textDim hover:text-gnome-text hover:bg-gnome-sidebar font-medium flex items-center gap-1.5 transition-all whitespace-nowrap" data-tab="tabTypography">
           <span>🔤</span> <span>Tamaños y Fuente</span>
         </button>
-        <button type="button" class="pref-tab-btn px-4 py-2 border-b-2 border-transparent text-gnome-textDim hover:text-gnome-text font-medium flex items-center gap-1.5 transition-all" data-tab="tabFiles">
-          <span>📁</span> <span>Archivos</span>
+        <button type="button" class="pref-tab-btn px-3 py-1.5 rounded-lg border border-transparent text-gnome-textDim hover:text-gnome-text hover:bg-gnome-sidebar font-medium flex items-center gap-1.5 transition-all whitespace-nowrap" data-tab="tabFiles">
+          <span>📁</span> <span>Archivos y Frecuentes</span>
         </button>
-        <button type="button" class="pref-tab-btn px-4 py-2 border-b-2 border-transparent text-gnome-textDim hover:text-gnome-text font-medium flex items-center gap-1.5 transition-all" data-tab="tabEditor">
-          <span>📝</span> <span>Editor de Texto</span>
+        <button type="button" class="pref-tab-btn px-3 py-1.5 rounded-lg border border-transparent text-gnome-textDim hover:text-gnome-text hover:bg-gnome-sidebar font-medium flex items-center gap-1.5 transition-all whitespace-nowrap" data-tab="tabTags">
+          <span>🏷️</span> <span>Etiquetas de Color</span>
         </button>
-        <button type="button" class="pref-tab-btn px-4 py-2 border-b-2 border-transparent text-gnome-textDim hover:text-gnome-text font-medium flex items-center gap-1.5 transition-all" data-tab="tabTerminal">
-          <span>💻</span> <span>Terminal</span>
+        <button type="button" class="pref-tab-btn px-3 py-1.5 rounded-lg border border-transparent text-gnome-textDim hover:text-gnome-text hover:bg-gnome-sidebar font-medium flex items-center gap-1.5 transition-all whitespace-nowrap" data-tab="tabTools">
+          <span>🛠️</span> <span>Editor y Terminal</span>
         </button>
-        <button type="button" class="pref-tab-btn px-4 py-2 border-b-2 border-transparent text-gnome-textDim hover:text-gnome-text font-medium flex items-center gap-1.5 transition-all" data-tab="tabExternalApps">
+        <button type="button" class="pref-tab-btn px-3 py-1.5 rounded-lg border border-transparent text-gnome-textDim hover:text-gnome-text hover:bg-gnome-sidebar font-medium flex items-center gap-1.5 transition-all whitespace-nowrap" data-tab="tabExternalApps">
           <span>⚡</span> <span>Aplicaciones Externas</span>
         </button>
       </div>
 
       <!-- Tab Content Panels -->
-      <div class="min-h-[260px] max-h-[60vh] overflow-y-auto pr-1 scrollbar-thin text-xs space-y-4">
+      <div class="min-h-[280px] max-h-[60vh] overflow-y-auto pr-1 scrollbar-thin text-xs space-y-4">
         <!-- 1. Pestaña: Temas -->
         <div id="panelThemes" class="pref-tab-panel space-y-4">
           <div>
@@ -1325,7 +1325,7 @@
           </div>
         </div>
 
-        <!-- 3. Pestaña: Archivos -->
+        <!-- 3. Pestaña: Archivos y Frecuentes -->
         <div id="panelFiles" class="pref-tab-panel hidden space-y-4">
           <div class="p-3 bg-gnome-sidebar/40 rounded-lg border border-gnome-border space-y-3">
             <label class="flex items-center gap-2.5 cursor-pointer select-none">
@@ -1355,6 +1355,24 @@
             </div>
           </div>
 
+          <!-- Historial de Rutas Frecuentes -->
+          <div class="p-3 bg-gnome-sidebar/40 rounded-lg border border-gnome-border space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="font-medium text-gnome-text">Estadísticas y Rutas Frecuentes:</span>
+              <button id="btnResetFrequentStats" type="button" class="px-2.5 py-1 rounded bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 text-[11px] font-medium transition-colors">
+                🗑️ Restablecer historial de visitas
+              </button>
+            </div>
+            <p class="text-[10px] text-gnome-textDim">Gestiona las rutas visitadas que aparecen automáticamente en la sección "Frecuentes" de la barra lateral.</p>
+            <div id="hiddenFrequentContainer" class="hidden pt-2 border-t border-gnome-border/40 space-y-1.5">
+              <div class="text-[11px] text-gnome-text font-medium flex items-center justify-between">
+                <span>Rutas ocultadas del menú:</span>
+                <button id="btnUnarchiveAllFrequent" type="button" class="text-[10px] text-gnome-active hover:underline">Volver a mostrar todas</button>
+              </div>
+              <div id="hiddenFrequentList" class="space-y-1 max-h-24 overflow-y-auto pr-1"></div>
+            </div>
+          </div>
+
           <!-- Extensiones de texto adicionales -->
           <div class="p-3 bg-gnome-sidebar/50 rounded-lg border border-gnome-border space-y-1.5">
             <label class="block text-gnome-text font-medium">Extensiones tratadas como texto y previsualización:</label>
@@ -1363,11 +1381,28 @@
           </div>
         </div>
 
-        <!-- 4. Pestaña: Editor de Texto -->
-        <div id="panelEditor" class="pref-tab-panel hidden space-y-4">
+        <!-- 4. Pestaña: Etiquetas de Color -->
+        <div id="panelTags" class="pref-tab-panel hidden space-y-4">
+          <div class="p-3 bg-gnome-sidebar/50 rounded-lg border border-gnome-border space-y-3">
+            <div class="flex items-center justify-between border-b border-gnome-border/50 pb-2">
+              <div>
+                <span class="font-medium text-gnome-text text-sm block">Nombres de Categorías de Color</span>
+                <span class="text-[10px] text-gnome-textDim">Personaliza el nombre descriptivo asignado a cada color (ej: Urgente, Trabajo, Personal, Finalizado).</span>
+              </div>
+              <button id="btnResetTagNames" type="button" class="text-[11px] text-gnome-active hover:underline">Restaurar nombres</button>
+            </div>
+            <div id="customTagInputsContainer" class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+              <!-- Dynamically generated in app.js or configured inputs -->
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. Pestaña Unificada: Editor y Terminal -->
+        <div id="panelTools" class="pref-tab-panel hidden space-y-4">
+          <!-- Editor de Texto -->
           <div class="p-3 bg-gnome-sidebar/50 rounded-lg border border-gnome-border space-y-3">
             <div>
-              <label class="block text-gnome-text font-medium text-sm border-b border-gnome-border/50 pb-1 mb-2">Editor de Texto Predeterminado</label>
+              <label class="block text-gnome-text font-medium text-sm border-b border-gnome-border/50 pb-1 mb-2">📝 Editor de Texto Predeterminado</label>
               <select id="selectTextEditor" class="w-full bg-gnome-surface border border-gnome-border rounded-md px-3 py-2 text-xs text-gnome-text focus:outline-none focus:border-gnome-active">
                 <option value="notepad">Bloc de Notas (Windows)</option>
                 <option value="code">VS Code (code)</option>
@@ -1390,13 +1425,11 @@
               💡 Este editor se usará al pulsar el botón <strong>Editar</strong> en la barra superior, en el menú contextual ("Abrir con Editor") y al editar desde QuickView.
             </div>
           </div>
-        </div>
 
-        <!-- 5. Pestaña: Terminal -->
-        <div id="panelTerminal" class="pref-tab-panel hidden space-y-4">
+          <!-- Terminal -->
           <div class="p-3 bg-gnome-sidebar/50 rounded-lg border border-gnome-border space-y-3">
             <div>
-              <label class="block text-gnome-text font-medium text-sm border-b border-gnome-border/50 pb-1 mb-2">Terminal Predeterminada</label>
+              <label class="block text-gnome-text font-medium text-sm border-b border-gnome-border/50 pb-1 mb-2">💻 Terminal Predeterminada</label>
               <select id="selectTerminalApp" class="w-full bg-gnome-surface border border-gnome-border rounded-md px-3 py-2 text-xs text-gnome-text focus:outline-none focus:border-gnome-active">
                 <option value="default">Por defecto del sistema</option>
                 <option value="wt">Windows Terminal (wt)</option>
@@ -2094,6 +2127,21 @@
     <div class="my-1 border-t border-gnome-border/60"></div>
     <button id="ctxMenuProperties" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
       <span>Propiedades</span><span class="text-gnome-textDim text-[11px]">Alt+Enter</span>
+    </button>
+  </div>
+
+  <!-- Context Menu for Frequent Locations Items -->
+  <div id="ctxMenuFrequent" class="hidden fixed z-50 w-64 bg-gnome-surface border border-gnome-border rounded-lg shadow-2xl py-1 text-xs text-gnome-text select-none">
+    <div id="ctxMenuFrequentPathHeader" class="px-3 py-1 text-[10px] text-gnome-textDim truncate font-mono border-b border-gnome-border/50 select-text"></div>
+    <button id="ctxMenuFrequentResetThis" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center gap-2">
+      <span>🔄</span> <span>Restablecer visitas de esta ruta</span>
+    </button>
+    <button id="ctxMenuFrequentHideThis" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center gap-2">
+      <span>👁️‍🗨️</span> <span>Ocultar de frecuentes</span>
+    </button>
+    <div class="my-1 border-t border-gnome-border/50"></div>
+    <button id="ctxMenuFrequentResetAll" class="w-full text-left px-3 py-1.5 hover:bg-rose-600 hover:text-white text-rose-400 flex items-center gap-2">
+      <span>🗑️</span> <span>Restablecer todo el historial</span>
     </button>
   </div>
 
