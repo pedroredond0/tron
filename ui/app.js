@@ -2353,7 +2353,7 @@ modalSherlock: document.getElementById('modalSherlock'),
 
         const left = document.createElement('div');
         left.className = 'flex items-center gap-1.5 min-w-0 flex-1';
-        left.innerHTML = `<span class="text-xs shrink-0">${getFileIcon(item)}</span><span class="truncate">${escapeHtml(item.name)}</span>`;
+        left.innerHTML = `<span class="miller-item-icon shrink-0 select-none">${getFileIcon(item)}</span><span class="truncate">${escapeHtml(item.name)}</span>`;
 
         const right = document.createElement('div');
         right.className = 'shrink-0 text-[10px] opacity-70 ml-1 font-mono';
@@ -2415,7 +2415,7 @@ modalSherlock: document.getElementById('modalSherlock'),
 
       const left = document.createElement('div');
       left.className = 'flex items-center gap-2 min-w-0 flex-1';
-      left.innerHTML = `<span class="text-xs shrink-0">${getFileIcon(item)}</span><span class="truncate">${escapeHtml(item.name)}</span>`;
+      left.innerHTML = `<span class="miller-item-icon shrink-0 select-none">${getFileIcon(item)}</span><span class="truncate">${escapeHtml(item.name)}</span>`;
 
       const right = document.createElement('div');
       right.className = 'shrink-0 flex items-center gap-1.5 text-[10px] ml-1 font-mono ' + (isSelected ? 'text-white/80' : 'text-gnome-textDim');
@@ -2430,8 +2430,19 @@ modalSherlock: document.getElementById('modalSherlock'),
       row.appendChild(right);
 
       row.addEventListener('click', (e) => {
-        handleRowClick(e, idx, 0, displayList);
-        triggerMillerPreview();
+        if (e.ctrlKey || e.shiftKey) {
+          handleRowClick(e, idx, 0, displayList);
+          triggerMillerPreview();
+          return;
+        }
+
+        // Single click: if directory, immediately navigate into it
+        if (item.is_directory) {
+          loadDirectory(item.path, true, 0);
+        } else {
+          handleRowClick(e, idx, 0, displayList);
+          triggerMillerPreview();
+        }
       });
 
       row.addEventListener('dblclick', () => {
@@ -2497,8 +2508,8 @@ modalSherlock: document.getElementById('modalSherlock'),
     targetEl.innerHTML = `
       <div class="w-full h-full flex flex-col min-h-0 text-left">
         <div class="p-3 bg-gnome-sidebar/50 border border-gnome-border rounded-lg mb-3 shrink-0 space-y-1">
-          <div class="text-xs text-gnome-text font-semibold flex items-center gap-1.5">
-            <span class="text-amber-400">📁</span>
+          <div class="text-xs text-gnome-text font-semibold flex items-center gap-2">
+            <span class="miller-header-icon shrink-0">${getFileIcon(folderItem)}</span>
             <span class="truncate">${escapeHtml(folderItem.name)}</span>
           </div>
           <div class="text-[11px] text-gnome-textDim">
@@ -2533,16 +2544,25 @@ modalSherlock: document.getElementById('modalSherlock'),
           const frag = document.createDocumentFragment();
           childItems.slice(0, 100).forEach(ci => {
             const itemRow = document.createElement('div');
-            itemRow.className = 'flex items-center justify-between px-2 py-1 rounded text-xs text-gnome-text hover:bg-gnome-hover select-none';
+            itemRow.className = 'flex items-center justify-between px-2 py-1 rounded text-xs text-gnome-text hover:bg-gnome-hover select-none cursor-pointer';
             itemRow.innerHTML = `
               <div class="flex items-center gap-1.5 min-w-0 flex-1">
-                <span class="text-xs shrink-0">${getFileIcon(ci)}</span>
+                <span class="miller-item-icon shrink-0 select-none">${getFileIcon(ci)}</span>
                 <span class="truncate">${escapeHtml(ci.name)}</span>
               </div>
               <div class="shrink-0 text-[10px] text-gnome-textDim font-mono ml-2">
                 ${ci.is_directory ? 'carpeta' : formatSize(ci.size)}
               </div>
             `;
+
+            itemRow.addEventListener('click', () => {
+              if (ci.is_directory) {
+                loadDirectory(ci.path, true, 0);
+              } else {
+                activateItem(ci, 0);
+              }
+            });
+
             frag.appendChild(itemRow);
           });
           if (childItems.length > 100) {
@@ -2571,7 +2591,6 @@ modalSherlock: document.getElementById('modalSherlock'),
       if (statsEl) statsEl.className = 'hidden';
     });
   }
-
   function handleMillerKeyDown(e) {
     if (!state.isMillerView) return false;
     const activeEl = document.activeElement;
