@@ -326,6 +326,7 @@ function escapeHtml(text) { const div = document.createElement("div"); div.textC
     get sortAsc() { return panels[activePanel].sortAsc; },
     set sortAsc(v) { panels[activePanel].sortAsc = v; },
     contextTargetItem: null,
+    liteMode: localStorage.getItem('tron_lite_mode') === 'true',
     isMillerView: localStorage.getItem('tron_miller_view') === 'true',
     showHiddenFiles: localStorage.getItem('tron_show_hidden') === 'true',
     customTextExts: (localStorage.getItem('tron_custom_text_exts') || 'sql, str, log, conf, env, bak')
@@ -548,6 +549,7 @@ function escapeHtml(text) { const div = document.createElement("div"); div.textC
     lblUiScaleValue: document.getElementById('lblUiScaleValue'),
     selectTheme: document.getElementById('selectTheme'),
     selectIconPack: document.getElementById('selectIconPack'),
+    chkLiteMode: document.getElementById('chkLiteMode'),
     chkMonochromeIcons: document.getElementById('chkMonochromeIcons'),
     externalAppsListContainer: document.getElementById('externalAppsListContainer'),
     btnResetExternalApps: document.getElementById('btnResetExternalApps'),
@@ -7813,6 +7815,7 @@ async function startTransferOperation(action, sources, targetDir) {
     if (el.selectTheme) el.selectTheme.value = theme;
     if (el.selectIconPack) el.selectIconPack.value = iconPack;
     if (el.chkMonochromeIcons) el.chkMonochromeIcons.checked = monochromeIcons;
+    if (el.chkLiteMode) el.chkLiteMode.checked = state.liteMode;
     if (el.chkShowMenuBar) el.chkShowMenuBar.checked = (localStorage.getItem('tron_show_menu_bar') !== 'false');
     if (el.chkPrefShowHidden) el.chkPrefShowHidden.checked = state.showHiddenFiles;
     if (el.chkPrefRecursiveSearch) el.chkPrefRecursiveSearch.checked = recursiveSearch;
@@ -7983,6 +7986,8 @@ async function startTransferOperation(action, sources, targetDir) {
     }
 
     localStorage.setItem('tron_theme', theme);
+    state.liteMode = el.chkLiteMode ? el.chkLiteMode.checked : false;
+    localStorage.setItem('tron_lite_mode', state.liteMode ? 'true' : 'false');
     localStorage.setItem('tron_icon_pack', iconPack);
     localStorage.setItem('tron_density', density);
     localStorage.setItem('tron_fontsize', fontSize);
@@ -8052,8 +8057,18 @@ async function startTransferOperation(action, sources, targetDir) {
     applyMenuBarVisibility();
   }
 
-  function applyAppearanceSettings(theme, density, fontSize, normalWeight, uiScale = '14', monochromeIcons = false, iconPack = 'default') {
+  
+  function applyLiteMode(isLite) {
+    if (isLite) {
+      document.body.classList.add('tron-lite');
+    } else {
+      document.body.classList.remove('tron-lite');
+    }
+  }
+
+function applyAppearanceSettings(theme, density, fontSize, normalWeight, uiScale = '14', monochromeIcons = false, iconPack = 'default') {
     document.body.setAttribute('data-theme', theme);
+    applyLiteMode(state.liteMode);
     state.normalFontWeight = normalWeight;
     state.iconPack = iconPack;
 

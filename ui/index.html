@@ -450,6 +450,36 @@
     .no-drag, button, input, select, a, .menu-dropdown {
       -webkit-app-region: no-drag;
     }
+  
+    [data-theme="8m"] {
+      --app-bg: #f7f3f9;
+      --app-surface: #ffffff;
+      --app-sidebar: #f2eaf7;
+      --app-border: #dac5e6;
+      --app-hover: #ede3f2;
+      --app-active-text: #ffffff;
+      --app-active-hover: #742d9c;
+      --app-text: #2e1a38;
+      --app-text-dim: #745187;
+    }
+
+    [data-theme="princess"] {
+      --app-bg: #fff5f7;
+      --app-surface: #ffffff;
+      --app-sidebar: #fce8ec;
+      --app-border: #f9c2cf;
+      --app-hover: #fee2e8;
+      --app-active-text: #ffffff;
+      --app-active-hover: #cc2559;
+      --app-text: #421c24;
+      --app-text-dim: #914856;
+    }
+
+  
+    body.tron-lite .advanced-tool {
+      display: none !important;
+    }
+
   </style>
   <script>
     if (typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform || navigator.userAgent)) {
@@ -466,7 +496,7 @@
       <div class="relative menu-dropdown">
       <button class="menu-btn px-2 py-0.5 rounded hover:bg-gnome-hover hover:text-white transition-colors">Archivo</button>
       <div class="menu-content hidden absolute left-0 top-full mt-0.5 w-60 bg-gnome-surface border border-gnome-border rounded-md shadow-xl py-1 z-50 text-xs">
-        <button id="menuNewFile" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+        <button id="menuNewFile" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between advanced-tool">
           <span>Nuevo Archivo...</span><span class="text-gnome-textDim text-[11px]">Ctrl+N</span>
         </button>
         <button id="menuNewFolder" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
@@ -479,7 +509,7 @@
         <button id="menuOpenDefault" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
           <span>Abrir</span><span class="text-gnome-textDim text-[11px]">Enter</span>
         </button>
-        <button id="menuOpenWith" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+        <button id="menuOpenWith" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between advanced-tool">
           <span>Abrir con...</span>
         </button>
         <button id="menuShowInExplorer" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
@@ -488,14 +518,14 @@
         <button id="menuCompress" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
           <span>Comprimir en .zip...</span>
         </button>
-        <button id="menuExportList" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+        <button id="menuExportList" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between advanced-tool">
           <span>🔭 Generar listado a archivo...</span>
         </button>
         <button id="menuDelete" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
           <span>Mover a Papelera</span><span class="text-gnome-textDim text-[11px]">Supr</span>
         </button>
         <div class="my-1 border-t border-gnome-border/60"></div>
-        <button id="menuProperties" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+        <button id="menuProperties" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between advanced-tool">
           <span>Propiedades</span><span class="text-gnome-textDim text-[11px]">Alt+Enter</span>
         </button>
         <div class="my-1 border-t border-gnome-border/60"></div>
@@ -646,12 +676,12 @@
   <!-- Action Bar -->
   <div id="actionBar" class="h-9 bg-gnome-bg border-b border-gnome-border flex items-center justify-between px-3 shrink-0 text-xs text-gnome-text">
     <div class="flex items-center gap-1.5">
-      <button id="btnActionTerminal" class="px-2.5 py-1 rounded bg-gnome-surface hover:bg-gnome-hover border border-gnome-border flex items-center gap-1.5 text-xs transition-colors" title="Abrir terminal aquí (Ctrl+T)">
-        <span id="iconActionTerminal" class="ui-icon-box font-mono font-bold text-gnome-active">&gt;_</span>
+      <button id="btnActionTerminal" class="px-2.5 py-1 rounded bg-gnome-surface hover:bg-gnome-hover border border-gnome-border flex items-center gap-1.5 text-xs transition-colors advanced-tool" title="Abrir terminal aquí (Ctrl+T)">
+        <span id="iconActionTerminal" class="ui-icon-box font-mono font-bold text-gnome-active advanced-tool">&gt;_</span>
         <span class="hidden sm:inline">Terminal</span>
       </button>
-      <button id="btnActionEdit" class="px-2.5 py-1 rounded bg-gnome-surface hover:bg-gnome-hover border border-gnome-border flex items-center gap-1.5 text-xs transition-colors" title="Abrir con editor de texto">
-        <span id="iconActionEdit" class="ui-icon-box">📝</span>
+      <button id="btnActionEdit" class="px-2.5 py-1 rounded bg-gnome-surface hover:bg-gnome-hover border border-gnome-border flex items-center gap-1.5 text-xs transition-colors advanced-tool" title="Abrir con editor de texto">
+        <span id="iconActionEdit" class="ui-icon-box advanced-tool">📝</span>
         <span class="hidden sm:inline">Editar</span>
       </button>
 
@@ -660,7 +690,7 @@
       <!-- Nuevo con iconos de archivo y directorio -->
       <div class="flex items-center rounded bg-gnome-surface border border-gnome-border overflow-hidden">
         <span class="px-2 py-1 text-xs font-medium text-gnome-text select-none">Nuevo</span>
-        <button id="btnActionNewFile" class="p-1 px-2 hover:bg-gnome-hover text-gnome-text border-l border-gnome-border transition-colors flex items-center justify-center" title="Crear nuevo archivo (Ctrl+N)">
+        <button id="btnActionNewFile" class="p-1 px-2 hover:bg-gnome-hover text-gnome-text border-l border-gnome-border transition-colors flex items-center justify-center advanced-tool" title="Crear nuevo archivo (Ctrl+N)">
           <span id="iconActionNewFile" class="ui-icon-box">📄</span>
         </button>
         <button id="btnActionNewFolder" class="p-1 px-2 hover:bg-gnome-hover text-gnome-text border-l border-gnome-border transition-colors flex items-center justify-center" title="Crear nueva carpeta (Ctrl+Shift+N)">
@@ -698,7 +728,7 @@
       </button>
 
       <!-- Generador de listados a archivo (txt) -->
-      <button id="btnActionExportList" class="p-1 px-2 rounded bg-gnome-surface hover:bg-gnome-hover border border-gnome-border text-gnome-text flex items-center justify-center transition-colors font-medium shadow-sm" title="Generar listado / árbol del directorio a archivo txt (ls/dir/tree)">
+      <button id="btnActionExportList" class="p-1 px-2 rounded bg-gnome-surface hover:bg-gnome-hover border border-gnome-border text-gnome-text flex items-center justify-center transition-colors font-medium shadow-sm advanced-tool" title="Generar listado / árbol del directorio a archivo txt (ls/dir/tree)">
         <span id="iconActionExportList" class="ui-icon-box">🔭📄</span>
       </button>
     </div>
@@ -810,13 +840,13 @@
 
       <!-- Red -->
       <div>
-        <div class="flex items-center justify-between px-2 mb-1">
+        <div id="sidebarNetworkSection" class="advanced-tool flex items-center justify-between px-2 mb-1">
           <span class="text-[11px] font-semibold text-gnome-textDim uppercase tracking-wider">Red</span>
           <button id="btnConnectNetwork" title="Conectar a recurso de red..." class="text-xs text-gnome-textDim hover:text-white">🔗</button>
         </div>
-        <div id="networkLinks" class="space-y-0.5">
+        <div id="networkLinks" class="advanced-tool" class="space-y-0.5">
           <button id="btnOpenNetworkDialog" class="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-gnome-hover text-xs text-gnome-text text-left transition-colors">
-            <span id="iconNetwork" class="ui-icon-box">🌐</span>
+            <span id="iconNetwork" class="ui-icon-box advanced-tool">🌐</span>
             <span class="truncate">Recurso de Red (UNC)...</span>
           </button>
         </div>
@@ -1311,6 +1341,17 @@
       <div class="min-h-[280px] max-h-[60vh] overflow-y-auto pr-1 scrollbar-thin text-xs space-y-4">
         <!-- 1. Pestaña: Temas -->
         <div id="panelThemes" class="pref-tab-panel space-y-4">
+
+          <div class="p-3 bg-gnome-sidebar/50 rounded-lg border border-gnome-border space-y-2 mb-4">
+            <label class="flex items-center gap-2.5 cursor-pointer select-none">
+              <input id="chkLiteMode" type="checkbox" class="w-4 h-4 rounded bg-gnome-sidebar border-gnome-border text-gnome-active focus:ring-0">
+              <div>
+                <span class="font-medium text-gnome-text block">Modo Lite (Interfaz Simplificada)</span>
+                <span class="text-[10px] text-gnome-textDim">Oculta herramientas avanzadas de terminal, desarrollo y volcado técnico para una experiencia limpia y directa.</span>
+              </div>
+            </label>
+          </div>
+
           <div>
             <label class="block text-gnome-textDim mb-1.5 font-medium">Tema Visual de Tron:</label>
             <select id="selectTheme" class="w-full bg-gnome-sidebar border border-gnome-border rounded-md px-3 py-2 text-xs text-gnome-text focus:outline-none focus:border-gnome-active">
@@ -1331,6 +1372,11 @@
                 <option value="nvchad-light">NvChad OneLight</option>
                 <option value="tokyonight-light">Tokyo Night Light</option>
                 <option value="matteblack-light">Matte Black Light Minimal</option>
+              </optgroup>
+            
+              <optgroup label="Temas Especiales">
+                <option value="8m">8M (Lila Claro)</option>
+                <option value="princess">Princesas (Rosa Pastel)</option>
               </optgroup>
             </select>
           </div>
@@ -2364,13 +2410,13 @@
     <button id="ctxMenuOpen" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
       <span>Abrir</span><span class="text-gnome-textDim text-[11px]">Enter</span>
     </button>
-    <button id="ctxMenuOpenWith" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+    <button id="ctxMenuOpenWith" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between advanced-tool">
       <span>Abrir con...</span>
     </button>
     <button id="ctxMenuQuickView" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
       <span>QuickView</span><span class="text-gnome-textDim text-[11px]">Espacio</span>
     </button>
-    <button id="ctxMenuOpenEditor" class="hidden w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between text-gnome-active">
+    <button id="ctxMenuOpenEditor" class="hidden w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between text-gnome-active advanced-tool">
       <span>Abrir con Editor</span>
     </button>
     <button id="ctxMenuOpenLocation" class="hidden w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
@@ -2380,10 +2426,10 @@
       <span>Mostrar en el Explorador</span>
     </button>
     <div class="my-1 border-t border-gnome-border/60"></div>
-    <button id="ctxMenuCopyPath" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+    <button id="ctxMenuCopyPath" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between advanced-tool">
       <span>Copiar Ruta</span><span class="text-gnome-textDim text-[11px]">Ctrl+Shift+C</span>
     </button>
-    <button id="ctxMenuCopyPosix" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+    <button id="ctxMenuCopyPosix" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between advanced-tool">
       <span>Copiar Ruta POSIX</span><span class="text-gnome-textDim text-[11px]">Ctrl+Alt+C</span>
     </button>
     <button id="ctxMenuCopyName" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
@@ -2414,7 +2460,7 @@
     <button id="ctxMenuCompress" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
       <span>🗜️ Comprimir en .zip...</span>
     </button>
-    <button id="ctxMenuExportList" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+    <button id="ctxMenuExportList" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between advanced-tool">
       <span>🔭📄 Generar listado a archivo...</span>
     </button>
     <div class="my-1 border-t border-gnome-border/60"></div>
@@ -2458,7 +2504,7 @@
       <span>Mover a Papelera</span><span class="text-gnome-textDim text-[11px]">Supr</span>
     </button>
     <div class="my-1 border-t border-gnome-border/60"></div>
-    <button id="ctxMenuProperties" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+    <button id="ctxMenuProperties" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between advanced-tool">
       <span>Propiedades</span><span class="text-gnome-textDim text-[11px]">Alt+Enter</span>
     </button>
   </div>
@@ -2498,7 +2544,7 @@
     <button id="ctxDirNewFolder" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
       <span>📁 Nueva Carpeta...</span><span class="text-gnome-textDim text-[11px]">Ctrl+Shift+N</span>
     </button>
-    <button id="ctxDirNewFile" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+    <button id="ctxDirNewFile" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between advanced-tool">
       <span>📄 Nuevo Archivo...</span><span class="text-gnome-textDim text-[11px]">Ctrl+N</span>
     </button>
     <div class="my-1 border-t border-gnome-border/60"></div>
@@ -2512,17 +2558,17 @@
     <button id="ctxDirRefresh" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
       <span>🔄 Actualizar</span><span class="text-gnome-textDim text-[11px]">F5</span>
     </button>
-    <button id="ctxDirTerminal" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+    <button id="ctxDirTerminal" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between advanced-tool">
       <span>💻 Abrir en Terminal</span><span class="text-gnome-textDim text-[11px]">Ctrl+T</span>
     </button>
-    <button id="ctxDirExportList" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+    <button id="ctxDirExportList" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between advanced-tool">
       <span>🔭 Generar listado a archivo...</span>
     </button>
     <button id="ctxDirCalcSizes" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
       <span>📊 Calcular tamaños de carpetas</span>
     </button>
     <div class="my-1 border-t border-gnome-border/60"></div>
-    <button id="ctxDirProperties" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+    <button id="ctxDirProperties" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between advanced-tool">
       <span>ℹ️ Propiedades de la carpeta</span><span class="text-gnome-textDim text-[11px]">Alt+Enter</span>
     </button>
   </div>
