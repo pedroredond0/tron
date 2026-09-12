@@ -271,6 +271,7 @@
     get sortAsc() { return panels[activePanel].sortAsc; },
     set sortAsc(v) { panels[activePanel].sortAsc = v; },
     contextTargetItem: null,
+    isMillerView: localStorage.getItem('tron_miller_view') === 'true',
     showHiddenFiles: localStorage.getItem('tron_show_hidden') === 'true',
     customTextExts: (localStorage.getItem('tron_custom_text_exts') || 'sql, str, log, conf, env, bak')
       .split(',')
@@ -548,6 +549,23 @@
     btnCancelRenameTag: document.getElementById('btnCancelRenameTag'),
     btnCloseRenameTagModal: document.getElementById('btnCloseRenameTagModal'),
     btnRefreshDrives: document.getElementById('btnRefreshDrives'),
+    btnToggleMillerView: document.getElementById('btnToggleMillerView'),
+    iconToggleMillerView: document.getElementById('iconToggleMillerView'),
+    menuToggleMillerView: document.getElementById('menuToggleMillerView'),
+    millerContainer: document.getElementById('millerContainer'),
+    millerColParent: document.getElementById('millerColParent'),
+    millerParentTitle: document.getElementById('millerParentTitle'),
+    millerParentCount: document.getElementById('millerParentCount'),
+    millerParentList: document.getElementById('millerParentList'),
+    millerColCurrent: document.getElementById('millerColCurrent'),
+    millerCurrentTitle: document.getElementById('millerCurrentTitle'),
+    millerCurrentCount: document.getElementById('millerCurrentCount'),
+    millerCurrentList: document.getElementById('millerCurrentList'),
+    millerColPreview: document.getElementById('millerColPreview'),
+    millerPreviewIcon: document.getElementById('millerPreviewIcon'),
+    millerPreviewTitle: document.getElementById('millerPreviewTitle'),
+    millerPreviewBadge: document.getElementById('millerPreviewBadge'),
+    millerPreviewContent: document.getElementById('millerPreviewContent'),
     modalConfirmExit: document.getElementById('modalConfirmExit'),
     btnCancelExit: document.getElementById('btnCancelExit'),
     btnForceExit: document.getElementById('btnForceExit'),
@@ -1055,6 +1073,9 @@ modalSherlock: document.getElementById('modalSherlock'),
         renderBreadcrumbs();
         updateStatusBar();
         renderTagSidebar();
+        if (state.isMillerView) {
+          renderMillerView();
+        }
       }
       renderTabs();
       if (isSplitView) updatePanelHighlights();
@@ -1215,6 +1236,9 @@ modalSherlock: document.getElementById('modalSherlock'),
       res = res.filter(item => item.name.toLowerCase().includes(q));
     }
     targetPanel.filteredItems = sortItems([...res], pIdx);
+    if (state.isMillerView && pIdx === 0) {
+      renderMillerView();
+    }
   }
 
   // Flatten filteredItems taking into account expandedDirs (collapsible tree)
@@ -1269,6 +1293,9 @@ modalSherlock: document.getElementById('modalSherlock'),
 
   // File List Rendering
   function renderFileList(pIdx = activePanel) {
+    if (state.isMillerView && pIdx === 0) {
+      renderMillerView();
+    }
     const targetPanel = panels[pIdx];
     const targetListEl = elPanels[pIdx]?.fileList;
     if (!targetListEl || !targetPanel) return;
@@ -1774,8 +1801,9 @@ modalSherlock: document.getElementById('modalSherlock'),
     el.fileList.focus();
   }
 
-  function cleanupMedia() {
-    const media = el.qvContent.querySelector('audio, video');
+  function cleanupMedia(container = el.qvContent) {
+    if (!container) return;
+    const media = container.querySelector('audio, video');
     if (media) {
       media.pause();
       media.removeAttribute('src');
@@ -1784,7 +1812,7 @@ modalSherlock: document.getElementById('modalSherlock'),
   }
 
   async function loadQuickViewContent(item) {
-    cleanupMedia();
+    cleanupMedia(el.qvContent);
     state.activeDirCalcId = Date.now();
     const currentCalcId = state.activeDirCalcId;
 
@@ -1798,8 +1826,19 @@ modalSherlock: document.getElementById('modalSherlock'),
     }
     el.qvContent.innerHTML = `<div class="text-xs text-gnome-textDim">Cargando vista previa...</div>`;
 
+    await loadItemPreview(item, el.qvContent, false, currentCalcId);
+  }
+
+  async function loadItemPreview(item, targetEl = el.qvContent, isMiller = false, calcId = null) {
+    if (!targetEl) return;
+    cleanupMedia(targetEl);
+
     if (item.is_directory) {
-      await renderFolderQuickView(item, currentCalcId);
+      if (isMiller) {
+        await renderMillerFolderPreview(item, targetEl);
+      } else {
+        await renderFolderQuickView(item, calcId || Date.now(), targetEl);
+      }
       return;
     }
 
@@ -1810,24 +1849,24 @@ modalSherlock: document.getElementById('modalSherlock'),
         customTextExts: state.customTextExts
       });
     } catch (e) {
-      renderFallbackCard(item, 'Error al obtener información del archivo: ' + e);
+      renderFallbackCard(item, 'Error al obtener información del archivo: ' + e, targetEl);
       return;
     }
 
-    if (!state.quickViewOpen) return; // User closed quickview in the meantime
+    if (!isMiller && !state.quickViewOpen) return;
 
     if (!previewMeta) {
-      renderFallbackCard(item, 'No se pudo generar la vista previa.');
+      renderFallbackCard(item, 'No se pudo generar la vista previa.', targetEl);
       return;
     }
 
     if (previewMeta.is_too_large) {
-      renderFallbackCard(item, `El archivo supera el límite de vista previa (${formatSize(previewMeta.max_size_bytes)})`);
+      renderFallbackCard(item, `El archivo supera el límite de vista previa (${formatSize(previewMeta.max_size_bytes)})`, targetEl);
       return;
     }
 
     if (previewMeta.error_message) {
-      renderFallbackCard(item, previewMeta.error_message);
+      renderFallbackCard(item, previewMeta.error_message, targetEl);
       return;
     }
 
@@ -1835,31 +1874,32 @@ modalSherlock: document.getElementById('modalSherlock'),
 
     switch (previewMeta.file_type) {
       case 'image':
-        renderImagePreview(item, dataUrl);
+        renderImagePreview(item, dataUrl, targetEl);
         break;
       case 'pdf':
-        renderPdfPreview(item, dataUrl);
+        renderPdfPreview(item, dataUrl, targetEl);
         break;
       case 'audio':
-        renderAudioPreview(item, dataUrl, previewMeta.mime_type);
+        renderAudioPreview(item, dataUrl, previewMeta.mime_type, targetEl);
         break;
       case 'video':
-        renderVideoPreview(item, dataUrl, previewMeta.mime_type);
+        renderVideoPreview(item, dataUrl, previewMeta.mime_type, targetEl);
         break;
       case 'text':
-        renderTextPreview(item, previewMeta);
+        renderTextPreview(item, previewMeta, targetEl);
         break;
       case 'office':
-        renderOfficePreview(item, previewMeta);
+        renderOfficePreview(item, previewMeta, targetEl);
         break;
       default:
-        renderFallbackCard(item, null);
+        renderFallbackCard(item, null, targetEl);
         break;
     }
   }
 
-  async function renderFolderQuickView(item, calcId) {
-    el.qvContent.innerHTML = `
+  async function renderFolderQuickView(item, calcId, targetEl = el.qvContent) {
+    if (!targetEl) return;
+    targetEl.innerHTML = `
       <div class="w-full max-w-md bg-gnome-sidebar border border-gnome-border rounded-xl p-6 flex flex-col items-center gap-4 text-center shadow-lg">
         <div class="text-6xl text-amber-400">📁</div>
         <div class="font-semibold text-sm text-gnome-text truncate max-w-xs">${escapeHtml(item.name)}</div>
@@ -1877,12 +1917,10 @@ modalSherlock: document.getElementById('modalSherlock'),
 
     try {
       const res = await invoke('get_directory_size', { path: item.path });
-      // Check if this calculation was cancelled (e.g. user navigated or closed with Esc)
       if (state.activeDirCalcId !== calcId || !state.quickViewOpen) {
         return;
       }
 
-      // Cache size
       state.dirSizes.set(item.path, res);
 
       const statusEl = document.getElementById('qvDirCalcStatus');
@@ -1913,24 +1951,26 @@ modalSherlock: document.getElementById('modalSherlock'),
     }
   }
 
-  function renderImagePreview(item, dataUrl) {
+  function renderImagePreview(item, dataUrl, targetEl = el.qvContent) {
+    if (!targetEl) return;
     if (!dataUrl) {
-      renderFallbackCard(item, 'No se pudo cargar los datos de la imagen');
+      renderFallbackCard(item, 'No se pudo cargar los datos de la imagen', targetEl);
       return;
     }
-    el.qvContent.innerHTML = `
+    targetEl.innerHTML = `
       <div class="w-full h-full flex flex-col items-center justify-center p-2">
         <img src="${dataUrl}" alt="${escapeHtml(item.name)}" class="max-w-full max-h-[70vh] object-contain rounded shadow" onerror="this.onerror=null; window._tronFallbackImage('${escapeHtml(item.name)}', '${escapeHtml(item.extension || '')}')"/>
       </div>
     `;
   }
 
-  function renderPdfPreview(item, dataUrl) {
+  function renderPdfPreview(item, dataUrl, targetEl = el.qvContent) {
+    if (!targetEl) return;
     if (!dataUrl) {
-      renderFallbackCard(item, 'No se pudo cargar el documento PDF');
+      renderFallbackCard(item, 'No se pudo cargar el documento PDF', targetEl);
       return;
     }
-    el.qvContent.innerHTML = `
+    targetEl.innerHTML = `
       <div class="w-full h-full min-h-[60vh] flex flex-col p-1">
         <iframe src="${dataUrl}#toolbar=1" class="w-full h-[65vh] rounded-lg border border-gnome-border bg-white" title="${escapeHtml(item.name)}"></iframe>
       </div>
@@ -1939,16 +1979,17 @@ modalSherlock: document.getElementById('modalSherlock'),
 
   window._tronFallbackImage = function(name, ext) {
     const msg = `No se pudo renderizar la imagen directamente en el visor. Pulsa 'Abrir' para verla en la aplicación predeterminada.`;
-    renderFallbackCard({ name, extension: ext, file_type: 'image' }, msg);
+    renderFallbackCard({ name, extension: ext, file_type: 'image' }, msg, el.qvContent);
   };
 
-  function renderTextPreview(item, previewMeta) {
+  function renderTextPreview(item, previewMeta, targetEl = el.qvContent) {
+    if (!targetEl) return;
     const content = previewMeta && previewMeta.content ? previewMeta.content : '';
     const ext = (item.extension || '').toLowerCase();
     const highlighted = highlightCodeContent(content, ext);
 
-    el.qvContent.innerHTML = `
-      <div class="w-full h-full max-h-[70vh] overflow-auto bg-gnome-sidebar border border-gnome-border rounded p-4">
+    targetEl.innerHTML = `
+      <div class="w-full h-full max-h-[70vh] overflow-auto bg-gnome-sidebar border border-gnome-border rounded p-4 text-left">
         <pre class="font-mono text-xs text-gnome-text whitespace-pre-wrap leading-relaxed select-text">${highlighted}</pre>
       </div>
     `;
@@ -1967,7 +2008,6 @@ modalSherlock: document.getElementById('modalSherlock'),
     } else if (['js', 'ts', 'rs', 'yaml', 'yml', 'c', 'cpp', 'h', 'hpp', 'sh', 'bat', 'ps1', 'str'].includes(ext)) {
       return highlightGenericCode(text);
     }
-    // Plain text or custom text extension
     return escapeHtml(text);
   }
 
@@ -2020,7 +2060,6 @@ modalSherlock: document.getElementById('modalSherlock'),
     const keywords = new Set(['def', 'class', 'import', 'from', 'as', 'return', 'if', 'elif', 'else', 'for', 'while', 'in', 'try', 'except', 'finally', 'with', 'lambda', 'pass', 'break', 'continue', 'and', 'or', 'not', 'is', 'None', 'True', 'False', 'async', 'await']);
     return lines.map(line => {
       let escaped = escapeHtml(line);
-      // Comment
       const commentIdx = escaped.indexOf('#');
       let codePart = escaped;
       let commentPart = '';
@@ -2029,10 +2068,8 @@ modalSherlock: document.getElementById('modalSherlock'),
         commentPart = `<span class="syn-comment">${escaped.slice(commentIdx)}</span>`;
       }
 
-      // Strings (single and double quotes)
       codePart = codePart.replace(/(["'])(?:(?=(\\?))\2.)*?\1/g, '<span class="syn-string">$&</span>');
 
-      // Keywords
       codePart = codePart.replace(/\b([a-zA-Z_]\w*)\b/g, (match, word) => {
         if (keywords.has(word)) {
           return `<span class="syn-keyword">${word}</span>`;
@@ -2040,7 +2077,6 @@ modalSherlock: document.getElementById('modalSherlock'),
         return match;
       });
 
-      // Numbers
       codePart = codePart.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="syn-number">$1</span>');
 
       return codePart + commentPart;
@@ -2051,17 +2087,13 @@ modalSherlock: document.getElementById('modalSherlock'),
     const lines = text.split('\n');
     return lines.map(line => {
       let escaped = escapeHtml(line);
-      // Headings
       if (/^#{1,6}\s/.test(escaped)) {
         return `<span class="syn-heading">${escaped}</span>`;
       }
-      // Lists
       if (/^(\s*[-*+]|\s*\d+\.)\s/.test(escaped)) {
         return `<span class="syn-list">${escaped}</span>`;
       }
-      // Inline code
       escaped = escaped.replace(/`([^`]+)`/g, '<span class="syn-string bg-gnome-bg/60 px-1 py-0.5 rounded font-mono">`$1`</span>');
-      // Bold / Italic
       escaped = escaped.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-bold text-gnome-text">$1</strong>');
       return escaped;
     }).join('\n');
@@ -2072,7 +2104,6 @@ modalSherlock: document.getElementById('modalSherlock'),
     const keywords = new Set(['fn', 'let', 'mut', 'pub', 'struct', 'enum', 'impl', 'use', 'const', 'var', 'function', 'return', 'if', 'else', 'for', 'while', 'import', 'export', 'type', 'interface', 'async', 'await', 'true', 'false']);
     return lines.map(line => {
       let escaped = escapeHtml(line);
-      // Comments (//)
       const commentIdx = escaped.indexOf('//');
       let codePart = escaped;
       let commentPart = '';
@@ -2092,12 +2123,13 @@ modalSherlock: document.getElementById('modalSherlock'),
     }).join('\n');
   }
 
-  function renderAudioPreview(item, dataUrl, mimeType) {
+  function renderAudioPreview(item, dataUrl, mimeType, targetEl = el.qvContent) {
+    if (!targetEl) return;
     if (!dataUrl) {
-      renderFallbackCard(item, 'No se pudo cargar el archivo de audio');
+      renderFallbackCard(item, 'No se pudo cargar el archivo de audio', targetEl);
       return;
     }
-    el.qvContent.innerHTML = `
+    targetEl.innerHTML = `
       <div class="w-full max-w-md bg-gnome-sidebar border border-gnome-border rounded-xl p-6 flex flex-col items-center gap-4 shadow-lg">
         <div class="w-20 h-20 rounded-full bg-gnome-active/20 flex items-center justify-center text-4xl text-gnome-active">
           🎵
@@ -2113,20 +2145,21 @@ modalSherlock: document.getElementById('modalSherlock'),
       </div>
     `;
 
-    const audio = document.getElementById('qvAudioPlayer');
+    const audio = targetEl.querySelector('#qvAudioPlayer') || document.getElementById('qvAudioPlayer');
     if (audio) {
       audio.onerror = () => {
-        renderFallbackCard(item, "Vista previa no disponible para este formato o códec de audio.");
+        renderFallbackCard(item, "Vista previa no disponible para este formato o códec de audio.", targetEl);
       };
     }
   }
 
-  function renderVideoPreview(item, dataUrl, mimeType) {
+  function renderVideoPreview(item, dataUrl, mimeType, targetEl = el.qvContent) {
+    if (!targetEl) return;
     if (!dataUrl) {
-      renderFallbackCard(item, 'No se pudo cargar el archivo de vídeo');
+      renderFallbackCard(item, 'No se pudo cargar el archivo de vídeo', targetEl);
       return;
     }
-    el.qvContent.innerHTML = `
+    targetEl.innerHTML = `
       <div class="w-full h-full flex flex-col items-center justify-center max-h-[70vh]">
         <video id="qvVideoPlayer" controls autoplay preload="metadata" playsinline class="max-w-full max-h-[65vh] rounded-lg shadow-lg border border-gnome-border bg-black">
           <source src="${dataUrl}" type="${mimeType || 'video/mp4'}">
@@ -2135,15 +2168,16 @@ modalSherlock: document.getElementById('modalSherlock'),
       </div>
     `;
 
-    const video = document.getElementById('qvVideoPlayer');
+    const video = targetEl.querySelector('#qvVideoPlayer') || document.getElementById('qvVideoPlayer');
     if (video) {
       video.onerror = () => {
-        renderFallbackCard(item, "Vista previa no disponible para este formato o códec de vídeo. Pulsa 'Abrir' para reproducirlo en tu reproductor predeterminado.");
+        renderFallbackCard(item, "Vista previa no disponible para este formato o códec de vídeo. Pulsa 'Abrir' para reproducirlo en tu reproductor predeterminado.", targetEl);
       };
     }
   }
 
-  function renderOfficePreview(item, previewMeta) {
+  function renderOfficePreview(item, previewMeta, targetEl = el.qvContent) {
+    if (!targetEl) return;
     const ext = (item.extension || '').toLowerCase();
     const content = previewMeta ? previewMeta.content : null;
     const dataUrl = previewMeta ? previewMeta.data_url : null;
@@ -2166,7 +2200,7 @@ modalSherlock: document.getElementById('modalSherlock'),
     }
 
     if (content) {
-      el.qvContent.innerHTML = `
+      targetEl.innerHTML = `
         <div class="w-full h-full flex flex-col p-1 max-h-[72vh] overflow-hidden">
           <div class="flex items-center justify-between px-3 py-2 bg-gnome-sidebar border border-gnome-border rounded-t-lg">
             <div class="flex items-center gap-2 ${officeBadgeBg} border px-2.5 py-1 rounded-md text-xs font-medium">
@@ -2176,13 +2210,13 @@ modalSherlock: document.getElementById('modalSherlock'),
               <span>📄 Vista de contenido</span>
             </div>
           </div>
-          <div class="flex-1 overflow-auto bg-gnome-surface border-x border-b border-gnome-border rounded-b-lg p-5 shadow-inner">
+          <div class="flex-1 overflow-auto bg-gnome-surface border-x border-b border-gnome-border rounded-b-lg p-5 shadow-inner text-left">
             ${content}
           </div>
         </div>
       `;
     } else if (dataUrl) {
-      el.qvContent.innerHTML = `
+      targetEl.innerHTML = `
         <div class="w-full h-full flex flex-col items-center justify-center p-2 max-h-[72vh]">
           <div class="relative max-h-[68vh] flex items-center justify-center bg-gnome-sidebar border border-gnome-border rounded-xl p-3 shadow-2xl overflow-hidden">
             <img src="${dataUrl}" alt="${escapeHtml(item.name)}" class="max-w-full max-h-[62vh] object-contain rounded-lg shadow-md bg-white"/>
@@ -2193,14 +2227,15 @@ modalSherlock: document.getElementById('modalSherlock'),
         </div>
       `;
     } else {
-      renderFallbackCard(item, `No se pudo extraer la vista previa de este documento de Office. Pulsa 'Abrir' para visualizarlo en su aplicación predeterminada.`);
+      renderFallbackCard(item, `No se pudo extraer la vista previa de este documento de Office. Pulsa 'Abrir' para visualizarlo en su aplicación predeterminada.`, targetEl);
     }
   }
 
-  function renderFallbackCard(item, customMsg) {
-    cleanupMedia();
+  function renderFallbackCard(item, customMsg, targetEl = el.qvContent) {
+    if (!targetEl) return;
+    cleanupMedia(targetEl);
     const msg = customMsg || 'Vista previa no disponible para este tipo de archivo.';
-    el.qvContent.innerHTML = `
+    targetEl.innerHTML = `
       <div class="w-full max-w-md bg-gnome-sidebar border border-gnome-border rounded-xl p-6 flex flex-col items-center gap-3 text-center shadow-lg">
         <div class="text-5xl mb-1">${getFileIcon(item)}</div>
         <div class="font-semibold text-sm text-gnome-text truncate max-w-xs">${escapeHtml(item.name)}</div>
@@ -2215,6 +2250,384 @@ modalSherlock: document.getElementById('modalSherlock'),
         </div>
       </div>
     `;
+  }
+
+  // ==========================================
+  // Miller Columns (macOS / Yazi View) Engine
+  // ==========================================
+  let millerPreviewTimer = null;
+  let millerActivePreviewPath = null;
+
+  function getParentDirectory(dirPath) {
+    if (!dirPath) return null;
+    let norm = dirPath.replace(/\\/g, '/').replace(/\/+$/, '');
+    if (!norm) return null;
+    const lastSlash = norm.lastIndexOf('/');
+    if (lastSlash > 0) {
+      let parent = norm.substring(0, lastSlash);
+      if (parent.length === 2 && parent.endsWith(':')) {
+        parent += '/';
+      }
+      return parent;
+    } else if (lastSlash === 0) {
+      return '/';
+    }
+    return null;
+  }
+
+  async function toggleMillerView() {
+    state.isMillerView = !state.isMillerView;
+    localStorage.setItem('tron_miller_view', state.isMillerView ? 'true' : 'false');
+
+    if (state.isMillerView) {
+      if (isSplitView) {
+        await toggleSplitView();
+      }
+      el.panelA.classList.add('hidden');
+      el.panelB.classList.add('hidden');
+      el.millerContainer.classList.remove('hidden');
+      if (el.btnToggleMillerView) el.btnToggleMillerView.classList.add('bg-gnome-active/20', 'text-gnome-active');
+      renderMillerView();
+      if (el.millerCurrentList) el.millerCurrentList.focus();
+    } else {
+      cleanupMedia(el.millerPreviewContent);
+      el.millerContainer.classList.add('hidden');
+      el.panelA.classList.remove('hidden');
+      if (el.btnToggleMillerView) el.btnToggleMillerView.classList.remove('bg-gnome-active/20', 'text-gnome-active');
+      renderFileList(0);
+      elPanels[0].fileList.focus();
+    }
+  }
+
+  async function renderMillerView() {
+    if (!state.isMillerView) return;
+    renderMillerParentColumn();
+    renderMillerCurrentColumn();
+    triggerMillerPreview();
+  }
+
+  async function renderMillerParentColumn() {
+    const parentListEl = el.millerParentList;
+    if (!parentListEl) return;
+    const curDir = state.currentDirectory;
+    const parentDir = getParentDirectory(curDir);
+
+    if (!parentDir) {
+      if (el.millerParentTitle) el.millerParentTitle.textContent = 'Raíz';
+      if (el.millerParentCount) el.millerParentCount.textContent = '';
+      parentListEl.innerHTML = `<div class="p-6 text-center text-[11px] text-gnome-textDim italic">Nivel superior no disponible</div>`;
+      return;
+    }
+
+    const parentName = parentDir.replace(/\\/g, '/').split('/').filter(Boolean).pop() || parentDir;
+    if (el.millerParentTitle) el.millerParentTitle.textContent = parentName;
+
+    try {
+      const res = await invoke('read_directory', { path: parentDir });
+      if (!res || !res.items) {
+        parentListEl.innerHTML = `<div class="p-4 text-xs text-gnome-textDim italic">Vacío</div>`;
+        if (el.millerParentCount) el.millerParentCount.textContent = '0';
+        return;
+      }
+
+      let items = res.items;
+      if (!state.showHiddenFiles) {
+        items = items.filter(i => !i.is_hidden);
+      }
+      items = sortItems([...items], 0);
+
+      if (el.millerParentCount) el.millerParentCount.textContent = `${items.length}`;
+      parentListEl.innerHTML = '';
+
+      const normCurDir = (curDir || '').replace(/\\/g, '/').toLowerCase().replace(/\/+$/, '');
+
+      const frag = document.createDocumentFragment();
+      items.forEach(item => {
+        const normItemPath = (item.path || '').replace(/\\/g, '/').toLowerCase().replace(/\/+$/, '');
+        const isCurrentFolder = item.is_directory && normItemPath === normCurDir;
+
+        const row = document.createElement('div');
+        row.className = `flex items-center justify-between px-2.5 py-1 rounded cursor-pointer text-xs select-none transition-colors ${
+          isCurrentFolder ? 'bg-gnome-active text-white font-medium shadow-sm' : 'hover:bg-gnome-hover text-gnome-textDim hover:text-gnome-text'
+        }`;
+
+        const left = document.createElement('div');
+        left.className = 'flex items-center gap-1.5 min-w-0 flex-1';
+        left.innerHTML = `<span class="text-xs shrink-0">${getFileIcon(item)}</span><span class="truncate">${escapeHtml(item.name)}</span>`;
+
+        const right = document.createElement('div');
+        right.className = 'shrink-0 text-[10px] opacity-70 ml-1 font-mono';
+        if (item.is_directory) {
+          right.textContent = '›';
+        }
+
+        row.appendChild(left);
+        row.appendChild(right);
+
+        row.addEventListener('click', () => {
+          if (item.is_directory) {
+            loadDirectory(item.path, true, 0);
+          }
+        });
+
+        frag.appendChild(row);
+      });
+
+      parentListEl.appendChild(frag);
+
+      const activeRow = parentListEl.querySelector('.bg-gnome-active');
+      if (activeRow) {
+        activeRow.scrollIntoView({ block: 'nearest' });
+      }
+    } catch (e) {
+      parentListEl.innerHTML = `<div class="p-3 text-[11px] text-red-400">Error: ${escapeHtml(String(e))}</div>`;
+    }
+  }
+
+  function renderMillerCurrentColumn() {
+    const listEl = el.millerCurrentList;
+    if (!listEl) return;
+    const curDir = state.currentDirectory;
+    const curName = (curDir || '').replace(/\\/g, '/').split('/').filter(Boolean).pop() || curDir || 'Directorio';
+
+    if (el.millerCurrentTitle) el.millerCurrentTitle.textContent = curName;
+
+    const displayList = state.filteredItems || [];
+    if (el.millerCurrentCount) el.millerCurrentCount.textContent = `${displayList.length}`;
+    listEl.innerHTML = '';
+
+    if (displayList.length === 0) {
+      listEl.innerHTML = `<div class="p-8 text-center text-xs text-gnome-textDim italic">Directorio vacío</div>`;
+      return;
+    }
+
+    const frag = document.createDocumentFragment();
+    displayList.forEach((item, idx) => {
+      const isSelected = state.selectedItems.has(item.path);
+      const isFocused = idx === state.selectedIndex;
+
+      const row = document.createElement('div');
+      row.className = `group flex items-center justify-between px-2.5 py-1.5 rounded cursor-pointer text-xs select-none transition-colors ${
+        isSelected
+          ? 'bg-gnome-active text-white font-medium shadow-sm ring-1 ring-gnome-active/80'
+          : 'hover:bg-gnome-hover text-gnome-text'
+      }`;
+
+      const left = document.createElement('div');
+      left.className = 'flex items-center gap-2 min-w-0 flex-1';
+      left.innerHTML = `<span class="text-xs shrink-0">${getFileIcon(item)}</span><span class="truncate">${escapeHtml(item.name)}</span>`;
+
+      const right = document.createElement('div');
+      right.className = 'shrink-0 flex items-center gap-1.5 text-[10px] ml-1 font-mono ' + (isSelected ? 'text-white/80' : 'text-gnome-textDim');
+
+      if (item.is_directory) {
+        right.innerHTML = `<span>›</span>`;
+      } else {
+        right.textContent = formatSize(item.size);
+      }
+
+      row.appendChild(left);
+      row.appendChild(right);
+
+      row.addEventListener('click', (e) => {
+        handleRowClick(e, idx, 0, displayList);
+        triggerMillerPreview();
+      });
+
+      row.addEventListener('dblclick', () => {
+        activateItem(item, 0);
+      });
+
+      row.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        openFileContextMenu(e, item, idx);
+      });
+
+      frag.appendChild(row);
+    });
+
+    listEl.appendChild(frag);
+
+    if (state.selectedIndex >= 0 && listEl.children[state.selectedIndex]) {
+      listEl.children[state.selectedIndex].scrollIntoView({ block: 'nearest' });
+    }
+  }
+
+  function triggerMillerPreview() {
+    if (!state.isMillerView) return;
+    if (millerPreviewTimer) clearTimeout(millerPreviewTimer);
+    millerPreviewTimer = setTimeout(() => {
+      renderMillerPreviewNow();
+    }, 60);
+  }
+
+  async function renderMillerPreviewNow() {
+    if (!state.isMillerView) return;
+    const previewEl = el.millerPreviewContent;
+    if (!previewEl) return;
+
+    if (state.selectedIndex < 0 || state.selectedIndex >= state.filteredItems.length) {
+      cleanupMedia(previewEl);
+      if (el.millerPreviewTitle) el.millerPreviewTitle.textContent = 'Ninguna selección';
+      if (el.millerPreviewIcon) el.millerPreviewIcon.textContent = '👁️';
+      if (el.millerPreviewBadge) el.millerPreviewBadge.classList.add('hidden');
+      previewEl.innerHTML = `<div class="text-xs text-gnome-textDim italic">Selecciona un elemento para ver su vista previa</div>`;
+      millerActivePreviewPath = null;
+      return;
+    }
+
+    const item = state.filteredItems[state.selectedIndex];
+    if (millerActivePreviewPath === item.path) return;
+    millerActivePreviewPath = item.path;
+
+    if (el.millerPreviewTitle) el.millerPreviewTitle.textContent = item.name;
+    if (el.millerPreviewIcon) el.millerPreviewIcon.innerHTML = getFileIcon(item);
+    if (el.millerPreviewBadge) {
+      el.millerPreviewBadge.textContent = item.is_directory ? 'CARPETA' : (item.extension || item.file_type || 'archivo').toUpperCase();
+      el.millerPreviewBadge.classList.remove('hidden');
+    }
+
+    previewEl.innerHTML = `<div class="text-xs text-gnome-textDim animate-pulse">Cargando vista previa...</div>`;
+    await loadItemPreview(item, previewEl, true);
+  }
+
+  async function renderMillerFolderPreview(folderItem, targetEl) {
+    if (!targetEl) return;
+    targetEl.innerHTML = `
+      <div class="w-full h-full flex flex-col min-h-0 text-left">
+        <div class="p-3 bg-gnome-sidebar/50 border border-gnome-border rounded-lg mb-3 shrink-0 space-y-1">
+          <div class="text-xs text-gnome-text font-semibold flex items-center gap-1.5">
+            <span class="text-amber-400">📁</span>
+            <span class="truncate">${escapeHtml(folderItem.name)}</span>
+          </div>
+          <div class="text-[11px] text-gnome-textDim">
+            <div><span class="font-medium text-gnome-text">Ruta:</span> <span class="break-all font-mono text-[10px]">${escapeHtml(folderItem.path)}</span></div>
+            <div><span class="font-medium text-gnome-text">Modificado:</span> ${formatDate(folderItem.modified)}</div>
+            <div id="millerFolderStats" class="mt-1 text-gnome-active flex items-center gap-1">
+              <span>⏳</span> Calculando tamaño...
+            </div>
+          </div>
+        </div>
+        <div class="text-[11px] font-semibold text-gnome-textDim uppercase tracking-wider px-1 pb-1">
+          Contenido directo:
+        </div>
+        <div id="millerFolderContents" class="flex-1 overflow-y-auto border border-gnome-border rounded-lg bg-gnome-surface p-1 space-y-0.5 min-h-[120px]">
+          <div class="p-3 text-center text-xs text-gnome-textDim animate-pulse">Leyendo contenido...</div>
+        </div>
+      </div>
+    `;
+
+    try {
+      const res = await invoke('read_directory', { path: folderItem.path });
+      const contentsEl = targetEl.querySelector('#millerFolderContents');
+      if (contentsEl && res && res.items) {
+        let childItems = res.items;
+        if (!state.showHiddenFiles) childItems = childItems.filter(ci => !ci.is_hidden);
+        childItems = sortItems([...childItems], 0);
+
+        if (childItems.length === 0) {
+          contentsEl.innerHTML = `<div class="p-4 text-center text-xs text-gnome-textDim italic">Carpeta vacía</div>`;
+        } else {
+          contentsEl.innerHTML = '';
+          const frag = document.createDocumentFragment();
+          childItems.slice(0, 100).forEach(ci => {
+            const itemRow = document.createElement('div');
+            itemRow.className = 'flex items-center justify-between px-2 py-1 rounded text-xs text-gnome-text hover:bg-gnome-hover select-none';
+            itemRow.innerHTML = `
+              <div class="flex items-center gap-1.5 min-w-0 flex-1">
+                <span class="text-xs shrink-0">${getFileIcon(ci)}</span>
+                <span class="truncate">${escapeHtml(ci.name)}</span>
+              </div>
+              <div class="shrink-0 text-[10px] text-gnome-textDim font-mono ml-2">
+                ${ci.is_directory ? 'carpeta' : formatSize(ci.size)}
+              </div>
+            `;
+            frag.appendChild(itemRow);
+          });
+          if (childItems.length > 100) {
+            const moreRow = document.createElement('div');
+            moreRow.className = 'p-2 text-center text-[10px] text-gnome-textDim italic';
+            moreRow.textContent = `...y ${childItems.length - 100} elementos más`;
+            frag.appendChild(moreRow);
+          }
+          contentsEl.appendChild(frag);
+        }
+      }
+    } catch (e) {
+      const contentsEl = targetEl.querySelector('#millerFolderContents');
+      if (contentsEl) contentsEl.innerHTML = `<div class="p-2 text-xs text-red-400">Error al leer: ${escapeHtml(String(e))}</div>`;
+    }
+
+    // Background directory size calculation
+    invoke('get_directory_size', { path: folderItem.path }).then(dirStats => {
+      const statsEl = targetEl.querySelector('#millerFolderStats');
+      if (statsEl && dirStats) {
+        statsEl.className = 'mt-1 text-emerald-400 font-medium';
+        statsEl.innerHTML = `<span>✔️</span> ${formatSize(dirStats.total_size)} (${dirStats.file_count} archivos, ${dirStats.dir_count} subcarpetas)`;
+      }
+    }).catch(() => {
+      const statsEl = targetEl.querySelector('#millerFolderStats');
+      if (statsEl) statsEl.className = 'hidden';
+    });
+  }
+
+  function handleMillerKeyDown(e) {
+    if (!state.isMillerView) return false;
+    const activeEl = document.activeElement;
+    const isInputActive = activeEl && ['INPUT', 'TEXTAREA', 'SELECT'].includes(activeEl.tagName);
+    if (isInputActive) return false;
+    if (state.quickViewOpen) return false;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (state.filteredItems.length === 0) return true;
+      let nextIndex = state.selectedIndex + 1;
+      if (nextIndex >= state.filteredItems.length) nextIndex = state.filteredItems.length - 1;
+      setSelectionIndex(nextIndex);
+      triggerMillerPreview();
+      return true;
+    }
+
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (state.filteredItems.length === 0) return true;
+      let prevIndex = state.selectedIndex - 1;
+      if (prevIndex < 0) prevIndex = 0;
+      setSelectionIndex(prevIndex);
+      triggerMillerPreview();
+      return true;
+    }
+
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      if (state.selectedIndex >= 0 && state.selectedIndex < state.filteredItems.length) {
+        const item = state.filteredItems[state.selectedIndex];
+        if (item.is_directory) {
+          loadDirectory(item.path, true, 0);
+        }
+      }
+      return true;
+    }
+
+    if (e.key === 'ArrowLeft' || e.key === 'Backspace') {
+      e.preventDefault();
+      if (state.currentDirectory) {
+        panels[0].selectedItems = new Set([state.currentDirectory]);
+      }
+      goUp();
+      return true;
+    }
+
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (state.selectedIndex >= 0 && state.selectedIndex < state.filteredItems.length) {
+        activateItem(state.filteredItems[state.selectedIndex], 0);
+      }
+      return true;
+    }
+
+    return false;
   }
 
   // Quick Purge: Delete (Trash) Operation
@@ -2526,6 +2939,12 @@ modalSherlock: document.getElementById('modalSherlock'),
       return;
     }
 
+    if (e.key === 'F4' || (isModKey(e) && e.key === '3')) {
+      e.preventDefault();
+      toggleMillerView();
+      return;
+    }
+
     if (e.key === 'Tab' && isSplitView && !isInputActive) {
       e.preventDefault();
       switchActivePanel(activePanel === 0 ? 1 : 0);
@@ -2657,6 +3076,10 @@ modalSherlock: document.getElementById('modalSherlock'),
       e.preventDefault();
       moveSelection(-10);
       return;
+    }
+
+    if (state.isMillerView) {
+      if (handleMillerKeyDown(e)) return;
     }
 
     // Single-key Alphanumeric Type-Ahead Navigation (Jumping to file starting with letter/digit)
@@ -3066,6 +3489,9 @@ async function startTransferOperation(action, sources, targetDir) {
   }
 
   async function toggleSplitView() {
+    if (!isSplitView && state.isMillerView) {
+      toggleMillerView();
+    }
     isSplitView = !isSplitView;
     if (isSplitView) {
       el.panelB.classList.remove('hidden');
@@ -5197,6 +5623,8 @@ async function startTransferOperation(action, sources, targetDir) {
     el.btnActionDelete.onclick = deleteCurrentItem;
     el.btnActionQuickView.onclick = openQuickView;
     if (el.btnToggleSplitView) el.btnToggleSplitView.onclick = toggleSplitView;
+    if (el.btnToggleMillerView) el.btnToggleMillerView.onclick = toggleMillerView;
+    if (el.menuToggleMillerView) el.menuToggleMillerView.onclick = () => { closeAllMenus(); toggleMillerView(); };
 
     // Window Controls (Minimizar, Maximizar/Restaurar, Cerrar)
     if (el.btnWinMinimize) {
@@ -6162,6 +6590,9 @@ async function startTransferOperation(action, sources, targetDir) {
         case 'toggle_split':
           toggleSplitView();
           break;
+        case 'toggle_miller':
+          toggleMillerView();
+          break;
         case 'refresh_dir':
           reloadBothPanelsIfNeeded();
           break;
@@ -6249,6 +6680,12 @@ async function startTransferOperation(action, sources, targetDir) {
 
     setupSherlockEvents();
     loadAppearanceSettings();
+    if (state.isMillerView) {
+      el.panelA.classList.add('hidden');
+      el.panelB.classList.add('hidden');
+      el.millerContainer.classList.remove('hidden');
+      if (el.btnToggleMillerView) el.btnToggleMillerView.classList.add('bg-gnome-active/20', 'text-gnome-active');
+    }
     loadDirectory(null);
   }
 

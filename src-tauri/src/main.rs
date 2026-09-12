@@ -4426,6 +4426,7 @@ fn build_app_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Result<tauri:
     let view_submenu = SubmenuBuilder::new(app, "Ver")
         .item(&MenuItemBuilder::with_id("toggle_quickview", "QuickView").accelerator("Space").build(app)?)
         .item(&MenuItemBuilder::with_id("toggle_split", "Vista Dividida (Panel Dual)").accelerator("CmdOrCtrl+\\").build(app)?)
+        .item(&MenuItemBuilder::with_id("toggle_miller", "Vista de Columnas (Miller / Finder)").accelerator("F4").build(app)?)
         .item(&MenuItemBuilder::with_id("refresh_dir", "Actualizar").accelerator("CmdOrCtrl+R").build(app)?)
         .item(&MenuItemBuilder::with_id("toggle_hidden", "Mostrar Archivos Ocultos").accelerator("CmdOrCtrl+H").build(app)?)
         .separator()
