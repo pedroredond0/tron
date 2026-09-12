@@ -283,6 +283,46 @@
       display: block;
     }
 
+    .miller-item-icon {
+      width: 1.25rem;
+      height: 1.25rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      line-height: 1;
+      font-size: 1rem;
+    }
+
+    .miller-item-icon img {
+      width: 100%;
+      height: 100%;
+      max-width: 1.25rem;
+      max-height: 1.25rem;
+      object-fit: contain;
+      display: block;
+    }
+
+    .miller-header-icon {
+      width: 1.5rem;
+      height: 1.5rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      line-height: 1;
+      font-size: 1.25rem;
+    }
+
+    .miller-header-icon img {
+      width: 100%;
+      height: 100%;
+      max-width: 1.5rem;
+      max-height: 1.5rem;
+      object-fit: contain;
+      display: block;
+    }
+
     /* Dynamic UI scale properties */
     header {
       font-size: var(--app-ui-scale, 14px) !important;
@@ -339,6 +379,8 @@
     [data-monochrome-icons="true"] .item-icon,
     [data-monochrome-icons="true"] .ui-icon-box,
     [data-monochrome-icons="true"] #qvIcon,
+    [data-monochrome-icons="true"] .miller-item-icon,
+    [data-monochrome-icons="true"] .miller-header-icon,
     [data-monochrome-icons="true"] aside button > span:first-child,
     [data-monochrome-icons="true"] #actionBar button > span:first-child,
     [data-monochrome-icons="true"] .btn-goto-parent,
@@ -944,7 +986,7 @@
           <div id="millerColPreview" class="flex-1 min-w-[320px] flex flex-col min-h-0 bg-gnome-sidebar/20">
             <div class="h-8 px-3 flex items-center justify-between border-b border-gnome-border/60 text-xs font-medium text-gnome-textDim bg-gnome-surface/40 shrink-0">
               <div class="flex items-center gap-1.5 min-w-0">
-                <span id="millerPreviewIcon" class="text-xs">👁️</span>
+                <span id="millerPreviewIcon" class="miller-item-icon text-xs">👁️</span>
                 <span id="millerPreviewTitle" class="truncate font-medium text-gnome-text">Vista Previa</span>
               </div>
               <span id="millerPreviewBadge" class="hidden text-[10px] px-1.5 py-0.5 rounded bg-gnome-surface border border-gnome-border text-gnome-active font-mono uppercase font-medium"></span>
