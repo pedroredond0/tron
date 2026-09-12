@@ -503,6 +503,9 @@
         <button id="menuToggleSplitView" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
           <span>Vista dividida (Panel dual)</span><span class="text-gnome-textDim text-[11px]">F3</span>
         </button>
+        <button id="menuToggleMillerView" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+          <span>Vista de columnas (Miller / Yazi)</span><span class="text-gnome-textDim text-[11px]">F4</span>
+        </button>
         <button id="menuToggleHidden" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
           <span>Mostrar archivos ocultos</span><span class="text-gnome-textDim text-[11px]">Ctrl+H</span>
         </button>
@@ -703,6 +706,17 @@
         </span>
       </button>
 
+      <!-- Botón Vista de Columnas (Miller Columns / Finder) -->
+      <button id="btnToggleMillerView" class="p-1 px-2 rounded hover:bg-gnome-surface text-gnome-text flex items-center justify-center transition-colors" title="Vista de Columnas Jerárquicas / Miller Columns (F4)">
+        <span id="iconToggleMillerView" class="ui-icon-box">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="9" y1="3" x2="9" y2="21"></line>
+            <line x1="15" y1="3" x2="15" y2="21"></line>
+          </svg>
+        </span>
+      </button>
+
       <!-- QuickView solo con el ojo -->
       <button id="btnActionQuickView" class="p-1 px-2 rounded hover:bg-gnome-surface text-gnome-text flex items-center justify-center transition-colors" title="Vista previa QuickView (Espacio)">
         <span id="iconActionQuickView" class="ui-icon-box">👁️</span>
@@ -894,6 +908,53 @@
             <!-- File rows generated dynamically -->
           </div>
         </div>
+
+        <!-- Miller Columns (Finder / Yazi Style) Container: 4 Blocks (1 Parent, 1 Current, 2 Preview) -->
+        <div id="millerContainer" class="hidden flex-1 flex flex-row min-h-0 min-w-0 bg-gnome-bg overflow-x-auto select-none divide-x divide-gnome-border">
+          
+          <!-- Column 1: Parent Directory Column (1 Block / ~25%) -->
+          <div id="millerColParent" class="w-1/4 min-w-[200px] max-w-sm flex flex-col min-h-0 bg-gnome-sidebar/30">
+            <div class="h-8 px-3 flex items-center justify-between border-b border-gnome-border/60 text-xs font-medium text-gnome-textDim bg-gnome-surface/40 shrink-0">
+              <div class="flex items-center gap-1.5 min-w-0">
+                <span class="text-xs opacity-70">📁</span>
+                <span id="millerParentTitle" class="truncate">Carpeta Superior</span>
+              </div>
+              <span id="millerParentCount" class="text-[10px] font-mono text-gnome-textDim shrink-0"></span>
+            </div>
+            <div id="millerParentList" class="flex-1 overflow-y-auto p-1 space-y-0.5 outline-none" tabindex="-1">
+              <!-- Parent directory items -->
+            </div>
+          </div>
+
+          <!-- Column 2: Current Directory Column (1 Block / ~25%) -->
+          <div id="millerColCurrent" class="w-1/4 min-w-[220px] max-w-sm flex flex-col min-h-0 bg-gnome-bg">
+            <div class="h-8 px-3 flex items-center justify-between border-b border-gnome-border/60 text-xs font-semibold text-gnome-active bg-gnome-surface/60 shrink-0">
+              <div class="flex items-center gap-1.5 min-w-0">
+                <span class="text-xs">📂</span>
+                <span id="millerCurrentTitle" class="truncate font-bold">Directorio Actual</span>
+              </div>
+              <span id="millerCurrentCount" class="text-[10px] font-mono text-gnome-textDim shrink-0"></span>
+            </div>
+            <div id="millerCurrentList" class="flex-1 overflow-y-auto p-1 space-y-0.5 outline-none focus:ring-1 focus:ring-inset focus:ring-gnome-active/50" tabindex="0">
+              <!-- Current directory items with active selection -->
+            </div>
+          </div>
+
+          <!-- Column 3: Live Preview Pane (2 Blocks / ~50%) -->
+          <div id="millerColPreview" class="flex-1 min-w-[320px] flex flex-col min-h-0 bg-gnome-sidebar/20">
+            <div class="h-8 px-3 flex items-center justify-between border-b border-gnome-border/60 text-xs font-medium text-gnome-textDim bg-gnome-surface/40 shrink-0">
+              <div class="flex items-center gap-1.5 min-w-0">
+                <span id="millerPreviewIcon" class="text-xs">👁️</span>
+                <span id="millerPreviewTitle" class="truncate font-medium text-gnome-text">Vista Previa</span>
+              </div>
+              <span id="millerPreviewBadge" class="hidden text-[10px] px-1.5 py-0.5 rounded bg-gnome-surface border border-gnome-border text-gnome-active font-mono uppercase font-medium"></span>
+            </div>
+            <div id="millerPreviewContent" class="flex-1 overflow-y-auto p-3 flex flex-col items-center justify-center min-h-0 text-center">
+              <!-- Dynamic live preview content -->
+            </div>
+          </div>
+
+        </div>
       </div>
 
       <!-- Status Bar Footer -->
@@ -1042,6 +1103,7 @@
           <span class="font-medium text-gnome-active">Enter</span><span>Abrir elemento / Entrar en carpeta</span>
           <span class="font-medium text-gnome-active">Ctrl + P</span><span>Ir a carpeta (Buscador difuso recursivo)</span>
           <span class="font-medium text-gnome-active">F3 / Ctrl + \</span><span>Dividir pantalla (Vista dual)</span>
+          <span class="font-medium text-gnome-active">F4</span><span>Vista de columnas (Miller / Finder / Yazi)</span>
           <span class="font-medium text-gnome-active">Tab</span><span>Alternar panel activo (Vista dual)</span>
           <span class="font-medium text-gnome-active">F5</span><span>Copiar al otro panel / Actualizar</span>
           <span class="font-medium text-gnome-active">H (en QuickView)</span><span>Visor hexadecimal / raw de archivo</span>
