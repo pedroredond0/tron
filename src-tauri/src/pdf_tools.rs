@@ -440,7 +440,8 @@ pub async fn pdf_optimize(pdf_path: String, quality_level: u8, output_path: Stri
 
                     let mut jpeg_buf = Cursor::new(Vec::new());
                     let rgb = processed_img.to_rgb8();
-                    if rgb.write_to(&mut jpeg_buf, ImageFormat::Jpeg).is_ok() {
+                    let mut encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg_buf, q);
+                    if encoder.encode_image(&rgb).is_ok() {
                         let new_bytes = jpeg_buf.into_inner();
                         // Only replace if new bytes are actually smaller
                         if new_bytes.len() < stream.content.len() || stream.content.len() > 100_000 {
@@ -585,7 +586,8 @@ pub async fn pdf_to_images(pdf_path: String, pages: Vec<u32>, format: String) ->
                             if let Ok((_, obj)) = doc.dereference(x_ref) {
                                 if let Ok(stream) = obj.as_stream() {
                                     if stream.dict.get(b"Subtype").map(|v| v == &Object::Name(b"Image".to_vec())).unwrap_or(false) {
-                                        if let Ok(data) = stream.decompressed_content() {
+                                        let data_res = stream.decompressed_content().or_else(|_| Ok::<_, ()>(stream.content.clone()));
+                                        if let Ok(data) = data_res {
                                             if let Ok(dyn_img) = image::load_from_memory(&data) {
                                                 saved_count += 1;
                                                 let target = output_dir.join(format!("pagina_{:02}_{}.{}", page_num, saved_count, ext));
