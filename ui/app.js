@@ -984,10 +984,24 @@ modalSherlock: document.getElementById('modalSherlock'),
         targetPanel.historyIndex = targetPanel.history.length - 1;
       }
 
-      targetPanel.selectedIndex = targetPanel.filteredItems.length > 0 ? 0 : -1;
+      const previousSelectedPaths = new Set(targetPanel.selectedItems);
       targetPanel.selectedItems.clear();
-      if (targetPanel.selectedIndex >= 0) {
-        targetPanel.selectedItems.add(targetPanel.filteredItems[targetPanel.selectedIndex].path);
+      let foundIndex = -1;
+      if (previousSelectedPaths.size > 0) {
+        for (let i = 0; i < targetPanel.filteredItems.length; i++) {
+          if (previousSelectedPaths.has(targetPanel.filteredItems[i].path)) {
+            targetPanel.selectedItems.add(targetPanel.filteredItems[i].path);
+            if (foundIndex === -1) foundIndex = i;
+          }
+        }
+      }
+      if (targetPanel.selectedItems.size > 0 && foundIndex >= 0) {
+        targetPanel.selectedIndex = foundIndex;
+      } else {
+        targetPanel.selectedIndex = targetPanel.filteredItems.length > 0 ? 0 : -1;
+        if (targetPanel.selectedIndex >= 0) {
+          targetPanel.selectedItems.add(targetPanel.filteredItems[targetPanel.selectedIndex].path);
+        }
       }
 
       renderFileList(pIdx);
@@ -1099,7 +1113,7 @@ modalSherlock: document.getElementById('modalSherlock'),
     const targetPanel = panels[pIdx];
     if (!targetPanel) return;
     if (targetPanel.activeSherlockFilter && targetPanel.sherlockResults) {
-      let res = state.sherlockResults;
+      let res = targetPanel.sherlockResults;
       if (!state.showHiddenFiles) {
         res = res.filter(item => !item.is_hidden);
       }
@@ -1108,11 +1122,11 @@ modalSherlock: document.getElementById('modalSherlock'),
     }
 
     if (targetPanel.isSearchingRecursive && targetPanel.searchItems) {
-      let res = state.searchItems;
+      let res = targetPanel.searchItems;
       if (!state.showHiddenFiles) {
         res = res.filter(item => !item.is_hidden);
       }
-      state.filteredItems = sortItems([...res]);
+      targetPanel.filteredItems = sortItems([...res]);
       return;
     }
 
@@ -1131,7 +1145,7 @@ modalSherlock: document.getElementById('modalSherlock'),
           }
         });
         // 2. Any tagged items from subdirectories under currentDirectory
-        const curDir = state.currentDirectory || '';
+        const curDir = targetPanel.currentDirectory || '';
         for (const [normPath, val] of Object.entries(fileTagsMap)) {
           const tags = Array.isArray(val) ? val : (val.tags || []);
           if (tags.includes(state.activeTagFilter) && isSubpath(curDir, normPath)) {
@@ -1156,14 +1170,15 @@ modalSherlock: document.getElementById('modalSherlock'),
     if (q) {
       res = res.filter(item => item.name.toLowerCase().includes(q));
     }
-    state.filteredItems = sortItems([...res]);
+    targetPanel.filteredItems = sortItems([...res]);
   }
 
   // Flatten filteredItems taking into account expandedDirs (collapsible tree)
   function buildDisplayItemList(pIdx = activePanel) {
     const p = panels[pIdx];
+    if (!p) return [];
     const list = [];
-    const expandedMap = state.expandedDirs || new Map();
+    const expandedMap = p.expandedDirs || new Map();
 
     function recurse(items, depth = 0) {
       for (const item of items) {
@@ -1176,16 +1191,18 @@ modalSherlock: document.getElementById('modalSherlock'),
       }
     }
 
-    recurse(state.filteredItems, 0);
+    recurse(p.filteredItems || [], 0);
     return list;
   }
 
-  async function toggleExpandDir(item) {
+  async function toggleExpandDir(item, pIdx = activePanel) {
     if (!item || !item.is_directory) return;
-    const expandedMap = state.expandedDirs;
+    const p = panels[pIdx];
+    if (!p) return;
+    const expandedMap = p.expandedDirs || new Map();
     if (expandedMap.has(item.path)) {
       expandedMap.delete(item.path);
-      renderFileList();
+      renderFileList(pIdx);
     } else {
       try {
         const res = await invoke('read_directory', { path: item.path });
@@ -1199,7 +1216,7 @@ modalSherlock: document.getElementById('modalSherlock'),
         } else {
           expandedMap.set(item.path, []);
         }
-        renderFileList();
+        renderFileList(pIdx);
       } catch (err) {
         console.warn('Error expanding dir:', err);
       }
@@ -1208,8 +1225,9 @@ modalSherlock: document.getElementById('modalSherlock'),
 
   // File List Rendering
   function renderFileList(pIdx = activePanel) {
+    const targetPanel = panels[pIdx];
     const targetListEl = elPanels[pIdx]?.fileList;
-    if (!targetListEl) return;
+    if (!targetListEl || !targetPanel) return;
     targetListEl.innerHTML = '';
     const displayList = buildDisplayItemList(pIdx);
 
@@ -1218,12 +1236,12 @@ modalSherlock: document.getElementById('modalSherlock'),
       return;
     }
 
-    const expandedMap = state.expandedDirs || new Map();
+    const expandedMap = targetPanel.expandedDirs || new Map();
     const fragment = document.createDocumentFragment();
 
     displayList.forEach((item, idx) => {
-      const isSelected = state.selectedItems.has(item.path);
-      const isFocused = idx === state.selectedIndex;
+      const isSelected = (targetPanel.selectedItems || new Set()).has(item.path);
+      const isFocused = idx === targetPanel.selectedIndex;
 
       const isCut = state.clipboard.action === 'cut' && state.clipboard.paths.includes(item.path);
 
@@ -1341,30 +1359,39 @@ modalSherlock: document.getElementById('modalSherlock'),
         const btnExpand = e.target.closest('.btn-expand-tree');
         if (btnExpand) {
           e.stopPropagation();
-          toggleExpandDir(item);
+          toggleExpandDir(item, pIdx);
           return;
         }
         const btnParent = e.target.closest('.btn-goto-parent');
         if (btnParent && btnParent.dataset.parentDir) {
           e.stopPropagation();
           state.activeTagFilter = null;
-          loadDirectory(btnParent.dataset.parentDir);
+          loadDirectory(btnParent.dataset.parentDir, true, pIdx);
           return;
         }
-        handleRowClick(e, idx);
+        if (isSplitView && activePanel !== pIdx) {
+          switchActivePanel(pIdx);
+        }
+        handleRowClick(e, idx, pIdx, displayList);
       });
       row.addEventListener('dblclick', (e) => {
         const btnExpand = e.target.closest('.btn-expand-tree');
         if (btnExpand) return;
         const btnParent = e.target.closest('.btn-goto-parent');
         if (btnParent) return;
-        activateItem(item);
+        if (isSplitView && activePanel !== pIdx) {
+          switchActivePanel(pIdx);
+        }
+        activateItem(item, pIdx);
       });
 
       // Custom Context Menu on Right Click
       row.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         e.stopPropagation();
+        if (isSplitView && activePanel !== pIdx) {
+          switchActivePanel(pIdx);
+        }
         openFileContextMenu(e, item, idx);
       });
 
@@ -1375,7 +1402,7 @@ modalSherlock: document.getElementById('modalSherlock'),
     });
 
     targetListEl.appendChild(fragment);
-    ensureVisible(state.selectedIndex);
+    ensureVisible(targetPanel.selectedIndex, pIdx);
   }
 
   // Custom Pointer-based Drag & Drop implementation
@@ -1584,37 +1611,45 @@ modalSherlock: document.getElementById('modalSherlock'),
     return div.innerHTML;
   }
 
-  function ensureVisible(index) {
+  function ensureVisible(index, pIdx = activePanel) {
     if (index < 0) return;
-    const row = el.fileList.children[index];
+    const targetListEl = elPanels[pIdx]?.fileList || el.fileList;
+    if (!targetListEl) return;
+    const row = targetListEl.children[index];
     if (row && typeof row.scrollIntoView === 'function') {
       row.scrollIntoView({ block: 'nearest' });
     }
   }
 
-  function handleRowClick(e, index) {
+  function handleRowClick(e, index, pIdx = activePanel, displayList = null) {
+    const p = panels[pIdx] || getActiveTabObj();
+    const list = displayList || buildDisplayItemList(pIdx);
+    if (index < 0 || index >= list.length) return;
+    const item = list[index];
+
     if (e.ctrlKey) {
-      const item = state.filteredItems[index];
-      if (state.selectedItems.has(item.path)) {
-        state.selectedItems.delete(item.path);
+      if (p.selectedItems.has(item.path)) {
+        p.selectedItems.delete(item.path);
       } else {
-        state.selectedItems.add(item.path);
+        p.selectedItems.add(item.path);
       }
-      state.selectedIndex = index;
-    } else if (e.shiftKey && state.selectedIndex >= 0) {
-      const start = Math.min(state.selectedIndex, index);
-      const end = Math.max(state.selectedIndex, index);
-      state.selectedItems.clear();
+      p.selectedIndex = index;
+    } else if (e.shiftKey && p.selectedIndex >= 0) {
+      const start = Math.min(p.selectedIndex, index);
+      const end = Math.max(p.selectedIndex, index);
+      p.selectedItems.clear();
       for (let i = start; i <= end; i++) {
-        state.selectedItems.add(state.filteredItems[i].path);
+        if (list[i]) p.selectedItems.add(list[i].path);
       }
     } else {
-      state.selectedItems.clear();
-      state.selectedIndex = index;
-      state.selectedItems.add(state.filteredItems[index].path);
+      p.selectedItems.clear();
+      p.selectedIndex = index;
+      p.selectedItems.add(item.path);
     }
-    renderFileList();
-    updateStatusBar();
+    renderFileList(pIdx);
+    if (pIdx === activePanel) {
+      updateStatusBar();
+    }
   }
 
   function openInTextEditor(filePath) {
@@ -1640,10 +1675,10 @@ modalSherlock: document.getElementById('modalSherlock'),
     });
   }
 
-  function activateItem(item) {
+  function activateItem(item, pIdx = activePanel) {
     if (!item) return;
     if (item.is_directory) {
-      loadDirectory(item.path);
+      loadDirectory(item.path, true, pIdx);
     } else {
       invoke('open_file_default', { path: item.path }).catch(err => {
         alert('Error al abrir archivo: ' + err);
@@ -2149,33 +2184,12 @@ modalSherlock: document.getElementById('modalSherlock'),
         await invoke('delete_file_item', { path });
       }
 
-      // Refresh directory list preserving QuickView
-      const res = await invoke('read_directory', { path: state.currentDirectory });
-      if (res) {
-        state.items = res.items || [];
-        state.freeSpaceBytes = res.free_space_bytes ?? null;
-        state.totalSpaceBytes = res.total_space_bytes ?? null;
-        applyFilter();
-      }
+      await reloadBothPanelsIfNeeded();
 
-      if (state.filteredItems.length === 0) {
-        // No more items left
-        if (state.quickViewOpen) closeQuickView();
-        state.selectedIndex = -1;
-        state.selectedItems.clear();
-        renderFileList();
-        updateStatusBar();
-      } else {
-        // Keep index clamped
-        if (state.selectedIndex >= state.filteredItems.length) {
-          state.selectedIndex = state.filteredItems.length - 1;
-        }
-        state.selectedItems.clear();
-        state.selectedItems.add(state.filteredItems[state.selectedIndex].path);
-        renderFileList();
-        updateStatusBar();
-
-        if (state.quickViewOpen) {
+      if (state.quickViewOpen) {
+        if (state.filteredItems.length === 0) {
+          closeQuickView();
+        } else if (state.selectedIndex >= 0 && state.selectedIndex < state.filteredItems.length) {
           await loadQuickViewContent(state.filteredItems[state.selectedIndex]);
         }
       }
@@ -2457,7 +2471,7 @@ modalSherlock: document.getElementById('modalSherlock'),
           startTransferOperation('copy', Array.from(state.selectedItems), targetDir);
         }
       } else {
-        loadDirectory(state.currentDirectory, false);
+        reloadBothPanelsIfNeeded();
       }
       return;
     }
@@ -2625,46 +2639,56 @@ modalSherlock: document.getElementById('modalSherlock'),
     }
   }
 
-  function moveSelectionWithShift(delta) {
-    if (state.filteredItems.length === 0) return;
-    if (state.selectionAnchor < 0) {
-      state.selectionAnchor = state.selectedIndex >= 0 ? state.selectedIndex : 0;
+  function moveSelectionWithShift(delta, pIdx = activePanel) {
+    const p = panels[pIdx] || getActiveTabObj();
+    const list = buildDisplayItemList(pIdx);
+    if (list.length === 0) return;
+    if (p.selectionAnchor < 0) {
+      p.selectionAnchor = p.selectedIndex >= 0 ? p.selectedIndex : 0;
     }
 
-    let next = (state.selectedIndex >= 0 ? state.selectedIndex : 0) + delta;
+    let next = (p.selectedIndex >= 0 ? p.selectedIndex : 0) + delta;
     if (next < 0) next = 0;
-    if (next >= state.filteredItems.length) next = state.filteredItems.length - 1;
+    if (next >= list.length) next = list.length - 1;
 
-    state.selectedIndex = next;
-    state.selectedItems.clear();
+    p.selectedIndex = next;
+    p.selectedItems.clear();
 
-    const start = Math.min(state.selectionAnchor, next);
-    const end = Math.max(state.selectionAnchor, next);
+    const start = Math.min(p.selectionAnchor, next);
+    const end = Math.max(p.selectionAnchor, next);
     for (let i = start; i <= end; i++) {
-      state.selectedItems.add(state.filteredItems[i].path);
+      if (list[i]) p.selectedItems.add(list[i].path);
     }
 
-    renderFileList();
-    updateStatusBar();
+    renderFileList(pIdx);
+    if (pIdx === activePanel) {
+      updateStatusBar();
+    }
   }
 
-  function moveSelection(delta) {
-    if (state.filteredItems.length === 0) return;
-    let next = state.selectedIndex + delta;
+  function moveSelection(delta, pIdx = activePanel) {
+    const p = panels[pIdx] || getActiveTabObj();
+    const list = buildDisplayItemList(pIdx);
+    if (list.length === 0) return;
+    let next = (p.selectedIndex >= 0 ? p.selectedIndex : 0) + delta;
     if (next < 0) next = 0;
-    if (next >= state.filteredItems.length) next = state.filteredItems.length - 1;
-    state.selectionAnchor = next;
-    setSelectionIndex(next);
+    if (next >= list.length) next = list.length - 1;
+    p.selectionAnchor = next;
+    setSelectionIndex(next, pIdx);
   }
 
-  function setSelectionIndex(idx) {
-    if (idx < 0 || idx >= state.filteredItems.length) return;
-    state.selectedIndex = idx;
-    state.selectionAnchor = idx;
-    state.selectedItems.clear();
-    state.selectedItems.add(state.filteredItems[idx].path);
-    renderFileList();
-    updateStatusBar();
+  function setSelectionIndex(idx, pIdx = activePanel) {
+    const p = panels[pIdx] || getActiveTabObj();
+    const list = buildDisplayItemList(pIdx);
+    if (idx < 0 || idx >= list.length) return;
+    p.selectedIndex = idx;
+    p.selectionAnchor = idx;
+    p.selectedItems.clear();
+    p.selectedItems.add(list[idx].path);
+    renderFileList(pIdx);
+    if (pIdx === activePanel) {
+      updateStatusBar();
+    }
   }
 
   async function navigateQuickView(delta) {
@@ -3588,7 +3612,7 @@ async function startTransferOperation(action, sources, targetDir) {
         sourcePaths: sources,
         outputZipPath: outZipPath
       });
-      await loadDirectory(state.currentDirectory, false);
+      await reloadBothPanelsIfNeeded();
       const idx = state.filteredItems.findIndex(i => i.path.toLowerCase() === outZipPath.toLowerCase());
       if (idx >= 0) {
         setSelectionIndex(idx);
@@ -3606,7 +3630,7 @@ async function startTransferOperation(action, sources, targetDir) {
         zipPath: item.path,
         targetDir: state.currentDirectory
       });
-      await loadDirectory(state.currentDirectory, false);
+      await reloadBothPanelsIfNeeded();
     } catch (err) {
       alert('Error al extraer archivo: ' + err);
     }
@@ -3626,7 +3650,7 @@ async function startTransferOperation(action, sources, targetDir) {
         zipPath: item.path,
         targetDir
       });
-      await loadDirectory(state.currentDirectory, false);
+      await reloadBothPanelsIfNeeded();
     } catch (err) {
       alert('Error al extraer en carpeta: ' + err);
     }
@@ -3874,7 +3898,7 @@ async function startTransferOperation(action, sources, targetDir) {
         openAfter
       });
       closeNewFileModal();
-      await loadDirectory(state.currentDirectory, false);
+      await reloadBothPanelsIfNeeded();
 
       // Select the newly created file
       const idx = state.filteredItems.findIndex(i => i.name.toLowerCase() === fileName.toLowerCase());
@@ -3909,7 +3933,7 @@ async function startTransferOperation(action, sources, targetDir) {
         folderName
       });
       closeNewFolderModal();
-      await loadDirectory(state.currentDirectory, false);
+      await reloadBothPanelsIfNeeded();
 
       // Select newly created folder
       const idx = state.filteredItems.findIndex(i => i.name.toLowerCase() === folderName.toLowerCase());
@@ -4660,7 +4684,7 @@ async function startTransferOperation(action, sources, targetDir) {
     try {
       await invoke('batch_rename', { renames: batchRenamePairs });
       closeBatchRenameModal();
-      loadDirectory(state.currentDirectory, false);
+      await reloadBothPanelsIfNeeded();
     } catch (err) {
       alert("Error en renombrado por lotes:\n" + err);
     }
@@ -4721,7 +4745,7 @@ async function startTransferOperation(action, sources, targetDir) {
         newName: newName
       });
       closeRenameItemModal();
-      await loadDirectory(state.currentDirectory, false);
+      await reloadBothPanelsIfNeeded();
       const idx = state.filteredItems.findIndex(i => i.name.toLowerCase() === newName.toLowerCase());
       if (idx >= 0) {
         setSelectionIndex(idx);
@@ -5015,7 +5039,7 @@ async function startTransferOperation(action, sources, targetDir) {
     el.btnBack.onclick = goBack;
     el.btnForward.onclick = goForward;
     if (el.btnParentDir) el.btnParentDir.onclick = goUp;
-    el.btnRefresh.onclick = () => loadDirectory(state.currentDirectory, false);
+    el.btnRefresh.onclick = () => reloadBothPanelsIfNeeded();
 
     // QuickView
     el.btnQvClose.onclick = closeQuickView;
@@ -5126,7 +5150,7 @@ async function startTransferOperation(action, sources, targetDir) {
     };
     el.menuQuickView.onclick = () => { closeAllMenus(); openQuickView(); };
     if (el.menuToggleSplitView) el.menuToggleSplitView.onclick = () => { closeAllMenus(); toggleSplitView(); };
-    el.menuRefresh.onclick = () => { closeAllMenus(); loadDirectory(state.currentDirectory, false); };
+    el.menuRefresh.onclick = () => { closeAllMenus(); reloadBothPanelsIfNeeded(); };
     el.menuShortcuts.onclick = () => { closeAllMenus(); openHelpModal(); };
     el.menuAbout.onclick = () => { closeAllMenus(); openAboutModal(); };
 
@@ -5992,7 +6016,7 @@ async function startTransferOperation(action, sources, targetDir) {
           toggleSplitView();
           break;
         case 'refresh_dir':
-          loadDirectory(state.currentDirectory, false);
+          reloadBothPanelsIfNeeded();
           break;
         case 'toggle_hidden':
           toggleShowHiddenFiles();

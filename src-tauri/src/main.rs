@@ -8,6 +8,8 @@ use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU16, AtomicU64, Ordering};
 use std::time::UNIX_EPOCH;
+#[cfg(not(target_os = "windows"))]
+use std::time::{Duration, Instant};
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
 use tauri::{Emitter, Manager};
@@ -561,10 +563,13 @@ fn extract_docx_content(file_path: &Path) -> Result<String, String> {
     }
 
     let mut html = String::new();
-    html.push_str("<div class=\"docx-page-container max-w-2xl mx-auto my-3 p-8 bg-gnome-sidebar border border-gnome-border rounded-xl shadow-xl space-y-4 font-sans text-xs leading-relaxed text-gnome-text select-text\">");
+    // Modern Document Paper Sheet Layout with page shadow, margins, and typography
+    html.push_str("<div class=\"docx-page-container max-w-3xl mx-auto my-4 p-8 sm:p-12 bg-white dark:bg-[#1e232a] text-[#1e293b] dark:text-[#f1f5f9] rounded-xl shadow-2xl border border-gnome-border/50 select-text font-sans leading-relaxed text-[13px]\">");
 
-    // Check for tables in document
-    for tbl_or_chunk in doc_xml.split("<w:tbl>") {
+    // Standardize paragraph tags for robust splitting
+    let normalized = doc_xml.replace("<w:p>", "<w:p >");
+
+    for tbl_or_chunk in normalized.split("<w:tbl>") {
         let (tbl_part, after_tbl) = if tbl_or_chunk.contains("</w:tbl>") {
             let mut parts = tbl_or_chunk.splitn(2, "</w:tbl>");
             (Some(parts.next().unwrap_or("")), parts.next().unwrap_or(""))
@@ -573,32 +578,42 @@ fn extract_docx_content(file_path: &Path) -> Result<String, String> {
         };
 
         if let Some(tbl_content) = tbl_part {
-            html.push_str("<div class=\"overflow-x-auto my-3 border border-gnome-border rounded-lg shadow-sm\"><table class=\"w-full text-xs border-collapse font-sans\">");
+            html.push_str("<div class=\"overflow-x-auto my-4 border border-gray-300 dark:border-gray-700 rounded-lg shadow-sm\"><table class=\"w-full text-xs border-collapse font-sans\">");
+            let mut is_first_row = true;
             for tr_chunk in tbl_content.split("<w:tr>") {
                 if !tr_chunk.contains("</w:tr>") { continue; }
-                html.push_str("<tr class=\"border-b border-gnome-border/40 hover:bg-gnome-hover/30\">");
+                let row_bg = if is_first_row {
+                    "bg-gray-100 dark:bg-gray-800 font-semibold border-b-2 border-gray-300 dark:border-gray-600"
+                } else {
+                    "border-b border-gray-200 dark:border-gray-700/60 hover:bg-gray-50 dark:hover:bg-gray-800/40"
+                };
+                html.push_str(&format!("<tr class=\"{}\">", row_bg));
                 for tc_chunk in tr_chunk.split("<w:tc>") {
                     if !tc_chunk.contains("</w:tc>") { continue; }
                     let mut cell_text = String::new();
                     for t_chunk in tc_chunk.split("<w:t") {
                         if let Some(start_b) = t_chunk.find('>') {
                             if let Some(close_t) = t_chunk.find("</w:t>") {
-                                cell_text.push_str(&t_chunk[start_b + 1..close_t]);
+                                if close_t > start_b {
+                                    cell_text.push_str(&t_chunk[start_b + 1..close_t]);
+                                }
                             }
                         }
                     }
-                    html.push_str(&format!("<td class=\"px-3 py-1.5 border-r border-gnome-border/30 text-gnome-text\">{}</td>", escape_html_str(cell_text.trim())));
+                    html.push_str(&format!("<td class=\"px-3.5 py-2 border-r border-gray-200 dark:border-gray-700/50 text-gray-800 dark:text-gray-200\">{}</td>", escape_html_str(cell_text.trim())));
                 }
                 html.push_str("</tr>");
+                is_first_row = false;
             }
             html.push_str("</table></div>");
         }
 
         for p_chunk in after_tbl.split("<w:p ") {
-            let is_title = p_chunk.contains("val=\"Title\"");
-            let is_h1 = p_chunk.contains("val=\"Heading1\"");
-            let is_h2 = p_chunk.contains("val=\"Heading2\"");
-            let is_h3 = p_chunk.contains("val=\"Heading3\"");
+            let is_title = p_chunk.contains("val=\"Title\"") || p_chunk.contains("val=\"title\"");
+            let is_subtitle = p_chunk.contains("val=\"Subtitle\"") || p_chunk.contains("val=\"subtitle\"");
+            let is_h1 = p_chunk.contains("val=\"Heading1\"") || p_chunk.contains("val=\"heading 1\"") || p_chunk.contains("val=\"Heading 1\"");
+            let is_h2 = p_chunk.contains("val=\"Heading2\"") || p_chunk.contains("val=\"heading 2\"") || p_chunk.contains("val=\"Heading 2\"");
+            let is_h3 = p_chunk.contains("val=\"Heading3\"") || p_chunk.contains("val=\"heading 3\"") || p_chunk.contains("val=\"Heading 3\"");
             let is_bullet = p_chunk.contains("<w:numPr>");
 
             let mut p_text = String::new();
@@ -610,12 +625,14 @@ fn extract_docx_content(file_path: &Path) -> Result<String, String> {
                 for t_chunk in r_chunk.split("<w:t") {
                     if let Some(start_bracket) = t_chunk.find('>') {
                         if let Some(close_tag) = t_chunk.find("</w:t>") {
-                            let val = &t_chunk[start_bracket + 1..close_tag];
-                            let mut seg = escape_html_str(val);
-                            if is_bold { seg = format!("<strong>{}</strong>", seg); }
-                            if is_italic { seg = format!("<em>{}</em>", seg); }
-                            if is_underline { seg = format!("<u>{}</u>", seg); }
-                            p_text.push_str(&seg);
+                            if close_tag > start_bracket {
+                                let val = &t_chunk[start_bracket + 1..close_tag];
+                                let mut seg = escape_html_str(val);
+                                if is_bold { seg = format!("<strong class=\"font-bold\">{}</strong>", seg); }
+                                if is_italic { seg = format!("<em class=\"italic\">{}</em>", seg); }
+                                if is_underline { seg = format!("<u class=\"underline\">{}</u>", seg); }
+                                p_text.push_str(&seg);
+                            }
                         }
                     }
                 }
@@ -624,17 +641,19 @@ fn extract_docx_content(file_path: &Path) -> Result<String, String> {
             let trimmed = p_text.trim();
             if !trimmed.is_empty() {
                 if is_title {
-                    html.push_str(&format!("<h1 class=\"text-lg font-bold text-gnome-active border-b border-gnome-border/60 pb-2 mb-3 mt-2\">{}</h1>", trimmed));
+                    html.push_str(&format!("<h1 class=\"text-2xl font-bold tracking-tight text-blue-600 dark:text-blue-400 border-b border-gray-200 dark:border-gray-700 pb-2 mb-4 mt-2\">{}</h1>", trimmed));
+                } else if is_subtitle {
+                    html.push_str(&format!("<h2 class=\"text-base font-medium text-gray-500 dark:text-gray-400 mb-4\">{}</h2>", trimmed));
                 } else if is_h1 {
-                    html.push_str(&format!("<h2 class=\"text-sm font-bold text-gnome-active border-b border-gnome-border/50 pb-1 mt-4 mb-2\">{}</h2>", trimmed));
+                    html.push_str(&format!("<h2 class=\"text-lg font-bold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-1 mt-6 mb-3\">{}</h2>", trimmed));
                 } else if is_h2 {
-                    html.push_str(&format!("<h3 class=\"text-xs font-semibold text-gnome-text border-b border-gnome-border/30 pb-0.5 mt-3 mb-1.5\">{}</h3>", trimmed));
+                    html.push_str(&format!("<h3 class=\"text-sm font-bold text-gray-800 dark:text-gray-200 mt-5 mb-2\">{}</h3>", trimmed));
                 } else if is_h3 {
-                    html.push_str(&format!("<h4 class=\"text-xs font-medium text-gnome-textDim mt-2 mb-1\">{}</h4>", trimmed));
+                    html.push_str(&format!("<h4 class=\"text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide mt-4 mb-1.5\">{}</h4>", trimmed));
                 } else if is_bullet {
-                    html.push_str(&format!("<div class=\"flex items-start gap-2 pl-4 py-0.5\"><span class=\"text-gnome-active font-bold\">•</span><span>{}</span></div>", trimmed));
+                    html.push_str(&format!("<div class=\"flex items-start gap-2.5 pl-4 py-1\"><span class=\"text-blue-500 font-bold shrink-0\">•</span><span class=\"leading-relaxed\">{}</span></div>", trimmed));
                 } else {
-                    html.push_str(&format!("<p class=\"text-gnome-text/90 leading-relaxed py-0.5\">{}</p>", trimmed));
+                    html.push_str(&format!("<p class=\"leading-relaxed mb-3 text-gray-800 dark:text-gray-200\">{}</p>", trimmed));
                 }
             }
         }
@@ -774,7 +793,7 @@ fn extract_pptx_content(file_path: &Path) -> Result<String, String> {
     });
 
     let mut html = String::new();
-    html.push_str("<div class=\"pptx-slides-wrapper space-y-4 max-w-3xl mx-auto overflow-auto max-h-[70vh] p-3 select-text\">");
+    html.push_str("<div class=\"pptx-slides-wrapper space-y-6 max-w-4xl mx-auto overflow-auto max-h-[72vh] p-4 select-text\">");
 
     for (idx, slide_name) in slide_names.iter().enumerate() {
         let mut slide_xml = String::new();
@@ -782,30 +801,62 @@ fn extract_pptx_content(file_path: &Path) -> Result<String, String> {
             let _ = entry.read_to_string(&mut slide_xml);
         }
 
-        let mut texts = Vec::new();
-        for t_chunk in slide_xml.split("<a:t>") {
-            if let Some(end_t) = t_chunk.find("</a:t>") {
-                let val = t_chunk[..end_t].trim();
-                if !val.is_empty() {
-                    texts.push(val.to_string());
+        // Group text by paragraphs (<a:p>) so sentences and points stay together
+        let mut paragraphs: Vec<String> = Vec::new();
+        for p_chunk in slide_xml.split("<a:p") {
+            let mut p_text = String::new();
+            for t_chunk in p_chunk.split("<a:t") {
+                if let Some(start_b) = t_chunk.find('>') {
+                    if let Some(end_t) = t_chunk.find("</a:t>") {
+                        if end_t > start_b {
+                            p_text.push_str(&t_chunk[start_b + 1..end_t]);
+                        }
+                    }
                 }
+            }
+            let trimmed = p_text.trim();
+            if !trimmed.is_empty() {
+                paragraphs.push(trimmed.to_string());
             }
         }
 
-        html.push_str("<div class=\"slide-card bg-gnome-sidebar border border-gnome-border rounded-xl p-5 shadow-lg space-y-2.5 transition-all hover:border-amber-500/40\">");
-        html.push_str(&format!("<div class=\"text-[11px] font-bold uppercase tracking-wider text-amber-400 flex items-center justify-between pb-1 border-b border-gnome-border/40\"><span>📽️ Diapositiva {}</span><span class=\"px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-[10px]\">Slide {}/{}</span></div>", idx + 1, idx + 1, slide_names.len()));
+        // Card styled like a 16:9 presentation slide
+        html.push_str("<div class=\"slide-card bg-[#181a1f] text-[#f1f5f9] border border-amber-500/30 rounded-xl p-6 shadow-2xl space-y-4 transition-all hover:border-amber-500/60 relative overflow-hidden\">");
+        
+        // Slide header badge
+        html.push_str(&format!(
+            "<div class=\"flex items-center justify-between pb-2 border-b border-amber-500/20 text-xs font-semibold select-none\">
+               <div class=\"flex items-center gap-2 text-amber-400\">
+                 <span class=\"text-base\">📽️</span>
+                 <span>DIAPOSITIVA {}</span>
+               </div>
+               <span class=\"px-2.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-[10px] text-amber-300 font-mono\">
+                 {}/{}
+               </span>
+             </div>",
+            idx + 1, idx + 1, slide_names.len()
+        ));
 
-        if let Some((first, rest)) = texts.split_first() {
-            html.push_str(&format!("<h3 class=\"text-sm font-bold text-gnome-text\">{}</h3>", escape_html_str(first)));
-            if !rest.is_empty() {
-                html.push_str("<ul class=\"space-y-1.5 text-xs text-gnome-textDim pl-4\">");
-                for item in rest {
-                    html.push_str(&format!("<li class=\"list-disc leading-relaxed text-gnome-text/80\">{}</li>", escape_html_str(item)));
+        if let Some((title, body_items)) = paragraphs.split_first() {
+            html.push_str(&format!(
+                "<h3 class=\"text-base font-bold text-white tracking-tight leading-snug pt-1\">{}</h3>",
+                escape_html_str(title)
+            ));
+            if !body_items.is_empty() {
+                html.push_str("<ul class=\"space-y-2 text-xs text-gray-300 pl-2\">");
+                for item in body_items {
+                    html.push_str(&format!(
+                        "<li class=\"flex items-start gap-2.5 leading-relaxed\">
+                           <span class=\"text-amber-400 mt-0.5 shrink-0 text-[10px]\">◆</span>
+                           <span class=\"flex-1\">{}</span>
+                         </li>",
+                        escape_html_str(item)
+                    ));
                 }
                 html.push_str("</ul>");
             }
         } else {
-            html.push_str("<p class=\"text-xs text-gnome-textDim italic py-2 flex items-center gap-1.5\"><span>🖼️</span> (Diapositiva con contenido puramente gráfico o visual)</p>");
+            html.push_str("<p class=\"text-xs text-gray-400 italic py-4 flex items-center justify-center gap-2\"><span>🖼️</span> (Diapositiva gráfica sin bloques de texto directos)</p>");
         }
 
         html.push_str("</div>");
@@ -1800,7 +1851,7 @@ fn copy_items(
 
     std::thread::spawn(move || {
         #[cfg(target_os = "windows")]
-        let (valid_sources, err_msg) = {
+        let (valid_sources, err_msg, total_bytes_copied) = {
             let mut p_from = Vec::new();
             let mut valid_sources = 0;
             for src in sources {
@@ -1835,26 +1886,37 @@ fn copy_items(
                     err_msg = Some(format!("Error de Windows Shell: {}", res));
                 }
             }
-            (valid_sources, err_msg)
+            (valid_sources, err_msg, 0u64)
         };
 
         #[cfg(not(target_os = "windows"))]
-        let (valid_sources, err_msg) = {
+        let (valid_sources, err_msg, total_bytes_copied) = {
             let mut valid_sources = 0;
             let mut err_msg = None;
-            for src in sources {
-                let src_path = PathBuf::from(&src);
-                if !src_path.exists() {
-                    continue;
+
+            let mut total_bytes = 0u64;
+            let mut source_paths = Vec::new();
+            for src in &sources {
+                let p = PathBuf::from(src);
+                if p.exists() {
+                    total_bytes += get_path_total_size(&p);
+                    source_paths.push(p);
                 }
+            }
+
+            let total_items = source_paths.len();
+            let start_time = Instant::now();
+            let mut last_emit = Instant::now();
+            let mut bytes_copied = 0u64;
+
+            for (idx, src_path) in source_paths.iter().enumerate() {
                 let file_name = match src_path.file_name() {
                     Some(n) => n,
                     None => continue,
                 };
                 let mut dest_path = PathBuf::from(&target_directory).join(file_name);
 
-                // Detect if destination is identical to source or already exists
-                let is_same_file = src_path == dest_path
+                let is_same_file = src_path == &dest_path
                     || match (src_path.canonicalize(), dest_path.canonicalize()) {
                         (Ok(s), Ok(d)) => s == d,
                         _ => false,
@@ -1890,15 +1952,49 @@ fn copy_items(
                     }
                 }
 
-                // Final safety check: never copy onto self
-                if src_path == dest_path {
+                if src_path == &dest_path {
                     continue;
                 }
 
+                let cur_item_name = file_name.to_string_lossy().to_string();
+                let op_id_sub = op_id.clone();
+                let target_dir_sub = target_dir_str.clone();
+                let app_handle_sub = app_handle.clone();
+
+                let mut on_bytes = |chunk_len: u64| {
+                    bytes_copied += chunk_len;
+                    if last_emit.elapsed() >= Duration::from_millis(150) || bytes_copied >= total_bytes {
+                        let elapsed = start_time.elapsed().as_secs_f64();
+                        let speed = if elapsed > 0.1 { bytes_copied as f64 / elapsed } else { 0.0 };
+                        let eta = if speed > 1024.0 && total_bytes > bytes_copied {
+                            ((total_bytes - bytes_copied) as f64 / speed) as u64
+                        } else {
+                            0
+                        };
+                        let _ = app_handle_sub.emit(
+                            "transfer-progress",
+                            TransferProgressPayload {
+                                operation_id: op_id_sub.clone(),
+                                action: "copy".into(),
+                                current_item: cur_item_name.clone(),
+                                current_index: idx + 1,
+                                total_items,
+                                bytes_copied,
+                                total_bytes,
+                                target_directory: target_dir_sub.clone(),
+                                is_done: false,
+                                speed_bytes_per_sec: speed,
+                                eta_seconds: eta,
+                            },
+                        );
+                        last_emit = Instant::now();
+                    }
+                };
+
                 let res = if src_path.is_dir() {
-                    copy_dir_recursive_with_progress(&src_path, &dest_path, &mut |_| {})
+                    copy_dir_recursive_with_progress(src_path, &dest_path, &mut on_bytes)
                 } else {
-                    std::fs::copy(&src_path, &dest_path).map(|_| ())
+                    copy_file_chunked(src_path, &dest_path, &mut on_bytes).map(|_| ())
                 };
                 if let Err(e) = res {
                     err_msg = Some(format!("Error al copiar: {}", e));
@@ -1906,7 +2002,7 @@ fn copy_items(
                 }
                 valid_sources += 1;
             }
-            (valid_sources, err_msg)
+            (valid_sources, err_msg, bytes_copied)
         };
 
         let _ = app_handle.emit(
@@ -1917,7 +2013,7 @@ fn copy_items(
                 success: err_msg.is_none(),
                 error: err_msg,
                 items_count: valid_sources,
-                total_bytes: 0,
+                total_bytes: total_bytes_copied,
                 target_directory: target_dir_str,
             },
         );
@@ -1944,7 +2040,7 @@ fn move_items(
 
     std::thread::spawn(move || {
         #[cfg(target_os = "windows")]
-        let (valid_sources, err_msg) = {
+        let (valid_sources, err_msg, total_bytes_moved) = {
             let mut p_from = Vec::new();
             let mut valid_sources = 0;
             for src in sources {
@@ -1979,37 +2075,86 @@ fn move_items(
                     err_msg = Some(format!("Error de Windows Shell: {}", res));
                 }
             }
-            (valid_sources, err_msg)
+            (valid_sources, err_msg, 0u64)
         };
 
         #[cfg(not(target_os = "windows"))]
-        let (valid_sources, err_msg) = {
+        let (valid_sources, err_msg, total_bytes_moved) = {
             let mut valid_sources = 0;
             let mut err_msg = None;
-            for src in sources {
-                let src_path = PathBuf::from(&src);
-                if !src_path.exists() {
-                    continue;
+
+            let mut total_bytes = 0u64;
+            let mut source_paths = Vec::new();
+            for src in &sources {
+                let p = PathBuf::from(src);
+                if p.exists() {
+                    total_bytes += get_path_total_size(&p);
+                    source_paths.push(p);
                 }
+            }
+
+            let total_items = source_paths.len();
+            let start_time = Instant::now();
+            let mut last_emit = Instant::now();
+            let mut bytes_copied = 0u64;
+
+            for (idx, src_path) in source_paths.iter().enumerate() {
                 let file_name = match src_path.file_name() {
                     Some(n) => n,
                     None => continue,
                 };
                 let dest_path = PathBuf::from(&target_directory).join(file_name);
-                if src_path == dest_path {
+                if src_path == &dest_path {
                     valid_sources += 1;
                     continue;
                 }
-                let res = if fs::rename(&src_path, &dest_path).is_ok() {
+
+                let cur_item_name = file_name.to_string_lossy().to_string();
+                let op_id_sub = op_id.clone();
+                let target_dir_sub = target_dir_str.clone();
+                let app_handle_sub = app_handle.clone();
+
+                let mut on_bytes = |chunk_len: u64| {
+                    bytes_copied += chunk_len;
+                    if last_emit.elapsed() >= Duration::from_millis(150) || bytes_copied >= total_bytes {
+                        let elapsed = start_time.elapsed().as_secs_f64();
+                        let speed = if elapsed > 0.1 { bytes_copied as f64 / elapsed } else { 0.0 };
+                        let eta = if speed > 1024.0 && total_bytes > bytes_copied {
+                            ((total_bytes - bytes_copied) as f64 / speed) as u64
+                        } else {
+                            0
+                        };
+                        let _ = app_handle_sub.emit(
+                            "transfer-progress",
+                            TransferProgressPayload {
+                                operation_id: op_id_sub.clone(),
+                                action: "move".into(),
+                                current_item: cur_item_name.clone(),
+                                current_index: idx + 1,
+                                total_items,
+                                bytes_copied,
+                                total_bytes,
+                                target_directory: target_dir_sub.clone(),
+                                is_done: false,
+                                speed_bytes_per_sec: speed,
+                                eta_seconds: eta,
+                            },
+                        );
+                        last_emit = Instant::now();
+                    }
+                };
+
+                let res = if fs::rename(src_path, &dest_path).is_ok() {
+                    bytes_copied += get_path_total_size(&dest_path);
                     Ok(())
                 } else if src_path.is_dir() {
-                    match copy_dir_recursive_with_progress(&src_path, &dest_path, &mut |_| {}) {
-                        Ok(_) => fs::remove_dir_all(&src_path),
+                    match copy_dir_recursive_with_progress(src_path, &dest_path, &mut on_bytes) {
+                        Ok(_) => fs::remove_dir_all(src_path),
                         Err(e) => Err(e),
                     }
                 } else {
-                    match std::fs::copy(&src_path, &dest_path) {
-                        Ok(_) => fs::remove_file(&src_path),
+                    match copy_file_chunked(src_path, &dest_path, &mut on_bytes) {
+                        Ok(_) => fs::remove_file(src_path),
                         Err(e) => Err(e),
                     }
                 };
@@ -2019,7 +2164,7 @@ fn move_items(
                 }
                 valid_sources += 1;
             }
-            (valid_sources, err_msg)
+            (valid_sources, err_msg, bytes_copied)
         };
 
         let _ = app_handle.emit(
@@ -2030,7 +2175,7 @@ fn move_items(
                 success: err_msg.is_none(),
                 error: err_msg,
                 items_count: valid_sources,
-                total_bytes: 0,
+                total_bytes: total_bytes_moved,
                 target_directory: target_dir_str,
             },
         );
