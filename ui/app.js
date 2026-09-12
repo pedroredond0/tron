@@ -1,3 +1,33 @@
+  function showToast(message, type = 'info') {
+    let toastContainer = document.getElementById('tronToastContainer');
+    if (!toastContainer) {
+      toastContainer = document.createElement('div');
+      toastContainer.id = 'tronToastContainer';
+      toastContainer.className = 'fixed bottom-8 right-8 z-[100] flex flex-col gap-2 pointer-events-none max-w-sm';
+      document.body.appendChild(toastContainer);
+    }
+
+    const toast = document.createElement('div');
+    const bgClass = type === 'error' ? 'bg-rose-900/90 border-rose-700 text-rose-100' :
+                    type === 'success' ? 'bg-emerald-900/90 border-emerald-700 text-emerald-100' :
+                    'bg-gnome-surface/95 border-gnome-border text-gnome-text shadow-2xl';
+
+    toast.className = `px-4 py-2.5 rounded-xl border backdrop-blur-md shadow-2xl text-xs flex items-center gap-2.5 transition-all duration-300 transform translate-y-2 opacity-0 pointer-events-auto ${bgClass}`;
+    
+    const icon = type === 'error' ? '❌' : type === 'success' ? '✅' : 'ℹ️';
+    toast.innerHTML = `<span>${icon}</span><span class="flex-1 font-medium">${escapeHtml(message)}</span>`;
+    toastContainer.appendChild(toast);
+
+    requestAnimationFrame(() => {
+      toast.classList.remove('translate-y-2', 'opacity-0');
+    });
+
+    setTimeout(() => {
+      toast.classList.add('opacity-0', 'translate-y-2');
+      setTimeout(() => toast.remove(), 300);
+    }, 3500);
+  }
+
 
 // tronExplorer - Frontend Controller
 (function() {
@@ -657,6 +687,51 @@
     ctxMenuDuplicate: document.getElementById('ctxMenuDuplicate'),
     ctxMenuAddFavorite: document.getElementById('ctxMenuAddFavorite'),
     ctxMenuDelete: document.getElementById('ctxMenuDelete'),
+    ctxMenuPdfTools: document.getElementById('ctxMenuPdfTools'),
+    btnCtxPdfToolsTrigger: document.getElementById('btnCtxPdfToolsTrigger'),
+    ctxMenuPdfToolsSub: document.getElementById('ctxMenuPdfToolsSub'),
+    ctxPdfToImages: document.getElementById('ctxPdfToImages'),
+    ctxPdfOptimize: document.getElementById('ctxPdfOptimize'),
+    ctxPdfSplit: document.getElementById('ctxPdfSplit'),
+    ctxPdfRotate: document.getElementById('ctxPdfRotate'),
+    ctxPdfExtractText: document.getElementById('ctxPdfExtractText'),
+    ctxPdfImagesToPdf: document.getElementById('ctxPdfImagesToPdf'),
+    ctxPdfMerge: document.getElementById('ctxPdfMerge'),
+
+    modalPdfToImages: document.getElementById('modalPdfToImages'),
+    btnClosePdfToImagesModal: document.getElementById('btnClosePdfToImagesModal'),
+    btnCancelPdfToImages: document.getElementById('btnCancelPdfToImages'),
+    btnConfirmPdfToImages: document.getElementById('btnConfirmPdfToImages'),
+    inputPdfToImagesRange: document.getElementById('inputPdfToImagesRange'),
+    selectPdfToImagesFormat: document.getElementById('selectPdfToImagesFormat'),
+    pdfToImagesOutputDir: document.getElementById('pdfToImagesOutputDir'),
+    pdfToImagesStatus: document.getElementById('pdfToImagesStatus'),
+    pdfToImagesStatusText: document.getElementById('pdfToImagesStatusText'),
+
+    modalPdfOptimize: document.getElementById('modalPdfOptimize'),
+    btnClosePdfOptimizeModal: document.getElementById('btnClosePdfOptimizeModal'),
+    btnCancelPdfOptimize: document.getElementById('btnCancelPdfOptimize'),
+    btnConfirmPdfOptimize: document.getElementById('btnConfirmPdfOptimize'),
+    pdfOptimizeOrigSize: document.getElementById('pdfOptimizeOrigSize'),
+    pdfOptimizeEstimatedSize: document.getElementById('pdfOptimizeEstimatedSize'),
+    pdfOptimizeQualityVal: document.getElementById('pdfOptimizeQualityVal'),
+    sliderPdfOptimizeQuality: document.getElementById('sliderPdfOptimizeQuality'),
+    inputPdfOptimizeOutName: document.getElementById('inputPdfOptimizeOutName'),
+    pdfOptimizeStatus: document.getElementById('pdfOptimizeStatus'),
+
+    modalPdfMerge: document.getElementById('modalPdfMerge'),
+    btnClosePdfMergeModal: document.getElementById('btnClosePdfMergeModal'),
+    btnCancelPdfMerge: document.getElementById('btnCancelPdfMerge'),
+    btnConfirmPdfMerge: document.getElementById('btnConfirmPdfMerge'),
+    pdfMergeList: document.getElementById('pdfMergeList'),
+    inputPdfMergeOutName: document.getElementById('inputPdfMergeOutName'),
+    pdfMergeStatus: document.getElementById('pdfMergeStatus'),
+
+    modalPdfExtractText: document.getElementById('modalPdfExtractText'),
+    btnClosePdfExtractTextModal: document.getElementById('btnClosePdfExtractTextModal'),
+    btnCancelPdfExtractText: document.getElementById('btnCancelPdfExtractText'),
+    btnConfirmPdfExtractText: document.getElementById('btnConfirmPdfExtractText'),
+    pdfExtractStatus: document.getElementById('pdfExtractStatus'),
     ctxMenuProperties: document.getElementById('ctxMenuProperties'),
     ctxMenuClearTags: document.getElementById('ctxMenuClearTags'),
     modalOpenWith: document.getElementById('modalOpenWith'),
@@ -3832,6 +3907,44 @@ async function startTransferOperation(action, sources, targetDir) {
       }
     }
 
+    // PdfTools contextual submenu logic
+    const selectedList = state.selectedItems.size > 0 
+      ? state.filteredItems.filter(i => state.selectedItems.has(i.path)) 
+      : [item];
+
+    const imageExts = ['png', 'jpg', 'jpeg', 'webp'];
+    const isSingle = selectedList.length === 1;
+    const singleExt = (selectedList[0]?.extension || '').toLowerCase();
+    const isSinglePdf = isSingle && singleExt === 'pdf';
+    
+    const allImages = selectedList.length >= 1 && selectedList.every(i => !i.is_directory && imageExts.includes((i.extension || '').toLowerCase()));
+    
+    const isMultiple = selectedList.length > 1;
+    const allPdfsOrImages = isMultiple && selectedList.every(i => {
+      if (i.is_directory) return false;
+      const ex = (i.extension || '').toLowerCase();
+      return ex === 'pdf' || imageExts.includes(ex);
+    });
+
+    const showPdfTools = isSinglePdf || allImages || allPdfsOrImages;
+    if (el.ctxMenuPdfTools) {
+      if (showPdfTools) {
+        el.ctxMenuPdfTools.classList.remove('hidden');
+        if (el.ctxPdfToImages) el.ctxPdfToImages.classList.toggle('hidden', !isSinglePdf);
+        if (el.ctxPdfOptimize) el.ctxPdfOptimize.classList.toggle('hidden', !isSinglePdf);
+        if (el.ctxPdfSplit) el.ctxPdfSplit.classList.toggle('hidden', !isSinglePdf);
+        if (el.ctxPdfRotate) el.ctxPdfRotate.classList.toggle('hidden', !isSinglePdf);
+        if (el.ctxPdfExtractText) el.ctxPdfExtractText.classList.toggle('hidden', !isSinglePdf);
+        if (el.ctxPdfImagesToPdf) el.ctxPdfImagesToPdf.classList.toggle('hidden', !allImages);
+        if (el.ctxPdfMerge) el.ctxPdfMerge.classList.toggle('hidden', !allPdfsOrImages);
+      } else {
+        el.ctxMenuPdfTools.classList.add('hidden');
+      }
+    }
+    if (el.ctxMenuPdfToolsSub) {
+      el.ctxMenuPdfToolsSub.classList.add('hidden');
+    }
+
     if (el.ctxMenuBatchRename && el.ctxMenuRename) {
       if (state.selectedItems.size > 1) {
         el.ctxMenuBatchRename.classList.remove('hidden');
@@ -3878,6 +3991,7 @@ async function startTransferOperation(action, sources, targetDir) {
   }
 
   function closeFileContextMenu() {
+    if (el.ctxMenuPdfToolsSub) el.ctxMenuPdfToolsSub.classList.add('hidden');
     if (el.fileContextMenu) {
       el.fileContextMenu.classList.add('hidden');
     }
@@ -5727,6 +5841,56 @@ async function startTransferOperation(action, sources, targetDir) {
     el.btnActionQuickView.onclick = openQuickView;
     if (el.btnToggleSplitView) el.btnToggleSplitView.onclick = toggleSplitView;
     if (el.btnToggleMillerView) el.btnToggleMillerView.onclick = toggleMillerView;
+
+    // PdfTools Event Listeners
+    if (el.ctxMenuPdfTools) {
+      el.ctxMenuPdfTools.onmouseenter = openPdfToolsSubmenu;
+    }
+    if (el.btnCtxPdfToolsTrigger) {
+      el.btnCtxPdfToolsTrigger.onclick = (e) => { e.stopPropagation(); openPdfToolsSubmenu(); };
+    }
+    if (el.ctxMenuPdfToolsSub) {
+      let subTimer = null;
+      el.ctxMenuPdfTools.addEventListener('mouseleave', () => {
+        subTimer = setTimeout(() => {
+          if (el.ctxMenuPdfToolsSub && !el.ctxMenuPdfToolsSub.matches(':hover')) {
+            closePdfToolsSubmenu();
+          }
+        }, 150);
+      });
+      el.ctxMenuPdfToolsSub.addEventListener('mouseenter', () => {
+        if (subTimer) clearTimeout(subTimer);
+      });
+      el.ctxMenuPdfToolsSub.addEventListener('mouseleave', () => {
+        closePdfToolsSubmenu();
+      });
+    }
+
+    if (el.ctxPdfToImages) el.ctxPdfToImages.onclick = openPdfToImagesModal;
+    if (el.btnClosePdfToImagesModal) el.btnClosePdfToImagesModal.onclick = closePdfToImagesModal;
+    if (el.btnCancelPdfToImages) el.btnCancelPdfToImages.onclick = closePdfToImagesModal;
+    if (el.btnConfirmPdfToImages) el.btnConfirmPdfToImages.onclick = confirmPdfToImages;
+
+    if (el.ctxPdfOptimize) el.ctxPdfOptimize.onclick = openPdfOptimizeModal;
+    if (el.btnClosePdfOptimizeModal) el.btnClosePdfOptimizeModal.onclick = closePdfOptimizeModal;
+    if (el.btnCancelPdfOptimize) el.btnCancelPdfOptimize.onclick = closePdfOptimizeModal;
+    if (el.btnConfirmPdfOptimize) el.btnConfirmPdfOptimize.onclick = confirmPdfOptimize;
+
+    if (el.ctxPdfSplit) el.ctxPdfSplit.onclick = actionPdfSplit;
+    if (el.ctxPdfRotate) el.ctxPdfRotate.onclick = actionPdfRotate;
+
+    if (el.ctxPdfExtractText) el.ctxPdfExtractText.onclick = openPdfExtractTextModal;
+    if (el.btnClosePdfExtractTextModal) el.btnClosePdfExtractTextModal.onclick = closePdfExtractTextModal;
+    if (el.btnCancelPdfExtractText) el.btnCancelPdfExtractText.onclick = closePdfExtractTextModal;
+    if (el.btnConfirmPdfExtractText) el.btnConfirmPdfExtractText.onclick = confirmPdfExtractText;
+
+    if (el.ctxPdfImagesToPdf) el.ctxPdfImagesToPdf.onclick = actionPdfImagesToPdf;
+
+    if (el.ctxPdfMerge) el.ctxPdfMerge.onclick = openPdfMergeModal;
+    if (el.btnClosePdfMergeModal) el.btnClosePdfMergeModal.onclick = closePdfMergeModal;
+    if (el.btnCancelPdfMerge) el.btnCancelPdfMerge.onclick = closePdfMergeModal;
+    if (el.btnConfirmPdfMerge) el.btnConfirmPdfMerge.onclick = confirmPdfMerge;
+
     if (el.millerParentHeader) el.millerParentHeader.onclick = () => goUp(0);
     if (el.menuToggleMillerView) el.menuToggleMillerView.onclick = () => { closeAllMenus(); toggleMillerView(); };
 
@@ -5914,7 +6078,7 @@ async function startTransferOperation(action, sources, targetDir) {
     });
 
     // Close popup dialogs on backdrop click
-    [el.modalNewFile, el.modalNewFolder, el.modalNetwork, el.modalHelp, el.modalAppearance, el.modalRenameFavorite, el.modalRenameTag, el.modalRenameItem, el.modalConfirmExit, el.modalAbout, el.modalOpenWith, el.modalCompress, el.modalArchiveView].forEach(m => {
+    [el.modalNewFile, el.modalNewFolder, el.modalNetwork, el.modalHelp, el.modalAppearance, el.modalRenameFavorite, el.modalRenameTag, el.modalRenameItem, el.modalConfirmExit, el.modalAbout, el.modalOpenWith, el.modalCompress, el.modalArchiveView, el.modalPdfToImages, el.modalPdfOptimize, el.modalPdfMerge, el.modalPdfExtractText].forEach(m => {
       if (m) {
         m.addEventListener('click', (e) => {
           if (e.target === m) m.classList.add('hidden');
