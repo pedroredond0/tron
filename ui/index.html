@@ -559,7 +559,7 @@
   </div>
 
   <!-- Top Navigation Header -->
-  <header class="h-11 bg-gnome-surface border-b border-gnome-border flex items-center justify-between px-3 shrink-0 gap-2">
+  <header class="h-11 bg-gnome-surface border-b border-gnome-border flex items-center justify-between px-3 shrink-0 gap-2" data-tauri-drag-region>
     <!-- History & Navigation buttons -->
     <div class="flex items-center gap-1">
       <button id="btnBack" title="Atrás (Alt+Left o Backspace)" class="p-1.5 rounded-md hover:bg-gnome-hover active:bg-gnome-border text-gnome-text disabled:opacity-30 disabled:pointer-events-none">
@@ -811,11 +811,13 @@
         <!-- Panel A -->
         <div id="panelA" class="flex-1 flex flex-col min-w-0 transition-colors" tabindex="-1">
           <!-- Symmetric Location & Header Bar (Panel A) -->
-          <div id="panelAHeader" class="hidden h-8 px-3 flex items-center justify-between bg-gnome-surface/90 border-b border-gnome-border text-xs shrink-0 select-none cursor-pointer">
-            <div id="panelAPathBox" class="flex items-center gap-1.5 min-w-0 flex-1 px-2.5 py-0.5 rounded text-xs transition-colors bg-gnome-active text-white font-semibold shadow-sm">
-              <span id="panelABadge" class="hidden"></span>
-              <span class="text-xs opacity-90 shrink-0">📁</span>
-              <span id="pathIndicatorA" class="font-mono text-[11px] truncate flex-1" title="Ruta del Panel 1"></span>
+          <div id="panelAHeader" class="hidden h-8 px-2 flex items-center justify-between bg-gnome-surface/90 border-b border-gnome-border text-xs shrink-0 select-none cursor-pointer">
+            <div id="panelATabsContainer" class="flex items-center gap-1 min-w-0 flex-1 overflow-x-auto scrollbar-none">
+              <div id="panelAPathBox" class="flex items-center gap-1.5 min-w-0 flex-1 px-2.5 py-0.5 rounded text-xs transition-colors bg-gnome-active text-white font-semibold shadow-sm">
+                <span id="panelABadge" class="hidden"></span>
+                <span class="text-xs opacity-90 shrink-0">📁</span>
+                <span id="pathIndicatorA" class="font-mono text-[11px] truncate flex-1" title="Ruta del Panel 1"></span>
+              </div>
             </div>
             <div class="flex items-center gap-1 shrink-0 text-gnome-textDim pl-2">
               <span id="panelACount" class="text-[10px] font-mono"></span>
@@ -851,11 +853,13 @@
         <!-- Panel B -->
         <div id="panelB" class="hidden flex-1 flex flex-col min-w-0 border-l border-gnome-border transition-colors" tabindex="-1">
           <!-- Symmetric Location & Header Bar (Panel B) -->
-          <div id="panelBHeader" class="hidden h-8 px-3 flex items-center justify-between bg-gnome-surface/90 border-b border-gnome-border text-xs shrink-0 select-none cursor-pointer">
-            <div id="panelBPathBox" class="flex items-center gap-1.5 min-w-0 flex-1 px-2.5 py-0.5 rounded text-xs transition-colors bg-gnome-sidebar/50 border border-gnome-border/60 text-gnome-textDim hover:text-gnome-text">
-              <span id="panelBBadge" class="hidden"></span>
-              <span class="text-xs opacity-90 shrink-0">📁</span>
-              <span id="pathIndicatorB" class="font-mono text-[11px] truncate flex-1" title="Ruta del Panel 2"></span>
+          <div id="panelBHeader" class="hidden h-8 px-2 flex items-center justify-between bg-gnome-surface/90 border-b border-gnome-border text-xs shrink-0 select-none cursor-pointer">
+            <div id="panelBTabsContainer" class="flex items-center gap-1 min-w-0 flex-1 overflow-x-auto scrollbar-none">
+              <div id="panelBPathBox" class="flex items-center gap-1.5 min-w-0 flex-1 px-2.5 py-0.5 rounded text-xs transition-colors bg-gnome-sidebar/50 border border-gnome-border/60 text-gnome-textDim hover:text-gnome-text">
+                <span id="panelBBadge" class="hidden"></span>
+                <span class="text-xs opacity-90 shrink-0">📁</span>
+                <span id="pathIndicatorB" class="font-mono text-[11px] truncate flex-1" title="Ruta del Panel 2"></span>
+              </div>
             </div>
             <div class="flex items-center gap-1 shrink-0 text-gnome-textDim pl-2">
               <span id="panelBCount" class="text-[10px] font-mono"></span>
@@ -1095,7 +1099,7 @@
         </div>
         <div class="flex justify-between items-center">
           <span class="text-gnome-textDim font-medium">Versión:</span>
-          <span id="aboutVersion" class="font-mono font-semibold text-gnome-active">1.0.3</span>
+          <span id="aboutVersion" class="font-mono font-semibold text-gnome-active">1.0.4</span>
         </div>
         <div class="flex justify-between items-center">
           <span class="text-gnome-textDim font-medium">Compilación (Unix):</span>

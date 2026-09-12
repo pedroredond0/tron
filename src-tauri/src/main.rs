@@ -10,7 +10,7 @@ use std::sync::atomic::{AtomicU16, AtomicU64, Ordering};
 use std::time::UNIX_EPOCH;
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 #[cfg(target_os = "windows")]
 use std::os::windows::ffi::OsStrExt;
 #[cfg(target_os = "windows")]
@@ -3758,6 +3758,100 @@ fn is_window_maximized(window: tauri::Window) -> Result<bool, String> {
     window.is_maximized().map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+fn connect_network_share(path: String) -> Result<String, String> {
+    let raw = path.trim();
+    if raw.is_empty() {
+        return Err("Ruta de red vacía".into());
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let smb_url = if raw.starts_with("\\\\") {
+            format!("smb://{}", raw.trim_start_matches('\\').replace('\\', "/"))
+        } else if !raw.to_lowercase().starts_with("smb://") && !raw.starts_with('/') {
+            format!("smb://{}", raw)
+        } else {
+            raw.to_string()
+        };
+
+        if raw.starts_with("/Volumes/") && std::path::Path::new(raw).exists() {
+            return Ok(raw.to_string());
+        }
+
+        // Use AppleScript mount volume
+        let script = format!("mount volume \"{}\"", smb_url.replace('"', "\\\""));
+        let output = std::process::Command::new("osascript")
+            .arg("-e")
+            .arg(&script)
+            .output();
+
+        match output {
+            Ok(out) if out.status.success() => {
+                let clean_url = smb_url.trim_end_matches('/');
+                let share_name = clean_url.rsplit('/').next().unwrap_or("");
+                let candidate = format!("/Volumes/{}", share_name);
+                if std::path::Path::new(&candidate).exists() {
+                    return Ok(candidate);
+                }
+                Ok("/Volumes".to_string())
+            }
+            Ok(out) => {
+                let err_str = String::from_utf8_lossy(&out.stderr);
+                let _ = std::process::Command::new("open").arg(&smb_url).spawn();
+                if err_str.trim().is_empty() {
+                    Ok("/Volumes".to_string())
+                } else {
+                    Err(format!("Error al conectar vía macOS: {}. Se abrió el diálogo nativo del sistema.", err_str.trim()))
+                }
+            }
+            Err(e) => {
+                let _ = std::process::Command::new("open").arg(&smb_url).spawn();
+                Err(format!("Error ejecutando comando del sistema: {}", e))
+            }
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let win_path = if raw.to_lowercase().starts_with("smb://") {
+            format!("\\\\{}", raw[6..].replace('/', "\\"))
+        } else if raw.starts_with("//") {
+            format!("\\\\{}", raw[2..].replace('/', "\\"))
+        } else if !raw.starts_with("\\\\") {
+            format!("\\\\{}", raw.replace('/', "\\"))
+        } else {
+            raw.to_string()
+        };
+
+        Ok(win_path)
+    }
+
+    #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
+    {
+        let smb_url = if raw.starts_with("\\\\") {
+            format!("smb://{}", raw.trim_start_matches('\\').replace('\\', "/"))
+        } else if !raw.to_lowercase().starts_with("smb://") {
+            format!("smb://{}", raw)
+        } else {
+            raw.to_string()
+        };
+
+        let _ = std::process::Command::new("gio")
+            .arg("mount")
+            .arg(&smb_url)
+            .output();
+
+        let uid = std::env::var("UID").unwrap_or_else(|_| "1000".into());
+        let gvfs_dir = format!("/run/user/{}/gvfs", uid);
+        if std::path::Path::new(&gvfs_dir).exists() {
+            Ok(gvfs_dir)
+        } else {
+            Ok("/run".to_string())
+        }
+    }
+}
+
 #[allow(dead_code)]
 fn build_app_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Result<tauri::menu::Menu<R>, Box<dyn std::error::Error>> {
     use tauri::menu::*;
@@ -3891,6 +3985,14 @@ fn main() {
             });
     }
 
+    #[cfg(target_os = "windows")]
+    let builder = builder.setup(|app| {
+        if let Some(window) = app.get_webview_window("main") {
+            let _ = window.set_decorations(false);
+        }
+        Ok(())
+    });
+
     let result = builder
         .invoke_handler(tauri::generate_handler![
             get_user_places,
@@ -3928,7 +4030,8 @@ fn main() {
             window_minimize,
             window_toggle_maximize,
             window_close,
-            is_window_maximized
+            is_window_maximized,
+            connect_network_share
         ])
         .run(tauri::generate_context!());
 
