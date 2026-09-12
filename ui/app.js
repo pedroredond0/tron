@@ -812,6 +812,19 @@ modalSherlock: document.getElementById('modalSherlock'),
     ctxMenuFrequentResetThis: document.getElementById('ctxMenuFrequentResetThis'),
     ctxMenuFrequentHideThis: document.getElementById('ctxMenuFrequentHideThis'),
     ctxMenuFrequentResetAll: document.getElementById('ctxMenuFrequentResetAll'),
+
+    // Directory Background Context Menu
+    dirContextMenu: document.getElementById('dirContextMenu'),
+    ctxDirNewFolder: document.getElementById('ctxDirNewFolder'),
+    ctxDirNewFile: document.getElementById('ctxDirNewFile'),
+    ctxDirPaste: document.getElementById('ctxDirPaste'),
+    ctxDirSelectAll: document.getElementById('ctxDirSelectAll'),
+    ctxDirRefresh: document.getElementById('ctxDirRefresh'),
+    ctxDirTerminal: document.getElementById('ctxDirTerminal'),
+    ctxDirExportList: document.getElementById('ctxDirExportList'),
+    ctxDirCalcSizes: document.getElementById('ctxDirCalcSizes'),
+    ctxDirProperties: document.getElementById('ctxDirProperties'),
+
     btnResetFrequentStats: document.getElementById('btnResetFrequentStats'),
     hiddenFrequentContainer: document.getElementById('hiddenFrequentContainer'),
     hiddenFrequentList: document.getElementById('hiddenFrequentList'),
@@ -2477,7 +2490,7 @@ modalSherlock: document.getElementById('modalSherlock'),
         const isCurrentFolder = item.is_directory && normItemPath === normCurDir;
 
         const row = document.createElement('div');
-        row.className = `flex items-center justify-between px-2.5 py-1 rounded cursor-pointer text-xs select-none transition-colors ${
+        row.className = `file-row flex items-center justify-between px-2.5 py-1 rounded cursor-pointer text-xs select-none transition-colors ${
           isCurrentFolder ? 'bg-gnome-active text-white font-medium shadow-sm' : 'hover:bg-gnome-hover text-gnome-textDim hover:text-gnome-text'
         }`;
 
@@ -2498,6 +2511,12 @@ modalSherlock: document.getElementById('modalSherlock'),
           if (item.is_directory) {
             loadDirectory(item.path, true, 0);
           }
+        });
+
+        row.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          openFileContextMenu(e, item, -1);
         });
 
         frag.appendChild(row);
@@ -2537,7 +2556,7 @@ modalSherlock: document.getElementById('modalSherlock'),
       const isFocused = idx === state.selectedIndex;
 
       const row = document.createElement('div');
-      row.className = `group flex items-center justify-between px-2.5 py-1.5 rounded cursor-pointer text-xs select-none transition-colors ${
+      row.className = `file-row group flex items-center justify-between px-2.5 py-1.5 rounded cursor-pointer text-xs select-none transition-colors ${
         isSelected
           ? 'bg-gnome-active text-white font-medium shadow-sm ring-1 ring-gnome-active/80'
           : 'hover:bg-gnome-hover text-gnome-text'
@@ -3836,23 +3855,61 @@ async function startTransferOperation(action, sources, targetDir) {
     startTransferOperation('copy', targetPaths, state.currentDirectory);
   }
 
+  let isOpeningContextMenu = false;
+
+  function updateRowSelectionVisuals(idx) {
+    if (idx < 0) return;
+    if (state.isMillerView) {
+      const mList = el.millerCurrentList;
+      if (mList) {
+        Array.from(mList.children).forEach((r, i) => {
+          if (i === idx) {
+            r.classList.add('bg-gnome-active', 'text-white', 'font-medium', 'shadow-sm');
+            r.classList.remove('hover:bg-gnome-hover');
+          } else {
+            r.classList.remove('bg-gnome-active', 'text-white', 'font-medium', 'shadow-sm');
+          }
+        });
+      }
+    } else {
+      const listEl = elPanels[activePanel]?.fileList || el.fileList;
+      if (listEl) {
+        Array.from(listEl.children).forEach((r, i) => {
+          if (i === idx) {
+            r.classList.add('bg-gnome-active', 'text-white');
+            r.classList.remove('hover:bg-gnome-hover/50', 'text-gnome-text');
+          } else {
+            r.classList.remove('bg-gnome-active', 'text-white');
+            r.classList.add('text-gnome-text');
+          }
+        });
+      }
+    }
+  }
+
   // File Context Menu
   function openFileContextMenu(e, item, idx) {
     state.contextTargetItem = item;
-    // If clicked item is not selected, select only it
-    if (!state.selectedItems.has(item.path)) {
+    // If clicked item is not selected, select only it without rebuilding entire DOM
+    if (item && item.path && !state.selectedItems.has(item.path)) {
       state.selectedItems.clear();
       state.selectedIndex = idx;
       state.selectionAnchor = idx;
       state.selectedItems.add(item.path);
-      renderFileList();
+      updateRowSelectionVisuals(idx);
       updateStatusBar();
     }
 
+    closeDirContextMenu();
+    closeFrequentContextMenu();
+
     if (!el.fileContextMenu) return;
 
-    const ext = (item.extension || '').toLowerCase();
-    const isZip = ext === 'zip' || (item.name || '').toLowerCase().endsWith('.zip');
+    isOpeningContextMenu = true;
+    setTimeout(() => { isOpeningContextMenu = false; }, 200);
+
+    const ext = (item?.extension || '').toLowerCase();
+    const isZip = ext === 'zip' || (item?.name || '').toLowerCase().endsWith('.zip');
 
     if (el.ctxMenuExtractHere) {
       if (isZip) el.ctxMenuExtractHere.classList.remove('hidden');
@@ -3862,7 +3919,7 @@ async function startTransferOperation(action, sources, targetDir) {
     if (el.ctxMenuExtractToFolder) {
       if (isZip) {
         el.ctxMenuExtractToFolder.classList.remove('hidden');
-        const folderName = (item.name || 'archivo').replace(/\.zip$/i, '');
+        const folderName = (item?.name || 'archivo').replace(/\.zip$/i, '');
         if (el.ctxMenuExtractToFolderText) {
           el.ctxMenuExtractToFolderText.textContent = `📦 Extraer en ${folderName}/`;
         }
@@ -3877,7 +3934,7 @@ async function startTransferOperation(action, sources, targetDir) {
     }
 
     if (el.ctxMenuOpenEditor) {
-      const isText = state.customTextExts.includes(ext) || item.file_type === 'text' || item.file_type === 'code' || !item.is_directory;
+      const isText = item && (state.customTextExts.includes(ext) || item.file_type === 'text' || item.file_type === 'code' || !item.is_directory);
       if (isText && !item.is_directory) {
         el.ctxMenuOpenEditor.classList.remove('hidden');
       } else {
@@ -3910,7 +3967,7 @@ async function startTransferOperation(action, sources, targetDir) {
     // PdfTools contextual submenu logic
     const selectedList = state.selectedItems.size > 0 
       ? state.filteredItems.filter(i => state.selectedItems.has(i.path)) 
-      : [item];
+      : (item ? [item] : []);
 
     const imageExts = ['png', 'jpg', 'jpeg', 'webp'];
     const isSingle = selectedList.length === 1;
@@ -3996,6 +4053,52 @@ async function startTransferOperation(action, sources, targetDir) {
       el.fileContextMenu.classList.add('hidden');
     }
     state.contextTargetItem = null;
+  }
+
+  // Directory Background Context Menu
+  function openDirContextMenu(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    closeFileContextMenu();
+    closeFrequentContextMenu();
+
+    if (!el.dirContextMenu) return;
+
+    if (el.ctxDirPaste) {
+      const hasClipboard = state.clipboard && state.clipboard.paths && state.clipboard.paths.length > 0;
+      el.ctxDirPaste.disabled = !hasClipboard;
+    }
+
+    isOpeningContextMenu = true;
+    setTimeout(() => { isOpeningContextMenu = false; }, 200);
+
+    el.dirContextMenu.style.visibility = 'hidden';
+    el.dirContextMenu.classList.remove('hidden');
+
+    const menuRect = el.dirContextMenu.getBoundingClientRect();
+    const menuWidth = menuRect.width || 220;
+    const menuHeight = menuRect.height || 280;
+
+    let x = e.clientX;
+    let y = e.clientY;
+
+    if (x + menuWidth > window.innerWidth) {
+      x = Math.max(8, e.clientX - menuWidth);
+    }
+    if (y + menuHeight > window.innerHeight) {
+      y = e.clientY - menuHeight;
+      if (y < 8) y = 8;
+    }
+
+    el.dirContextMenu.style.left = `${Math.max(5, x)}px`;
+    el.dirContextMenu.style.top = `${Math.max(5, y)}px`;
+    el.dirContextMenu.style.visibility = 'visible';
+  }
+
+  function closeDirContextMenu() {
+    if (el.dirContextMenu) {
+      el.dirContextMenu.classList.add('hidden');
+    }
   }
 
   // Frequent Locations Context Menu
@@ -7225,32 +7328,137 @@ async function startTransferOperation(action, sources, targetDir) {
       };
     }
 
-    // Close context menu on outside click or scroll
+    // Directory Context Menu Actions
+    if (el.ctxDirNewFolder) {
+      el.ctxDirNewFolder.onclick = () => {
+        closeDirContextMenu();
+        openNewFolderModal();
+      };
+    }
+    if (el.ctxDirNewFile) {
+      el.ctxDirNewFile.onclick = () => {
+        closeDirContextMenu();
+        openNewFileModal();
+      };
+    }
+    if (el.ctxDirPaste) {
+      el.ctxDirPaste.onclick = () => {
+        closeDirContextMenu();
+        pasteClipboardItems();
+      };
+    }
+    if (el.ctxDirSelectAll) {
+      el.ctxDirSelectAll.onclick = () => {
+        closeDirContextMenu();
+        state.selectedItems.clear();
+        state.filteredItems.forEach(i => state.selectedItems.add(i.path));
+        renderFileList();
+        updateStatusBar();
+      };
+    }
+    if (el.ctxDirRefresh) {
+      el.ctxDirRefresh.onclick = () => {
+        closeDirContextMenu();
+        reloadBothPanelsIfNeeded();
+      };
+    }
+    if (el.ctxDirTerminal) {
+      el.ctxDirTerminal.onclick = () => {
+        closeDirContextMenu();
+        openCurrentTerminal();
+      };
+    }
+    if (el.ctxDirExportList) {
+      el.ctxDirExportList.onclick = () => {
+        closeDirContextMenu();
+        openExportListModal();
+      };
+    }
+    if (el.ctxDirCalcSizes) {
+      el.ctxDirCalcSizes.onclick = () => {
+        closeDirContextMenu();
+        calculateAllDirSizes();
+      };
+    }
+    if (el.ctxDirProperties) {
+      el.ctxDirProperties.onclick = () => {
+        closeDirContextMenu();
+        showItemProperties();
+      };
+    }
+
+    // Close context menus on outside click or scroll
     document.addEventListener('click', (e) => {
+      if (e.button !== 0) return;
+      if (
+        (el.fileContextMenu && el.fileContextMenu.contains(e.target)) ||
+        (el.ctxMenuPdfToolsSub && el.ctxMenuPdfToolsSub.contains(e.target)) ||
+        (el.dirContextMenu && el.dirContextMenu.contains(e.target)) ||
+        (el.ctxMenuFrequent && el.ctxMenuFrequent.contains(e.target))
+      ) {
+        return;
+      }
       closeFileContextMenu();
+      closeDirContextMenu();
       closeFrequentContextMenu();
       if (el.pasteDetailsCard && !el.pasteDetailsCard.contains(e.target) && !el.pasteProgressContainer.contains(e.target)) {
         el.pasteDetailsCard.classList.add('hidden');
       }
     });
+
     document.addEventListener('contextmenu', (e) => {
-      if (!e.target.closest('.file-row') && !e.target.closest('#frequentLinks')) {
+      if (
+        (el.fileContextMenu && el.fileContextMenu.contains(e.target)) ||
+        (el.ctxMenuPdfToolsSub && el.ctxMenuPdfToolsSub.contains(e.target)) ||
+        (el.dirContextMenu && el.dirContextMenu.contains(e.target)) ||
+        (el.ctxMenuFrequent && el.ctxMenuFrequent.contains(e.target))
+      ) {
+        return;
+      }
+
+      if (e.target.closest('.file-row') || e.target.closest('#frequentLinks')) {
+        return;
+      }
+
+      const inDirBg = e.target.closest('#fileList') || 
+                      e.target.closest('#fileListB') || 
+                      e.target.closest('#panelA') || 
+                      e.target.closest('#panelB') || 
+                      e.target.closest('#millerContainer');
+
+      if (inDirBg) {
+        openDirContextMenu(e);
+      } else {
         closeFileContextMenu();
+        closeDirContextMenu();
         closeFrequentContextMenu();
       }
     });
+
     if (el.fileList) {
       elPanels.forEach(p => {
         p.fileList.addEventListener('scroll', () => {
+          if (isOpeningContextMenu) return;
           closeFileContextMenu();
+          closeDirContextMenu();
           closeFrequentContextMenu();
         });
-        p.fileList.addEventListener('mousedown', () => {
+        p.fileList.addEventListener('mousedown', (e) => {
+          if (e.button !== 0) return;
           const idx = elPanels.indexOf(p);
           if (isSplitView && activePanel !== idx) {
             switchActivePanel(idx);
           }
         });
+      });
+    }
+
+    if (el.millerContainer) {
+      el.millerContainer.addEventListener('scroll', () => {
+        if (isOpeningContextMenu) return;
+        closeFileContextMenu();
+        closeDirContextMenu();
+        closeFrequentContextMenu();
       });
     }
 

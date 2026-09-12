@@ -2358,7 +2358,7 @@
   </div>
 
   <!-- Styled Context Menu for File Items -->
-  <div id="fileContextMenu" class="hidden fixed z-50 w-56 bg-gnome-surface border border-gnome-border rounded-lg shadow-2xl py-1 text-xs text-gnome-text select-none overflow-y-auto">
+  <div id="fileContextMenu" class="hidden fixed z-[9999] w-56 bg-gnome-surface border border-gnome-border rounded-lg shadow-2xl py-1 text-xs text-gnome-text select-none overflow-y-auto">
     <button id="ctxMenuOpen" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
       <span>Abrir</span><span class="text-gnome-textDim text-[11px]">Enter</span>
     </button>
@@ -2398,7 +2398,7 @@
     <button id="ctxMenuArchiveViewContent" class="hidden w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
       <span>📋 Ver contenido</span>
     </button>
-    <!-- Dedicated PdfTools Submenu -->
+    <!-- Dedicated PdfTools Submenu Trigger -->
     <div id="ctxMenuPdfTools" class="hidden relative">
       <button id="btnCtxPdfToolsTrigger" type="button" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between font-medium text-amber-400">
         <span class="flex items-center gap-1.5">
@@ -2406,34 +2406,6 @@
         </span>
         <span class="text-xs opacity-70">›</span>
       </button>
-      <div id="ctxMenuPdfToolsSub" class="hidden fixed w-64 bg-gnome-surface border border-gnome-border rounded-lg shadow-2xl py-1 text-xs text-gnome-text select-none z-50">
-        <!-- PDF Actions (visible when single PDF is selected) -->
-        <button id="ctxPdfToImages" class="hidden w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center gap-2">
-          <span>🖼️</span> <span>Convertir PDF en Imágenes...</span>
-        </button>
-        <button id="ctxPdfOptimize" class="hidden w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center gap-2">
-          <span>🗜️</span> <span>Optimizar / Reducir tamaño...</span>
-        </button>
-        <button id="ctxPdfSplit" class="hidden w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center gap-2">
-          <span>✂️</span> <span>Dividir PDF por páginas...</span>
-        </button>
-        <button id="ctxPdfRotate" class="hidden w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center gap-2">
-          <span>🔄</span> <span>Rotar PDF (90° horario)</span>
-        </button>
-        <button id="ctxPdfExtractText" class="hidden w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center gap-2">
-          <span>📝</span> <span>Extraer texto a Markdown / TXT...</span>
-        </button>
-
-        <!-- Image Actions (visible when 1+ images are selected) -->
-        <button id="ctxPdfImagesToPdf" class="hidden w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center gap-2">
-          <span>📑</span> <span>Convertir a PDF</span>
-        </button>
-
-        <!-- Multi Merge Action (visible when multiple PDFs/images are selected) -->
-        <button id="ctxPdfMerge" class="hidden w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center gap-2 font-medium text-gnome-active hover:text-white">
-          <span>📎</span> <span>Unir en un único PDF (Merge)...</span>
-        </button>
-      </div>
     </div>
 
     <!-- Compression action for standard files/folders -->
@@ -2489,8 +2461,72 @@
     </button>
   </div>
 
+  <!-- Dedicated PdfTools Submenu (Floating, Independent) -->
+  <div id="ctxMenuPdfToolsSub" class="hidden fixed w-64 bg-gnome-surface border border-gnome-border rounded-lg shadow-2xl py-1 text-xs text-gnome-text select-none z-[9999]">
+    <!-- PDF Actions (visible when single PDF is selected) -->
+    <button id="ctxPdfToImages" class="hidden w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center gap-2">
+      <span>🖼️</span> <span>Convertir PDF en Imágenes...</span>
+    </button>
+    <button id="ctxPdfOptimize" class="hidden w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center gap-2">
+      <span>🗜️</span> <span>Optimizar / Reducir tamaño...</span>
+    </button>
+    <button id="ctxPdfSplit" class="hidden w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center gap-2">
+      <span>✂️</span> <span>Dividir PDF por páginas...</span>
+    </button>
+    <button id="ctxPdfRotate" class="hidden w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center gap-2">
+      <span>🔄</span> <span>Rotar PDF (90° horario)</span>
+    </button>
+    <button id="ctxPdfExtractText" class="hidden w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center gap-2">
+      <span>📝</span> <span>Extraer texto a Markdown / TXT...</span>
+    </button>
+
+    <!-- Image Actions (visible when 1+ images are selected) -->
+    <button id="ctxPdfImagesToPdf" class="hidden w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center gap-2">
+      <span>📑</span> <span>Convertir a PDF</span>
+    </button>
+
+    <!-- Multi Merge Action (visible when multiple PDFs/images are selected) -->
+    <button id="ctxPdfMerge" class="hidden w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center gap-2 font-medium text-gnome-active hover:text-white">
+      <span>📎</span> <span>Unir en un único PDF (Merge)...</span>
+    </button>
+  </div>
+
+  <!-- Context Menu for Folder / Directory Background -->
+  <div id="dirContextMenu" class="hidden fixed z-[9999] w-60 bg-gnome-surface border border-gnome-border rounded-lg shadow-2xl py-1 text-xs text-gnome-text select-none">
+    <button id="ctxDirNewFolder" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+      <span>📁 Nueva Carpeta...</span><span class="text-gnome-textDim text-[11px]">Ctrl+Shift+N</span>
+    </button>
+    <button id="ctxDirNewFile" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+      <span>📄 Nuevo Archivo...</span><span class="text-gnome-textDim text-[11px]">Ctrl+N</span>
+    </button>
+    <div class="my-1 border-t border-gnome-border/60"></div>
+    <button id="ctxDirPaste" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between disabled:opacity-40">
+      <span>📋 Pegar</span><span class="text-gnome-textDim text-[11px]">Ctrl+V</span>
+    </button>
+    <button id="ctxDirSelectAll" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+      <span>☑️ Seleccionar todo</span><span class="text-gnome-textDim text-[11px]">Ctrl+A</span>
+    </button>
+    <div class="my-1 border-t border-gnome-border/60"></div>
+    <button id="ctxDirRefresh" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+      <span>🔄 Actualizar</span><span class="text-gnome-textDim text-[11px]">F5</span>
+    </button>
+    <button id="ctxDirTerminal" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+      <span>💻 Abrir en Terminal</span><span class="text-gnome-textDim text-[11px]">Ctrl+T</span>
+    </button>
+    <button id="ctxDirExportList" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+      <span>🔭 Generar listado a archivo...</span>
+    </button>
+    <button id="ctxDirCalcSizes" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+      <span>📊 Calcular tamaños de carpetas</span>
+    </button>
+    <div class="my-1 border-t border-gnome-border/60"></div>
+    <button id="ctxDirProperties" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center justify-between">
+      <span>ℹ️ Propiedades de la carpeta</span><span class="text-gnome-textDim text-[11px]">Alt+Enter</span>
+    </button>
+  </div>
+
   <!-- Context Menu for Frequent Locations Items -->
-  <div id="ctxMenuFrequent" class="hidden fixed z-50 w-64 bg-gnome-surface border border-gnome-border rounded-lg shadow-2xl py-1 text-xs text-gnome-text select-none">
+  <div id="ctxMenuFrequent" class="hidden fixed z-[9999] w-64 bg-gnome-surface border border-gnome-border rounded-lg shadow-2xl py-1 text-xs text-gnome-text select-none">
     <div id="ctxMenuFrequentPathHeader" class="px-3 py-1 text-[10px] text-gnome-textDim truncate font-mono border-b border-gnome-border/50 select-text"></div>
     <button id="ctxMenuFrequentResetThis" class="w-full text-left px-3 py-1.5 hover:bg-gnome-active hover:text-white flex items-center gap-2">
       <span>🔄</span> <span>Restablecer visitas de esta ruta</span>
