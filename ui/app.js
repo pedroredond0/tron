@@ -61,6 +61,8 @@
       selectedItems: new Set(),
       history: [],
       historyIndex: -1,
+      sortField: 'name',
+      sortAsc: true,
       searchQuery: '',
       isSearchingRecursive: false,
       activeSherlockFilter: null,
@@ -104,6 +106,10 @@
       set selectionAnchor(v) { this.currentTab.selectionAnchor = v; },
       get selectedItems() { return this.currentTab.selectedItems; },
       set selectedItems(v) { this.currentTab.selectedItems = v; },
+      get sortField() { return this.currentTab.sortField || 'name'; },
+      set sortField(v) { this.currentTab.sortField = v; },
+      get sortAsc() { return this.currentTab.sortAsc !== false; },
+      set sortAsc(v) { this.currentTab.sortAsc = v; },
       get history() { return this.currentTab.history; },
       set history(v) { this.currentTab.history = v; },
       get historyIndex() { return this.currentTab.historyIndex; },
@@ -260,15 +266,24 @@
     hiddenFrequentLocations: new Set(JSON.parse(localStorage.getItem('tron_hidden_frequent_locations') || '[]')),
 
     clipboard: { action: null, paths: [] },
-    sortField: 'name',
-    sortAsc: true,
+    get sortField() { return panels[activePanel].sortField; },
+    set sortField(v) { panels[activePanel].sortField = v; },
+    get sortAsc() { return panels[activePanel].sortAsc; },
+    set sortAsc(v) { panels[activePanel].sortAsc = v; },
     contextTargetItem: null,
     showHiddenFiles: localStorage.getItem('tron_show_hidden') === 'true',
     customTextExts: (localStorage.getItem('tron_custom_text_exts') || 'sql, str, log, conf, env, bak')
       .split(',')
       .map(s => s.trim().toLowerCase().replace(/^\./, ''))
       .filter(Boolean),
-    textEditor: localStorage.getItem('tron_text_editor') || 'notepad',
+    textEditor: (function() {
+      const saved = localStorage.getItem('tron_text_editor');
+      const isMacUser = /Mac|iPhone|iPod|iPad/.test(navigator.platform || '') || /Macintosh/.test(navigator.userAgent || '');
+      if (isMacUser && (!saved || saved === 'notepad')) {
+        return 'TextEdit';
+      }
+      return saved || 'notepad';
+    })(),
     textEditorCustomPath: localStorage.getItem('tron_text_editor_custom') || '',
     terminalApp: localStorage.getItem('tron_terminal_app') || 'default',
     terminalCustomPath: localStorage.getItem('tron_terminal_custom') || '',
@@ -526,6 +541,13 @@
     btnConfirmRenameFav: document.getElementById('btnConfirmRenameFav'),
     btnCancelRenameFav: document.getElementById('btnCancelRenameFav'),
     btnCloseRenameFavModal: document.getElementById('btnCloseRenameFavModal'),
+    modalRenameTag: document.getElementById('modalRenameTag'),
+    inputRenameTagName: document.getElementById('inputRenameTagName'),
+    renameTagDot: document.getElementById('renameTagDot'),
+    btnConfirmRenameTag: document.getElementById('btnConfirmRenameTag'),
+    btnCancelRenameTag: document.getElementById('btnCancelRenameTag'),
+    btnCloseRenameTagModal: document.getElementById('btnCloseRenameTagModal'),
+    btnRefreshDrives: document.getElementById('btnRefreshDrives'),
     modalConfirmExit: document.getElementById('modalConfirmExit'),
     btnCancelExit: document.getElementById('btnCancelExit'),
     btnForceExit: document.getElementById('btnForceExit'),
@@ -864,14 +886,18 @@ modalSherlock: document.getElementById('modalSherlock'),
     return item.file_type ? item.file_type.toUpperCase() : 'Archivo';
   }
 
-  function sortItems(list) {
+  function sortItems(list, pIdx = activePanel) {
+    const pState = panels[pIdx];
+    const sField = pState ? pState.sortField : (state.sortField || 'name');
+    const sAsc = pState ? pState.sortAsc : (state.sortAsc !== false);
+
     return list.sort((a, b) => {
       // Directories always come first
       if (a.is_directory && !b.is_directory) return -1;
       if (!a.is_directory && b.is_directory) return 1;
 
       let res = 0;
-      switch (state.sortField) {
+      switch (sField) {
         case 'name':
           res = a.name.localeCompare(b.name, 'es', { sensitivity: 'base', numeric: true });
           break;
@@ -898,46 +924,64 @@ modalSherlock: document.getElementById('modalSherlock'),
           else res = a.name.localeCompare(b.name, 'es', { sensitivity: 'base', numeric: true });
           break;
       }
-      return state.sortAsc ? res : -res;
+      return sAsc ? res : -res;
     });
   }
 
-  function updateSortHeaderUI() {
+  function updateSortHeaderUI(targetPIdx = null) {
     const fields = ['Name', 'Type', 'Size', 'Date'];
-    const currentFieldCap = state.sortField.charAt(0).toUpperCase() + state.sortField.slice(1);
+    const pIndices = targetPIdx !== null ? [targetPIdx] : [0, 1];
 
-    fields.forEach(f => {
-      const icon = el['sortIcon' + f];
-      if (!icon) return;
-      if (f === currentFieldCap) {
-        icon.classList.remove('hidden');
-        icon.textContent = state.sortAsc ? '▲' : '▼';
-      } else {
-        icon.classList.add('hidden');
-        icon.textContent = '';
-      }
+    pIndices.forEach(pIdx => {
+      const panelState = panels[pIdx];
+      const panelEl = elPanels[pIdx];
+      if (!panelState || !panelEl) return;
+      const curField = panelState.sortField || 'name';
+      const curAsc = panelState.sortAsc !== false;
+      const currentFieldCap = curField.charAt(0).toUpperCase() + curField.slice(1);
+
+      fields.forEach(f => {
+        const icon = panelEl['sortIcon' + f];
+        if (!icon) return;
+        if (f === currentFieldCap) {
+          icon.classList.remove('hidden');
+          icon.textContent = curAsc ? '▲' : '▼';
+        } else {
+          icon.classList.add('hidden');
+          icon.textContent = '';
+        }
+      });
     });
   }
 
-  function setSort(field) {
-    if (state.sortField === field) {
-      state.sortAsc = !state.sortAsc;
-    } else {
-      state.sortField = field;
-      state.sortAsc = true;
+  function setSort(field, pIdx = activePanel) {
+    if (activePanel !== pIdx) {
+      switchActivePanel(pIdx);
     }
-    updateSortHeaderUI();
-    applyFilter();
-    // Maintain selection of active item
-    if (state.selectedIndex >= 0 && state.selectedIndex < state.filteredItems.length) {
-      const selectedPath = Array.from(state.selectedItems)[0];
+    const targetPanel = panels[pIdx];
+    if (!targetPanel) return;
+
+    if (targetPanel.sortField === field) {
+      targetPanel.sortAsc = !targetPanel.sortAsc;
+    } else {
+      targetPanel.sortField = field;
+      targetPanel.sortAsc = true;
+    }
+    updateSortHeaderUI(pIdx);
+    applyFilter(pIdx);
+
+    // Maintain selection of active item in this panel
+    if (targetPanel.selectedIndex >= 0 && targetPanel.selectedIndex < targetPanel.filteredItems.length) {
+      const selectedPath = Array.from(targetPanel.selectedItems)[0];
       if (selectedPath) {
-        const newIdx = state.filteredItems.findIndex(i => i.path === selectedPath);
-        if (newIdx >= 0) state.selectedIndex = newIdx;
+        const newIdx = targetPanel.filteredItems.findIndex(i => i.path === selectedPath);
+        if (newIdx >= 0) targetPanel.selectedIndex = newIdx;
       }
     }
-    renderFileList();
-    updateStatusBar();
+    renderFileList(pIdx);
+    if (pIdx === activePanel) {
+      updateStatusBar();
+    }
   }
 
   // Directory Loading (Strictly Isolated by Panel Index)
@@ -1117,7 +1161,7 @@ modalSherlock: document.getElementById('modalSherlock'),
       if (!state.showHiddenFiles) {
         res = res.filter(item => !item.is_hidden);
       }
-      targetPanel.filteredItems = sortItems([...res]);
+      targetPanel.filteredItems = sortItems([...res], pIdx);
       return;
     }
 
@@ -1126,7 +1170,7 @@ modalSherlock: document.getElementById('modalSherlock'),
       if (!state.showHiddenFiles) {
         res = res.filter(item => !item.is_hidden);
       }
-      targetPanel.filteredItems = sortItems([...res]);
+      targetPanel.filteredItems = sortItems([...res], pIdx);
       return;
     }
 
@@ -1170,7 +1214,7 @@ modalSherlock: document.getElementById('modalSherlock'),
     if (q) {
       res = res.filter(item => item.name.toLowerCase().includes(q));
     }
-    targetPanel.filteredItems = sortItems([...res]);
+    targetPanel.filteredItems = sortItems([...res], pIdx);
   }
 
   // Flatten filteredItems taking into account expandedDirs (collapsible tree)
@@ -4389,23 +4433,28 @@ async function startTransferOperation(action, sources, targetDir) {
       const count = tagCounts[colorKey] || 0;
       const isActive = state.activeTagFilter === colorKey;
       const displayName = getTagDisplayName(colorKey);
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = `w-full flex items-center justify-between gap-2 px-2 py-1 rounded-md text-xs transition-colors select-none ${
+      const row = document.createElement('div');
+      row.className = `group w-full flex items-center justify-between gap-1 px-2 py-1 rounded-md text-xs transition-colors select-none cursor-pointer ${
         isActive 
           ? 'bg-gnome-active text-white font-medium' 
           : 'text-gnome-text hover:bg-gnome-hover'
       }`;
-      btn.title = `${displayName} (clic derecho para renombrar)`;
-      btn.innerHTML = `
-        <div class="flex items-center gap-2 min-w-0">
-          <span class="w-2.5 h-2.5 rounded-full inline-block shadow-sm" style="background-color: ${def.hex}"></span>
+      row.title = `${displayName} (clic para filtrar, lápiz o clic derecho para renombrar)`;
+      row.innerHTML = `
+        <div class="flex items-center gap-2 min-w-0 flex-1 truncate">
+          <span class="w-2.5 h-2.5 rounded-full inline-block shrink-0 shadow-sm" style="background-color: ${def.hex}"></span>
           <span class="truncate">${escapeHtml(displayName)}</span>
         </div>
-        <span class="text-[10px] font-mono ${isActive ? 'text-white/80' : 'text-gnome-textDim'}">${count}</span>
+        <div class="flex items-center gap-1 shrink-0">
+          <button class="btn-rename-tag opacity-0 group-hover:opacity-100 p-0.5 rounded text-[11px] transition-all ${
+            isActive ? 'text-white/80 hover:text-white' : 'text-gnome-textDim hover:text-gnome-active'
+          }" title="Renombrar categoría">✏️</button>
+          <span class="text-[10px] font-mono ${isActive ? 'text-white/80' : 'text-gnome-textDim'}">${count}</span>
+        </div>
       `;
 
-      btn.onclick = () => {
+      row.onclick = (e) => {
+        if (e.target.closest('.btn-rename-tag')) return;
         if (state.activeTagFilter === colorKey) {
           state.activeTagFilter = null;
         } else {
@@ -4417,34 +4466,65 @@ async function startTransferOperation(action, sources, targetDir) {
         renderTagSidebar();
       };
 
-      btn.oncontextmenu = (e) => {
+      const btnRename = row.querySelector('.btn-rename-tag');
+      if (btnRename) {
+        btnRename.onclick = (e) => {
+          e.stopPropagation();
+          openRenameTagModal(colorKey);
+        };
+      }
+
+      row.oncontextmenu = (e) => {
         e.preventDefault();
         e.stopPropagation();
-        renameColorCategoryPrompt(colorKey);
+        openRenameTagModal(colorKey);
       };
 
-      el.tagLinks.appendChild(btn);
+      el.tagLinks.appendChild(row);
     }
   }
 
-  function renameColorCategoryPrompt(colorKey) {
-    const currentName = getTagDisplayName(colorKey);
-    const newName = prompt(`Nuevo nombre para la categoría de color "${(TAG_COLOR_DEFS[colorKey] && TAG_COLOR_DEFS[colorKey].defaultName) || colorKey}":`, currentName);
-    if (newName !== null) {
-      if (!customTagNames) customTagNames = {};
-      const clean = newName.trim();
-      if (clean) {
-        customTagNames[colorKey] = clean;
-      } else {
-        delete customTagNames[colorKey];
-      }
-      try {
-        localStorage.setItem('tron_custom_tag_names', JSON.stringify(customTagNames));
-      } catch (err) {}
-      renderTagSidebar();
-      renderFileList();
-      updateTagInputsInPreferences();
+  let tagColorKeyToRename = null;
+  function openRenameTagModal(colorKey) {
+    tagColorKeyToRename = colorKey;
+    const def = TAG_COLOR_DEFS[colorKey];
+    if (el.renameTagDot && def) {
+      el.renameTagDot.style.backgroundColor = def.hex;
     }
+    if (el.inputRenameTagName) {
+      el.inputRenameTagName.value = getTagDisplayName(colorKey);
+    }
+    if (el.modalRenameTag) {
+      el.modalRenameTag.classList.remove('hidden');
+      el.inputRenameTagName.focus();
+      el.inputRenameTagName.select();
+    }
+  }
+
+  function closeRenameTagModal() {
+    if (el.modalRenameTag) {
+      el.modalRenameTag.classList.add('hidden');
+    }
+    tagColorKeyToRename = null;
+    if (el.fileList) el.fileList.focus();
+  }
+
+  function saveRenamedTag() {
+    if (!tagColorKeyToRename || !el.inputRenameTagName) return;
+    const newName = el.inputRenameTagName.value.trim();
+    if (!customTagNames) customTagNames = {};
+    if (newName) {
+      customTagNames[tagColorKeyToRename] = newName;
+    } else {
+      delete customTagNames[tagColorKeyToRename];
+    }
+    try {
+      localStorage.setItem('tron_custom_tag_names', JSON.stringify(customTagNames));
+    } catch (err) {}
+    closeRenameTagModal();
+    renderTagSidebar();
+    renderFileList();
+    updateTagInputsInPreferences();
   }
 
   // Favorites Management
@@ -4970,13 +5050,47 @@ async function startTransferOperation(action, sources, targetDir) {
       const drives = await invoke('get_system_drives') || [];
       el.driveLinks.innerHTML = '';
       drives.forEach(d => {
-        const btn = document.createElement('button');
-        btn.className = 'w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-gnome-hover text-xs text-gnome-text text-left transition-colors';
+        const itemRow = document.createElement('div');
+        itemRow.className = 'group flex items-center justify-between px-2 py-1.5 rounded-md hover:bg-gnome-hover text-xs text-gnome-text cursor-pointer transition-colors';
         const iconHtml = getUiIconHtml('drive', '💽');
-        btn.innerHTML = `<span class="ui-icon-box">${iconHtml}</span> <span class="truncate">${escapeHtml(d.name)}</span>`;
-        btn.onclick = () => loadDirectory(d.path);
-        setupSidebarDropTarget(btn, d.path);
-        el.driveLinks.appendChild(btn);
+
+        let ejectHtml = '';
+        if (d.is_ejectable) {
+          ejectHtml = `<button class="btn-eject-drive opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-gnome-border text-xs text-gnome-textDim hover:text-gnome-text transition-all ml-1" title="Expulsar volumen">⏏️</button>`;
+        }
+
+        itemRow.innerHTML = `
+          <div class="flex items-center gap-2 min-w-0 flex-1 truncate">
+            <span class="ui-icon-box">${iconHtml}</span>
+            <span class="truncate">${escapeHtml(d.name)}</span>
+          </div>
+          ${ejectHtml}
+        `;
+
+        itemRow.title = d.path;
+        itemRow.onclick = (e) => {
+          if (e.target.closest('.btn-eject-drive')) return;
+          loadDirectory(d.path);
+        };
+
+        if (d.is_ejectable) {
+          const ejectBtn = itemRow.querySelector('.btn-eject-drive');
+          if (ejectBtn) {
+            ejectBtn.onclick = async (e) => {
+              e.stopPropagation();
+              try {
+                const msg = await invoke('eject_volume', { path: d.path });
+                showToast(msg || 'Volumen expulsado con éxito', 'success');
+                loadSidebar();
+              } catch (err) {
+                showToast('Error al expulsar: ' + err, 'error');
+              }
+            };
+          }
+        }
+
+        setupSidebarDropTarget(itemRow, d.path);
+        el.driveLinks.appendChild(itemRow);
       });
     } catch (e) {
       console.warn('Error al obtener unidades:', e);
@@ -5268,7 +5382,7 @@ async function startTransferOperation(action, sources, targetDir) {
     });
 
     // Close popup dialogs on backdrop click
-    [el.modalNewFile, el.modalNewFolder, el.modalNetwork, el.modalHelp, el.modalAppearance, el.modalRenameFavorite, el.modalRenameItem, el.modalConfirmExit, el.modalAbout, el.modalOpenWith, el.modalCompress, el.modalArchiveView].forEach(m => {
+    [el.modalNewFile, el.modalNewFolder, el.modalNetwork, el.modalHelp, el.modalAppearance, el.modalRenameFavorite, el.modalRenameTag, el.modalRenameItem, el.modalConfirmExit, el.modalAbout, el.modalOpenWith, el.modalCompress, el.modalArchiveView].forEach(m => {
       if (m) {
         m.addEventListener('click', (e) => {
           if (e.target === m) m.classList.add('hidden');
@@ -5401,6 +5515,33 @@ async function startTransferOperation(action, sources, targetDir) {
           closeRenameFavoriteModal();
         }
       });
+    }
+
+    // Rename Color Tag Modal Wiring
+    if (el.btnCloseRenameTagModal) el.btnCloseRenameTagModal.onclick = closeRenameTagModal;
+    if (el.btnCancelRenameTag) el.btnCancelRenameTag.onclick = closeRenameTagModal;
+    if (el.btnConfirmRenameTag) el.btnConfirmRenameTag.onclick = saveRenamedTag;
+    if (el.inputRenameTagName) {
+      el.inputRenameTagName.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          e.stopPropagation();
+          saveRenamedTag();
+        }
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          e.stopPropagation();
+          closeRenameTagModal();
+        }
+      });
+    }
+
+    // Drives Refresh Button Wiring
+    if (el.btnRefreshDrives) {
+      el.btnRefreshDrives.onclick = () => {
+        loadSidebar();
+        showToast('Unidades actualizadas', 'info');
+      };
     }
 
     // Appearance Modal Wiring
@@ -5546,11 +5687,17 @@ async function startTransferOperation(action, sources, targetDir) {
       });
     });
 
-    // Sort Column Headers Wiring
-    if (el.sortHeaderName) el.sortHeaderName.onclick = () => setSort('name');
-    if (el.sortHeaderType) el.sortHeaderType.onclick = () => setSort('type');
-    if (el.sortHeaderSize) el.sortHeaderSize.onclick = () => setSort('size');
-    if (el.sortHeaderDate) el.sortHeaderDate.onclick = () => setSort('date');
+    // Sort Column Headers Wiring - Panel A
+    if (elPanels[0].sortHeaderName) elPanels[0].sortHeaderName.onclick = () => setSort('name', 0);
+    if (elPanels[0].sortHeaderType) elPanels[0].sortHeaderType.onclick = () => setSort('type', 0);
+    if (elPanels[0].sortHeaderSize) elPanels[0].sortHeaderSize.onclick = () => setSort('size', 0);
+    if (elPanels[0].sortHeaderDate) elPanels[0].sortHeaderDate.onclick = () => setSort('date', 0);
+
+    // Sort Column Headers Wiring - Panel B
+    if (elPanels[1].sortHeaderName) elPanels[1].sortHeaderName.onclick = () => setSort('name', 1);
+    if (elPanels[1].sortHeaderType) elPanels[1].sortHeaderType.onclick = () => setSort('type', 1);
+    if (elPanels[1].sortHeaderSize) elPanels[1].sortHeaderSize.onclick = () => setSort('size', 1);
+    if (elPanels[1].sortHeaderDate) elPanels[1].sortHeaderDate.onclick = () => setSort('date', 1);
 
     // File Context Menu Wiring
     if (el.ctxMenuOpen) {
