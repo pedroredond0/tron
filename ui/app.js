@@ -186,6 +186,29 @@
     return c.startsWith(p);
   }
 
+  function normPathForMatch(p) {
+    if (!p) return '';
+    let s = p.replace(/\\/g, '/').toLowerCase();
+    if (s.length > 3 && s.endsWith('/')) s = s.replace(/\/+$/, '');
+    return s;
+  }
+
+  function getDirectChildOnPath(ancestorPath, currentPath) {
+    if (!ancestorPath || !currentPath) return null;
+    const aNorm = normPathForMatch(ancestorPath);
+    const cNorm = normPathForMatch(currentPath);
+    if (cNorm.startsWith(aNorm) && cNorm.length > aNorm.length) {
+      const remaining = cNorm.substring(aNorm.length).replace(/^\/+/, '');
+      const firstSegment = remaining.split('/')[0];
+      if (firstSegment) {
+        const sep = ancestorPath.includes('\\') ? '\\' : '/';
+        const cleanAncestor = ancestorPath.replace(/[\/\\]+$/, '');
+        return cleanAncestor + (cleanAncestor.length <= 3 && cleanAncestor.endsWith(':') ? '\\' : sep) + firstSegment;
+      }
+    }
+    return null;
+  }
+
   function createFileItemFromPath(fullPath, isDir = false) {
     if (!fullPath) return null;
     const isWindows = /^[a-zA-Z]:[\\\/]/.test(fullPath) || fullPath.startsWith('\\\\');
@@ -554,6 +577,7 @@
     menuToggleMillerView: document.getElementById('menuToggleMillerView'),
     millerContainer: document.getElementById('millerContainer'),
     millerColParent: document.getElementById('millerColParent'),
+    millerParentHeader: document.getElementById('millerParentHeader'),
     millerParentTitle: document.getElementById('millerParentTitle'),
     millerParentCount: document.getElementById('millerParentCount'),
     millerParentList: document.getElementById('millerParentList'),
@@ -1003,7 +1027,7 @@ modalSherlock: document.getElementById('modalSherlock'),
   }
 
   // Directory Loading (Strictly Isolated by Panel Index)
-  async function loadDirectory(path, addToHistory = true, targetPanelIdx = activePanel) {
+  async function loadDirectory(path, addToHistory = true, targetPanelIdx = activePanel, pathToSelect = null) {
     const pIdx = targetPanelIdx;
     const targetPanel = panels[pIdx];
     const targetFileListEl = elPanels[pIdx]?.fileList;
@@ -1048,19 +1072,41 @@ modalSherlock: document.getElementById('modalSherlock'),
 
       const previousSelectedPaths = new Set(targetPanel.selectedItems);
       targetPanel.selectedItems.clear();
+
+      const normTarget = pathToSelect ? normPathForMatch(pathToSelect) : null;
+      const normPrevSet = new Set();
+      if (!normTarget && previousSelectedPaths.size > 0) {
+        previousSelectedPaths.forEach(p => {
+          if (p) normPrevSet.add(normPathForMatch(p));
+        });
+      }
+
       let foundIndex = -1;
-      if (previousSelectedPaths.size > 0) {
+      if (normTarget) {
         for (let i = 0; i < targetPanel.filteredItems.length; i++) {
-          if (previousSelectedPaths.has(targetPanel.filteredItems[i].path)) {
-            targetPanel.selectedItems.add(targetPanel.filteredItems[i].path);
+          const item = targetPanel.filteredItems[i];
+          if (normPathForMatch(item.path) === normTarget) {
+            targetPanel.selectedItems.add(item.path);
+            foundIndex = i;
+            break;
+          }
+        }
+      } else if (normPrevSet.size > 0) {
+        for (let i = 0; i < targetPanel.filteredItems.length; i++) {
+          const item = targetPanel.filteredItems[i];
+          if (normPrevSet.has(normPathForMatch(item.path))) {
+            targetPanel.selectedItems.add(item.path);
             if (foundIndex === -1) foundIndex = i;
           }
         }
       }
-      if (targetPanel.selectedItems.size > 0 && foundIndex >= 0) {
+
+      if (foundIndex >= 0) {
         targetPanel.selectedIndex = foundIndex;
+        targetPanel.selectionAnchor = foundIndex;
       } else {
         targetPanel.selectedIndex = targetPanel.filteredItems.length > 0 ? 0 : -1;
+        targetPanel.selectionAnchor = targetPanel.selectedIndex;
         if (targetPanel.selectedIndex >= 0) {
           targetPanel.selectedItems.add(targetPanel.filteredItems[targetPanel.selectedIndex].path);
         }
@@ -1127,7 +1173,10 @@ modalSherlock: document.getElementById('modalSherlock'),
           (idx === parts.length - 1 ? 'font-semibold text-gnome-active' : 'text-gnome-textDim');
         btn.textContent = part;
         btn.title = targetPath;
-        btn.onclick = () => loadDirectory(targetPath);
+        btn.onclick = () => {
+          const childToSelect = getDirectChildOnPath(targetPath, panels[activePanel].currentDirectory);
+          loadDirectory(targetPath, true, activePanel, childToSelect);
+        };
         el.breadcrumbs.appendChild(btn);
 
         if (idx < parts.length - 1) {
@@ -1148,7 +1197,10 @@ modalSherlock: document.getElementById('modalSherlock'),
         (parts.length === 0 ? 'font-semibold text-gnome-active' : 'text-gnome-textDim');
       rootBtn.textContent = '/';
       rootBtn.title = '/';
-      rootBtn.onclick = () => loadDirectory('/');
+      rootBtn.onclick = () => {
+        const childToSelect = getDirectChildOnPath('/', panels[activePanel].currentDirectory);
+        loadDirectory('/', true, activePanel, childToSelect);
+      };
       el.breadcrumbs.appendChild(rootBtn);
 
       let accumulated = '';
@@ -1166,7 +1218,10 @@ modalSherlock: document.getElementById('modalSherlock'),
           (idx === parts.length - 1 ? 'font-semibold text-gnome-active' : 'text-gnome-textDim');
         btn.textContent = part;
         btn.title = targetPath;
-        btn.onclick = () => loadDirectory(targetPath);
+        btn.onclick = () => {
+          const childToSelect = getDirectChildOnPath(targetPath, panels[activePanel].currentDirectory);
+          loadDirectory(targetPath, true, activePanel, childToSelect);
+        };
         el.breadcrumbs.appendChild(btn);
       });
     }
@@ -2629,12 +2684,9 @@ modalSherlock: document.getElementById('modalSherlock'),
       return true;
     }
 
-    if (e.key === 'ArrowLeft' || e.key === 'Backspace') {
+    if (e.key === 'ArrowLeft' || (!e.altKey && e.key === 'Backspace')) {
       e.preventDefault();
-      if (state.currentDirectory) {
-        panels[0].selectedItems = new Set([state.currentDirectory]);
-      }
-      goUp();
+      goUp(0);
       return true;
     }
 
@@ -2643,6 +2695,42 @@ modalSherlock: document.getElementById('modalSherlock'),
       if (state.selectedIndex >= 0 && state.selectedIndex < state.filteredItems.length) {
         activateItem(state.filteredItems[state.selectedIndex], 0);
       }
+      return true;
+    }
+
+    if (e.key === 'Home') {
+      e.preventDefault();
+      if (state.filteredItems.length > 0) {
+        setSelectionIndex(0);
+        triggerMillerPreview();
+      }
+      return true;
+    }
+
+    if (e.key === 'End') {
+      e.preventDefault();
+      if (state.filteredItems.length > 0) {
+        setSelectionIndex(state.filteredItems.length - 1);
+        triggerMillerPreview();
+      }
+      return true;
+    }
+
+    if (e.key === 'PageDown') {
+      e.preventDefault();
+      if (state.filteredItems.length === 0) return true;
+      let nextIndex = Math.min(state.selectedIndex + 10, state.filteredItems.length - 1);
+      setSelectionIndex(nextIndex);
+      triggerMillerPreview();
+      return true;
+    }
+
+    if (e.key === 'PageUp') {
+      e.preventDefault();
+      if (state.filteredItems.length === 0) return true;
+      let prevIndex = Math.max(state.selectedIndex - 10, 0);
+      setSelectionIndex(prevIndex);
+      triggerMillerPreview();
       return true;
     }
 
@@ -2989,6 +3077,10 @@ modalSherlock: document.getElementById('modalSherlock'),
     }
 
 
+    if (state.isMillerView) {
+      if (handleMillerKeyDown(e)) return;
+    }
+
     if (e.key === 'F1') {
       e.preventDefault();
       openHelpModal();
@@ -3097,9 +3189,6 @@ modalSherlock: document.getElementById('modalSherlock'),
       return;
     }
 
-    if (state.isMillerView) {
-      if (handleMillerKeyDown(e)) return;
-    }
 
     // Single-key Alphanumeric Type-Ahead Navigation (Jumping to file starting with letter/digit)
     if (!e.ctrlKey && !e.altKey && !e.metaKey && e.key.length === 1 && /^[a-zA-Z0-9]$/.test(e.key)) {
@@ -3206,19 +3295,14 @@ modalSherlock: document.getElementById('modalSherlock'),
     }
   }
 
-  function goUp() {
-    if (!state.currentDirectory) return;
-    let norm = state.currentDirectory.replace(/\\/g, '/').replace(/\/+$/, '');
-    if (!norm) return;
-    const lastSlash = norm.lastIndexOf('/');
-    if (lastSlash > 0) {
-      let parent = norm.substring(0, lastSlash);
-      if (parent.length === 2 && parent.endsWith(':')) {
-        parent += '\\';
-      }
-      loadDirectory(parent);
-    } else if (lastSlash === 0) {
-      loadDirectory('/');
+  function goUp(targetPanelIdx = activePanel) {
+    const pIdx = (typeof targetPanelIdx === 'number') ? targetPanelIdx : activePanel;
+    const targetPanel = panels[pIdx];
+    if (!targetPanel || !targetPanel.currentDirectory) return;
+    const exitingDir = targetPanel.currentDirectory;
+    const parent = getParentDirectory(exitingDir);
+    if (parent) {
+      loadDirectory(parent, true, pIdx, exitingDir);
     }
   }
 
@@ -5643,6 +5727,7 @@ async function startTransferOperation(action, sources, targetDir) {
     el.btnActionQuickView.onclick = openQuickView;
     if (el.btnToggleSplitView) el.btnToggleSplitView.onclick = toggleSplitView;
     if (el.btnToggleMillerView) el.btnToggleMillerView.onclick = toggleMillerView;
+    if (el.millerParentHeader) el.millerParentHeader.onclick = () => goUp(0);
     if (el.menuToggleMillerView) el.menuToggleMillerView.onclick = () => { closeAllMenus(); toggleMillerView(); };
 
     // Window Controls (Minimizar, Maximizar/Restaurar, Cerrar)
