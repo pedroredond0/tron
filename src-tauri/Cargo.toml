@@ -1,6 +1,6 @@
 [package]
 name = "tron"
-version = "1.1.15"
+version = "1.1.16"
 description = "Tron - Gestor de archivos moderno, ligero y multiplataforma"
 edition = "2021"
 
@@ -8,7 +8,6 @@ edition = "2021"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-windows = { version = "0.61.3", features = ["Data_Pdf", "Storage", "Storage_Streams", "Foundation"] }
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 serde = { version = "1.0", features = ["derive"] }
@@ -20,10 +19,12 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 lopdf = "0.33"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
 
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.61.3", features = ["Data_Pdf", "Storage", "Storage_Streams", "Foundation"] }
+
 [profile.release]
 opt-level = "z"
 lto = true
 codegen-units = 1
 panic = "abort"
 strip = true
-
