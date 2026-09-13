@@ -2533,8 +2533,11 @@ modalSherlock: document.getElementById('modalSherlock'),
         if (typeof setupRowDragAndDrop === 'function') {
           setupRowDragAndDrop(row, item);
         }
-        row.addEventListener('click', () => {
-          if (item.is_directory) {
+        row.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (isCurrentFolder) {
+            goUp(0);
+          } else if (item.is_directory) {
             loadDirectory(item.path, true, 0);
           }
         });
@@ -2549,6 +2552,13 @@ modalSherlock: document.getElementById('modalSherlock'),
       });
 
       parentListEl.appendChild(frag);
+      
+      // Click en el espacio vacío del nivel padre
+      parentListEl.onclick = (e) => {
+        if (e.target === parentListEl) {
+          goUp(0);
+        }
+      };
 
       const activeRow = parentListEl.querySelector('.bg-gnome-active');
       if (activeRow) {
