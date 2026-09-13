@@ -2472,6 +2472,8 @@ modalSherlock: document.getElementById('modalSherlock'),
     if (!parentListEl) return;
     const curDir = state.currentDirectory;
     const parentDir = getParentDirectory(curDir);
+    parentListEl.classList.add('drop-target');
+    parentListEl.dataset.targetDir = parentDir || '';
 
     if (!parentDir) {
       if (el.millerParentTitle) el.millerParentTitle.textContent = 'Raíz';
@@ -2524,7 +2526,13 @@ modalSherlock: document.getElementById('modalSherlock'),
 
         row.appendChild(left);
         row.appendChild(right);
-
+        if (item.is_directory) {
+          row.classList.add('drop-target');
+          row.dataset.targetDir = item.path;
+        }
+        if (typeof setupRowDragAndDrop === 'function') {
+          setupRowDragAndDrop(row, item);
+        }
         row.addEventListener('click', () => {
           if (item.is_directory) {
             loadDirectory(item.path, true, 0);
@@ -2555,6 +2563,8 @@ modalSherlock: document.getElementById('modalSherlock'),
     const listEl = el.millerCurrentList;
     if (!listEl) return;
     const curDir = state.currentDirectory;
+    listEl.classList.add('drop-target');
+    listEl.dataset.targetDir = curDir || '';
     const curName = (curDir || '').replace(/\\/g, '/').split('/').filter(Boolean).pop() || curDir || 'Directorio';
 
     if (el.millerCurrentTitle) el.millerCurrentTitle.textContent = curName;
@@ -2594,9 +2604,15 @@ modalSherlock: document.getElementById('modalSherlock'),
       }
 
       row.appendChild(left);
-      row.appendChild(right);
-
-      row.addEventListener('click', (e) => {
+        row.appendChild(right);
+        if (item.is_directory) {
+          row.classList.add('drop-target');
+          row.dataset.targetDir = item.path;
+        }
+        if (typeof setupRowDragAndDrop === 'function') {
+          setupRowDragAndDrop(row, item);
+        }
+        row.addEventListener('click', (e) => {
         if (e.ctrlKey || e.shiftKey) {
           handleRowClick(e, idx, 0, displayList);
           triggerMillerPreview();
