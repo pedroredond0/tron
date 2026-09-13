@@ -4848,6 +4848,8 @@ async function startTransferOperation(action, sources, targetDir) {
     }
 
     const fmt = (el.selectPdfToImagesFormat?.value || 'jpg').toLowerCase();
+    const selectDpi = document.getElementById('selectPdfToImagesDpi');
+    const dpi = parseInt(selectDpi ? selectDpi.value : '150', 10);
 
     if (el.pdfToImagesStatus) el.pdfToImagesStatus.classList.remove('hidden');
     if (el.btnConfirmPdfToImages) el.btnConfirmPdfToImages.disabled = true;
