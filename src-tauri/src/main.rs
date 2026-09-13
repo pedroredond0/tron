@@ -1664,7 +1664,12 @@ fn read_file_preview(path: String, custom_text_exts: Option<Vec<String>>) -> Res
             }
         }
     } else if file_type == "pdf" {
-        if size > MAX_PREVIEW_BINARY_SIZE {
+        let port = STREAM_PORT.load(Ordering::SeqCst);
+        if port > 0 {
+            let enc_path = url_encode(&path);
+            data_url = Some(format!("http://127.0.0.1:{}/stream?path={}", port, enc_path));
+            is_too_large = false;
+        } else if size > MAX_PREVIEW_BINARY_SIZE {
             is_too_large = true;
         } else {
             match fs::read(p) {
