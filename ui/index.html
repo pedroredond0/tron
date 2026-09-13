@@ -689,12 +689,12 @@
 
       <!-- Nuevo con iconos de archivo y directorio -->
       <div class="flex items-center rounded bg-gnome-surface border border-gnome-border overflow-hidden">
-        <span class="px-2 py-1 text-xs font-medium text-gnome-text select-none">Nuevo</span>
+        <button id="btnActionNewFolder" class="px-2 py-1 hover:bg-gnome-hover text-xs font-medium text-gnome-text transition-colors flex items-center gap-1.5 justify-center" title="Crear nueva carpeta (Ctrl+Shift+N)">
+          <span>Nuevo</span>
+          <span id="iconActionNewFolder" class="ui-icon-box">📁</span>
+        </button>
         <button id="btnActionNewFile" class="p-1 px-2 hover:bg-gnome-hover text-gnome-text border-l border-gnome-border transition-colors flex items-center justify-center advanced-tool" title="Crear nuevo archivo (Ctrl+N)">
           <span id="iconActionNewFile" class="ui-icon-box">📄</span>
-        </button>
-        <button id="btnActionNewFolder" class="p-1 px-2 hover:bg-gnome-hover text-gnome-text border-l border-gnome-border transition-colors flex items-center justify-center" title="Crear nueva carpeta (Ctrl+Shift+N)">
-          <span id="iconActionNewFolder" class="ui-icon-box">📁</span>
         </button>
       </div>
 
