@@ -1864,8 +1864,10 @@ modalSherlock: document.getElementById('modalSherlock'),
       }
       p.selectedIndex = index;
     } else if (e.shiftKey && p.selectedIndex >= 0) {
-      const start = Math.min(p.selectedIndex, index);
-      const end = Math.max(p.selectedIndex, index);
+      const anchor = p.selectionAnchor >= 0 ? p.selectionAnchor : p.selectedIndex;
+      const start = Math.min(anchor, index);
+      const end = Math.max(anchor, index);
+      p.selectedIndex = index;
       p.selectedItems.clear();
       for (let i = start; i <= end; i++) {
         if (list[i]) p.selectedItems.add(list[i].path);
@@ -1873,6 +1875,7 @@ modalSherlock: document.getElementById('modalSherlock'),
     } else {
       p.selectedItems.clear();
       p.selectedIndex = index;
+      p.selectionAnchor = index;
       p.selectedItems.add(item.path);
     }
     renderFileList(pIdx);
@@ -2762,6 +2765,19 @@ modalSherlock: document.getElementById('modalSherlock'),
     if (isInputActive) return false;
     if (state.quickViewOpen) return false;
 
+    if (e.shiftKey && e.key === 'ArrowDown') {
+      e.preventDefault();
+      moveSelectionWithShift(1, 0);
+      triggerMillerPreview();
+      return true;
+    }
+    if (e.shiftKey && e.key === 'ArrowUp') {
+      e.preventDefault();
+      moveSelectionWithShift(-1, 0);
+      triggerMillerPreview();
+      return true;
+    }
+
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       if (state.filteredItems.length === 0) return true;
@@ -3390,6 +3406,7 @@ modalSherlock: document.getElementById('modalSherlock'),
     if (next === state.selectedIndex) return; // Reached boundary
 
     state.selectedIndex = next;
+    state.selectionAnchor = next;
     state.selectedItems.clear();
     state.selectedItems.add(state.filteredItems[next].path);
     renderFileList();
