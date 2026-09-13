@@ -925,7 +925,7 @@ modalSherlock: document.getElementById('modalSherlock'),
     if (el.iconActionCopy) el.iconActionCopy.innerHTML = getUiIconHtml('copy', '📋');
     if (el.iconActionPaste) el.iconActionPaste.innerHTML = getUiIconHtml('paste', '📥');
     if (el.iconActionDelete) el.iconActionDelete.innerHTML = getUiIconHtml('delete', '🗑️');
-    if (el.iconActionCalcDirSizes) el.iconActionCalcDirSizes.innerHTML = getUiIconHtml('spreadsheet', '📊');
+    if (el.iconActionCalcDirSizes) el.iconActionCalcDirSizes.innerHTML = getUiIconHtml('calc_size', '📏');
     if (el.iconActionSherlock) el.iconActionSherlock.innerHTML = getUiIconHtml('search', '🔍');
     if (el.iconActionExportList) el.iconActionExportList.innerHTML = getUiIconHtml('document', '🔭📄');
     if (el.iconOpenAppearance) el.iconOpenAppearance.innerHTML = getUiIconHtml('gear', '⚙️');
