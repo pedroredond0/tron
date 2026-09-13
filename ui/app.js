@@ -5522,7 +5522,7 @@ async function startTransferOperation(action, sources, targetDir) {
     const isPanelActive = panelIdx === activePanel;
     tabEl.className = `group h-6 px-2.5 rounded flex items-center gap-1.5 text-xs select-none cursor-pointer transition-colors max-w-[170px] shrink-0 ${
       isActive
-        ? (isPanelActive ? 'bg-gnome-active text-white font-semibold shadow-sm' : 'bg-gnome-surface text-white font-medium border border-gnome-active/50 shadow-sm')
+        ? (isPanelActive ? 'bg-gnome-active text-white font-semibold shadow-sm' : 'bg-gnome-surface text-gnome-active font-medium border border-gnome-active/50 shadow-sm')
         : 'bg-gnome-sidebar hover:bg-gnome-hover/70 text-gnome-textDim hover:text-gnome-text'
     }`;
     tabEl.title = t.currentDirectory || 'Inicio';
