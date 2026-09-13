@@ -326,7 +326,7 @@ function escapeHtml(text) { const div = document.createElement("div"); div.textC
     get sortAsc() { return panels[activePanel].sortAsc; },
     set sortAsc(v) { panels[activePanel].sortAsc = v; },
     contextTargetItem: null,
-    liteMode: localStorage.getItem('tron_lite_mode') === 'true',
+    liteMode: localStorage.getItem('tron_lite_mode') !== 'false',
     isMillerView: localStorage.getItem('tron_miller_view') === 'true',
     showHiddenFiles: localStorage.getItem('tron_show_hidden') === 'true',
     customTextExts: (localStorage.getItem('tron_custom_text_exts') || 'sql, str, log, conf, env, bak')
@@ -345,7 +345,7 @@ function escapeHtml(text) { const div = document.createElement("div"); div.textC
     terminalApp: localStorage.getItem('tron_terminal_app') || 'default',
     terminalCustomPath: localStorage.getItem('tron_terminal_custom') || '',
     monochromeIcons: localStorage.getItem('tron_monochrome_icons') === 'true',
-    iconPack: localStorage.getItem('tron_icon_pack') || 'default',
+    iconPack: localStorage.getItem('tron_icon_pack') || 'win10',
     showMenuBar: localStorage.getItem('tron_show_menu_bar') !== 'false',
     recursiveTagSearch: localStorage.getItem('tron_recursive_tag_search') !== 'false',
     externalAppsConfig: null,
@@ -7815,8 +7815,8 @@ async function startTransferOperation(action, sources, targetDir) {
 
   // --- Appearance & Preferences Settings ---
   function openAppearanceModal() {
-    const theme = localStorage.getItem('tron_theme') || 'adwaita';
-    const iconPack = localStorage.getItem('tron_icon_pack') || 'default';
+    const theme = localStorage.getItem('tron_theme') || 'windows10-light';
+    const iconPack = localStorage.getItem('tron_icon_pack') || 'win10';
     const density = localStorage.getItem('tron_density') || 'normal';
     const fontSize = localStorage.getItem('tron_fontsize') || 'text-sm';
     const normalWeight = localStorage.getItem('tron_normal_weight') === 'true';
@@ -8047,8 +8047,8 @@ async function startTransferOperation(action, sources, targetDir) {
   }
 
   function loadAppearanceSettings() {
-    const theme = localStorage.getItem('tron_theme') || 'adwaita';
-    const iconPack = localStorage.getItem('tron_icon_pack') || 'default';
+    const theme = localStorage.getItem('tron_theme') || 'windows10-light';
+    const iconPack = localStorage.getItem('tron_icon_pack') || 'win10';
     const density = localStorage.getItem('tron_density') || 'normal';
     const fontSize = localStorage.getItem('tron_fontsize') || 'text-sm';
     const normalWeight = localStorage.getItem('tron_normal_weight') === 'true';
