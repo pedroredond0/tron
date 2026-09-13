@@ -4846,7 +4846,8 @@ async function startTransferOperation(action, sources, targetDir) {
       const outDir = await invoke('pdf_to_images', {
         pdfPath: pdfToImagesTarget.path,
         pages: pages,
-        format: fmt
+        format: fmt,
+        dpi: dpi
       });
       closePdfToImagesModal();
       showToast('PDF convertido a imágenes en: ' + outDir, 'success');

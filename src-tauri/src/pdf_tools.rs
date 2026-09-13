@@ -547,7 +547,7 @@ pub async fn pdf_save_rendered_pages(output_dir: String, pages: Vec<RenderedPage
 
 /// Export PDF to images (with system pdftoppm if present, or extracting image XObjects)
 #[tauri::command]
-pub async fn pdf_to_images(pdf_path: String, pages: Vec<u32>, format: String) -> Result<String, String> {
+pub async fn pdf_to_images(pdf_path: String, pages: Vec<u32>, format: String, dpi: u32) -> Result<String, String> {
     let p = Path::new(&pdf_path);
     if !p.exists() {
         return Err(format!("No existe el archivo: {}", pdf_path));
@@ -574,7 +574,7 @@ pub async fn pdf_to_images(pdf_path: String, pages: Vec<u32>, format: String) ->
     } else {
         cmd.arg("-jpeg");
     }
-    cmd.arg("-r").arg("150");
+    cmd.arg("-r").arg(dpi.to_string());
 
     if pages.len() == 1 {
         let p_str = pages[0].to_string();
@@ -591,6 +591,17 @@ pub async fn pdf_to_images(pdf_path: String, pages: Vec<u32>, format: String) ->
     if let Ok(output) = cmd.output() {
         if output.status.success() {
             return Ok(output_dir.to_string_lossy().to_string());
+        }
+    }
+
+    
+    // Fallback: Windows native PDF rendering (if pdftoppm failed or is not installed)
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(count) = windows_pdf_to_images(&pdf_path, &output_dir, &pages, ext, dpi).await {
+            if count > 0 {
+                return Ok(output_dir.to_string_lossy().to_string());
+            }
         }
     }
 
@@ -711,3 +722,65 @@ mod tests {
     }
 }
 
+
+#[cfg(target_os = "windows")]
+pub async fn windows_pdf_to_images(pdf_path: &str, output_dir: &std::path::Path, pages: &[u32], ext: &str, dpi: u32) -> Result<u32, String> {
+    use windows::core::HSTRING;
+    use windows::Data::Pdf::{PdfDocument, PdfPageRenderOptions};
+    use windows::Storage::StorageFile;
+    use windows::Storage::Streams::{InMemoryRandomAccessStream, DataReader};
+
+    let path = HSTRING::from(pdf_path);
+    let file = StorageFile::GetFileFromPathAsync(&path).map_err(|e| e.to_string())?.get().map_err(|e| e.to_string())?;
+    let pdf = PdfDocument::LoadFromFileAsync(&file).map_err(|e| e.to_string())?.get().map_err(|e| e.to_string())?;
+    
+    let count = pdf.PageCount().map_err(|e| e.to_string())?;
+    if count == 0 {
+        return Ok(0);
+    }
+    
+    let target_pages: Vec<u32> = if pages.is_empty() {
+        (0..count).collect()
+    } else {
+        pages.iter().map(|&p| if p > 0 { p - 1 } else { 0 }).collect()
+    };
+    
+    let mut saved_count = 0;
+    
+    for page_idx in target_pages {
+        if page_idx >= count { continue; }
+        let page = pdf.GetPage(page_idx).map_err(|e| e.to_string())?;
+        
+        let stream = InMemoryRandomAccessStream::new().map_err(|e| e.to_string())?;
+        let options = PdfPageRenderOptions::new().map_err(|e| e.to_string())?;
+        
+        let size_obj = page.Size().map_err(|e| e.to_string())?;
+        let scale = dpi as f32 / 72.0;
+        options.SetDestinationWidth((size_obj.Width * scale) as u32).map_err(|e| e.to_string())?;
+        options.SetDestinationHeight((size_obj.Height * scale) as u32).map_err(|e| e.to_string())?;
+        
+        page.RenderWithOptionsToStreamAsync(&stream, &options).map_err(|e| e.to_string())?.get().map_err(|e| e.to_string())?;
+        
+        let size = stream.Size().map_err(|e| e.to_string())? as usize;
+        stream.Seek(0).map_err(|e| e.to_string())?;
+        
+        let reader = DataReader::CreateDataReader(&stream).map_err(|e| e.to_string())?;
+        reader.LoadAsync(size as u32).map_err(|e| e.to_string())?.get().map_err(|e| e.to_string())?;
+        
+        let mut bytes = vec![0u8; size];
+        reader.ReadBytes(&mut bytes).map_err(|e| e.to_string())?;
+        
+        saved_count += 1;
+        let target = output_dir.join(format!("pagina_{:02}_{}.{}", page_idx + 1, saved_count, ext));
+        
+        if ext == "png" {
+            std::fs::write(&target, &bytes).map_err(|e| e.to_string())?;
+        } else {
+            if let Ok(dyn_img) = image::load_from_memory(&bytes) {
+                let _ = dyn_img.save(&target);
+            }
+        }
+    }
+    
+    Ok(saved_count)
+}
