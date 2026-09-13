@@ -3892,7 +3892,7 @@ async function startTransferOperation(action, sources, targetDir) {
       btn.title = `${cleanPath} (${count} visitas) - Clic derecho para opciones`;
       btn.innerHTML = `
         <div class="flex items-center gap-2 min-w-0 flex-1 truncate">
-          <span class="ui-icon-box text-amber-400">🕒</span>
+          <span class="ui-icon-box ${document.documentElement.dataset.theme === 'princess' ? 'text-pink-400' : 'text-amber-400'}">🕒</span>
           <span class="truncate">${escapeHtml(folderName)}</span>
         </div>
         <span class="text-[10px] px-1.5 py-0.2 rounded bg-gnome-surface text-gnome-textDim font-mono">${count}</span>
