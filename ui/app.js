@@ -4052,7 +4052,13 @@ async function startTransferOperation(action, sources, targetDir) {
     if (el.ctxMenuPdfTools) {
       if (showPdfTools) {
         el.ctxMenuPdfTools.classList.remove('hidden');
-        if (el.ctxPdfToImages) el.ctxPdfToImages.classList.toggle('hidden', !isSinglePdf);
+        if (el.ctxPdfToImages) {
+          if (isMac) {
+            el.ctxPdfToImages.classList.add('hidden');
+          } else {
+            el.ctxPdfToImages.classList.toggle('hidden', !isSinglePdf);
+          }
+        }
         if (el.ctxPdfOptimize) el.ctxPdfOptimize.classList.toggle('hidden', !isSinglePdf);
         if (el.ctxPdfSplit) el.ctxPdfSplit.classList.toggle('hidden', !isSinglePdf);
         if (el.ctxPdfRotate) el.ctxPdfRotate.classList.toggle('hidden', !isSinglePdf);
