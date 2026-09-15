@@ -814,6 +814,8 @@ fn extract_pptx_content(file_path: &Path) -> Result<String, String> {
     let mut html = String::new();
     html.push_str("<div class=\"pptx-slides-wrapper space-y-6 max-w-4xl mx-auto overflow-auto max-h-[72vh] p-4 select-text\">");
 
+    let mut total_paragraphs = 0usize;
+
     for (idx, slide_name) in slide_names.iter().enumerate() {
         let mut slide_xml = String::new();
         if let Ok(mut entry) = archive.by_name(slide_name) {
@@ -838,6 +840,8 @@ fn extract_pptx_content(file_path: &Path) -> Result<String, String> {
                 paragraphs.push(trimmed.to_string());
             }
         }
+        
+        total_paragraphs += paragraphs.len();
 
         // Card styled like a 16:9 presentation slide
         html.push_str("<div class=\"slide-card bg-[#181a1f] text-[#f1f5f9] border border-amber-500/30 rounded-xl p-6 shadow-2xl space-y-4 transition-all hover:border-amber-500/60 relative overflow-hidden\">");
@@ -879,6 +883,10 @@ fn extract_pptx_content(file_path: &Path) -> Result<String, String> {
         }
 
         html.push_str("</div>");
+    }
+
+    if total_paragraphs == 0 {
+        return Err("No se encontraron bloques de texto en ninguna diapositiva".into());
     }
 
     html.push_str("</div>");
@@ -3757,165 +3765,195 @@ fn launch_with_app(path: String, app_command: String) -> Result<(), String> {
 
 #[tauri::command]
 async fn compress_to_zip(app_handle: tauri::AppHandle, source_paths: Vec<String>, output_zip_path: String) -> Result<usize, String> {
-    let out_path = PathBuf::from(&output_zip_path);
-    if let Some(parent) = out_path.parent() {
-        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-    }
-    
-    let op_id = format!("compress-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis());
+    tokio::task::spawn_blocking(move || {
+        let out_path = PathBuf::from(&output_zip_path);
+        if let Some(parent) = out_path.parent() {
+            fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+        
+        let op_id = format!("compress-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis());
 
-    let mut total_files = 0usize;
-    for src_str in &source_paths {
-        let p = PathBuf::from(src_str);
-        if p.is_dir() {
-            let mut stack = vec![p];
-            while let Some(dir) = stack.pop() {
-                if let Ok(entries) = fs::read_dir(dir) {
-                    for entry in entries.flatten() {
-                        if entry.path().is_dir() {
-                            stack.push(entry.path());
-                        } else {
-                            total_files += 1;
+        let mut total_files = 0usize;
+        for src_str in &source_paths {
+            let p = PathBuf::from(src_str);
+            if p.is_dir() {
+                let mut stack = vec![p];
+                while let Some(dir) = stack.pop() {
+                    if let Ok(entries) = fs::read_dir(dir) {
+                        for entry in entries.flatten() {
+                            if entry.path().is_dir() {
+                                stack.push(entry.path());
+                            } else {
+                                total_files += 1;
+                            }
                         }
                     }
                 }
+            } else if p.exists() {
+                total_files += 1;
             }
-        } else if p.exists() {
-            total_files += 1;
         }
-    }
-    if total_files == 0 { total_files = 1; }
+        if total_files == 0 { total_files = 1; }
 
-    let file = File::create(&out_path).map_err(|e| format!("No se pudo crear el archivo zip: {}", e))?;
-    let mut zip = zip::ZipWriter::new(file);
-    let options = zip::write::SimpleFileOptions::default()
-        .compression_method(zip::CompressionMethod::Deflated);
+        let file = File::create(&out_path).map_err(|e| format!("No se pudo crear el archivo zip: {}", e))?;
+        let mut zip = zip::ZipWriter::new(file);
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Deflated);
 
-    let mut total_added = 0usize;
+        let mut total_added = 0usize;
 
-    for src_str in source_paths {
-        let src = PathBuf::from(&src_str);
-        if !src.exists() {
-            continue;
-        }
+        for src_str in source_paths {
+            let src = PathBuf::from(&src_str);
+            if !src.exists() {
+                continue;
+            }
 
-        let base_name = src.file_name().unwrap_or_default().to_string_lossy().to_string();
+            let base_name = src.file_name().unwrap_or_default().to_string_lossy().to_string();
 
-        if src.is_dir() {
-            let mut stack = vec![(src.clone(), base_name.clone())];
-            while let Some((dir_path, zip_rel_path)) = stack.pop() {
-                let dir_entry_name = if zip_rel_path.ends_with('/') {
-                    zip_rel_path.clone()
-                } else {
-                    format!("{}/", zip_rel_path)
-                };
-                zip.add_directory(&dir_entry_name, options)
-                    .map_err(|e| format!("Error al añadir directorio: {}", e))?;
+            if src.is_dir() {
+                let mut stack = vec![(src.clone(), base_name.clone())];
+                while let Some((dir_path, zip_rel_path)) = stack.pop() {
+                    let dir_entry_name = if zip_rel_path.ends_with('/') {
+                        zip_rel_path.clone()
+                    } else {
+                        format!("{}/", zip_rel_path)
+                    };
+                    zip.add_directory(&dir_entry_name, options)
+                        .map_err(|e| format!("Error al añadir directorio: {}", e))?;
 
-                if let Ok(entries) = fs::read_dir(&dir_path) {
-                    for entry in entries.flatten() {
-                        let entry_p = entry.path();
-                        let entry_name = entry.file_name().to_string_lossy().to_string();
-                        let entry_zip_path = format!("{}/{}", zip_rel_path, entry_name);
+                    if let Ok(entries) = fs::read_dir(&dir_path) {
+                        for entry in entries.flatten() {
+                            let entry_p = entry.path();
+                            let entry_name = entry.file_name().to_string_lossy().to_string();
+                            let entry_zip_path = format!("{}/{}", zip_rel_path, entry_name);
 
-                        if entry_p.is_dir() {
-                            stack.push((entry_p, entry_zip_path));
-                        } else {
-                            zip.start_file(&entry_zip_path, options)
-                                .map_err(|e| format!("Error al iniciar archivo: {}", e))?;
-                            let mut f = File::open(&entry_p).map_err(|e| e.to_string())?;
-                            std::io::copy(&mut f, &mut zip).map_err(|e| e.to_string())?;
-                            total_added += 1;
-                            
-                            let _ = app_handle.emit("transfer-progress", TransferProgressPayload {
-                                operation_id: op_id.clone(),
-                                action: "compress".into(),
-                                current_item: entry_name,
-                                current_index: total_added,
-                                total_items: total_files,
-                                bytes_copied: 0,
-                                total_bytes: 0,
-                                target_directory: output_zip_path.clone(),
-                                is_done: false,
-                                speed_bytes_per_sec: 0.0, eta_seconds: 0,
-                            });
+                            if entry_p.is_dir() {
+                                stack.push((entry_p, entry_zip_path));
+                            } else {
+                                zip.start_file(&entry_zip_path, options)
+                                    .map_err(|e| format!("Error al iniciar archivo: {}", e))?;
+                                let mut f = File::open(&entry_p).map_err(|e| e.to_string())?;
+                                std::io::copy(&mut f, &mut zip).map_err(|e| e.to_string())?;
+                                total_added += 1;
+                                
+                                let _ = app_handle.emit("transfer-progress", TransferProgressPayload {
+                                    operation_id: op_id.clone(),
+                                    action: "compress".into(),
+                                    current_item: entry_name,
+                                    current_index: total_added,
+                                    total_items: total_files,
+                                    bytes_copied: 0,
+                                    total_bytes: 0,
+                                    target_directory: output_zip_path.clone(),
+                                    is_done: false,
+                                    speed_bytes_per_sec: 0.0, eta_seconds: 0,
+                                });
+                            }
                         }
                     }
                 }
+            } else {
+                zip.start_file(&base_name, options)
+                    .map_err(|e| format!("Error al iniciar archivo: {}", e))?;
+                let mut f = File::open(&src).map_err(|e| e.to_string())?;
+                std::io::copy(&mut f, &mut zip).map_err(|e| e.to_string())?;
+                total_added += 1;
+                
+                let _ = app_handle.emit("transfer-progress", TransferProgressPayload {
+                    operation_id: op_id.clone(),
+                    action: "compress".into(),
+                    current_item: base_name,
+                    current_index: total_added,
+                    total_items: total_files,
+                    bytes_copied: 0,
+                    total_bytes: 0,
+                    target_directory: output_zip_path.clone(),
+                    is_done: false,
+                    speed_bytes_per_sec: 0.0, eta_seconds: 0,
+                });
             }
-        } else {
-            zip.start_file(&base_name, options)
-                .map_err(|e| format!("Error al iniciar archivo: {}", e))?;
-            let mut f = File::open(&src).map_err(|e| e.to_string())?;
-            std::io::copy(&mut f, &mut zip).map_err(|e| e.to_string())?;
-            total_added += 1;
-            
-            let _ = app_handle.emit("transfer-progress", TransferProgressPayload {
-                operation_id: op_id.clone(),
-                action: "compress".into(),
-                current_item: base_name,
-                current_index: total_added,
-                total_items: total_files,
-                bytes_copied: 0,
-                total_bytes: 0,
-                target_directory: output_zip_path.clone(),
-                is_done: false,
-                speed_bytes_per_sec: 0.0, eta_seconds: 0,
-            });
         }
-    }
-    
-    let _ = app_handle.emit("transfer-finished", TransferFinishedPayload {
-        operation_id: op_id.clone(),
-        success: true,
-        error: None,
-        items_count: total_added, action: "compress".to_string(), target_directory: output_zip_path.clone(),
-        total_bytes: 0,
-    });
+        
+        let _ = app_handle.emit("transfer-finished", TransferFinishedPayload {
+            operation_id: op_id.clone(),
+            success: true,
+            error: None,
+            items_count: total_added,
+            action: "compress".to_string(), target_directory: output_zip_path.clone(),
+            total_bytes: 0,
+        });
 
-    zip.finish().map_err(|e| format!("Error al finalizar zip: {}", e))?;
-    Ok(total_added)
+        zip.finish().map_err(|e| format!("Error al finalizar zip: {}", e))?;
+        Ok(total_added)
+    }).await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-fn extract_zip_archive(zip_path: String, target_dir: String) -> Result<usize, String> {
-    let zip_p = PathBuf::from(&zip_path);
-    if !zip_p.exists() {
-        return Err("El archivo zip no existe".into());
-    }
-
-    let target_p = PathBuf::from(&target_dir);
-    fs::create_dir_all(&target_p).map_err(|e| format!("No se pudo crear directorio destino: {}", e))?;
-
-    let file = File::open(&zip_p).map_err(|e| format!("Error al abrir zip: {}", e))?;
-    let mut archive = zip::ZipArchive::new(file).map_err(|e| format!("Archivo zip no válido: {}", e))?;
-
-    let mut extracted_count = 0usize;
-
-    for i in 0..archive.len() {
-        let mut file = archive.by_index(i).map_err(|e| e.to_string())?;
-        let enclosed = match file.enclosed_name() {
-            Some(path) => path.to_owned(),
-            None => continue,
-        };
-
-        let outpath = target_p.join(enclosed);
-
-        if file.is_dir() {
-            fs::create_dir_all(&outpath).map_err(|e| e.to_string())?;
-        } else {
-            if let Some(p) = outpath.parent() {
-                if !p.exists() {
-                    fs::create_dir_all(p).map_err(|e| e.to_string())?;
-                }
-            }
-            let mut outfile = File::create(&outpath).map_err(|e| e.to_string())?;
-            std::io::copy(&mut file, &mut outfile).map_err(|e| e.to_string())?;
-            extracted_count += 1;
+async fn extract_zip_archive(app_handle: tauri::AppHandle, zip_path: String, target_dir: String) -> Result<usize, String> {
+    tokio::task::spawn_blocking(move || {
+        let zip_p = PathBuf::from(&zip_path);
+        if !zip_p.exists() {
+            return Err("El archivo zip no existe".into());
         }
-    }
 
-    Ok(extracted_count)
+        let op_id = format!("extract-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis());
+        let target_p = PathBuf::from(&target_dir);
+        fs::create_dir_all(&target_p).map_err(|e| format!("No se pudo crear directorio destino: {}", e))?;
+
+        let file = File::open(&zip_p).map_err(|e| format!("Error al abrir zip: {}", e))?;
+        let mut archive = zip::ZipArchive::new(file).map_err(|e| format!("Archivo zip no válido: {}", e))?;
+
+        let total_files = archive.len();
+        let mut extracted_count = 0usize;
+
+        for i in 0..total_files {
+            let mut file = archive.by_index(i).map_err(|e| e.to_string())?;
+            let enclosed = match file.enclosed_name() {
+                Some(path) => path.to_owned(),
+                None => continue,
+            };
+            
+            let file_name_str = enclosed.to_string_lossy().to_string();
+            let outpath = target_p.join(&enclosed);
+
+            if file.name().ends_with('/') {
+                fs::create_dir_all(&outpath).map_err(|e| format!("No se pudo crear dir en zip: {}", e))?;
+            } else {
+                if let Some(p) = outpath.parent() {
+                    if !p.exists() {
+                        fs::create_dir_all(p).map_err(|e| format!("No se pudo crear subdirectorio: {}", e))?;
+                    }
+                }
+                let mut outfile = File::create(&outpath).map_err(|e| format!("No se pudo crear archivo extraído: {}", e))?;
+                std::io::copy(&mut file, &mut outfile).map_err(|e| format!("Error escribiendo archivo extraído: {}", e))?;
+                extracted_count += 1;
+                
+                let _ = app_handle.emit("transfer-progress", TransferProgressPayload {
+                    operation_id: op_id.clone(),
+                    action: "extract".into(),
+                    current_item: file_name_str,
+                    current_index: extracted_count,
+                    total_items: total_files,
+                    bytes_copied: 0,
+                    total_bytes: 0,
+                    target_directory: target_dir.clone(),
+                    is_done: false,
+                    speed_bytes_per_sec: 0.0, eta_seconds: 0,
+                });
+            }
+        }
+        
+        let _ = app_handle.emit("transfer-finished", TransferFinishedPayload {
+            operation_id: op_id.clone(),
+            success: true,
+            error: None,
+            items_count: extracted_count,
+            action: "extract".to_string(), target_directory: target_dir.clone(),
+            total_bytes: 0,
+        });
+
+        Ok(extracted_count)
+    }).await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]

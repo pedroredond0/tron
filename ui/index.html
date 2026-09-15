@@ -897,21 +897,6 @@
       </div>
 
       <!-- Split View Toolbar -->
-      <div id="splitViewToolbar" class="hidden h-9 bg-gnome-surface border-b border-gnome-border items-center justify-center gap-4 shrink-0 select-none shadow-sm z-10 relative">
-        <div class="flex items-center gap-2 bg-gnome-bg border border-gnome-border rounded-lg p-0.5">
-          <button id="btnSplitCopy" class="px-4 py-1.5 rounded-md hover:bg-gnome-active hover:text-white text-gnome-text flex items-center gap-2 text-xs font-medium transition-colors" title="Copiar al otro panel (F5)">
-            <span class="text-sm">📋</span>
-            <span id="splitCopyText">Copiar a panel derecho</span>
-            <span id="splitCopyArrow" class="text-base leading-none">→</span>
-          </button>
-          <div class="w-[1px] h-4 bg-gnome-border"></div>
-          <button id="btnSplitMove" class="px-4 py-1.5 rounded-md hover:bg-gnome-active hover:text-white text-gnome-text flex items-center gap-2 text-xs font-medium transition-colors" title="Mover al otro panel (F6)">
-            <span class="text-sm">✂️</span>
-            <span id="splitMoveText">Mover a panel derecho</span>
-            <span id="splitMoveArrow" class="text-base leading-none">→</span>
-          </button>
-        </div>
-      </div>
 
       <!-- Dual Panel Wrapper -->
       <div id="panelsWrapper" class="flex-1 flex flex-row min-h-0 bg-gnome-bg">
@@ -928,7 +913,11 @@
               </div>
             </div>
             <div class="flex items-center gap-1 shrink-0 text-gnome-textDim pl-2">
-              <span id="panelACount" class="text-[10px] font-mono"></span>
+              <span id="panelACount" class="text-[10px] font-mono mr-2"></span>
+              <div class="split-transfer-btns hidden flex items-center gap-1 bg-gnome-sidebar border border-gnome-border rounded p-0.5">
+                <button id="btnPanelACopy" class="hover:bg-gnome-active hover:text-white px-2 py-0.5 rounded text-[10px] transition-colors" title="Copiar al otro panel">Copiar →</button>
+                <button id="btnPanelAMove" class="hover:bg-gnome-active hover:text-white px-2 py-0.5 rounded text-[10px] transition-colors" title="Mover al otro panel">Mover →</button>
+              </div>
             </div>
           </div>
           
@@ -970,7 +959,11 @@
               </div>
             </div>
             <div class="flex items-center gap-1 shrink-0 text-gnome-textDim pl-2">
-              <span id="panelBCount" class="text-[10px] font-mono"></span>
+              <span id="panelBCount" class="text-[10px] font-mono mr-2"></span>
+              <div class="split-transfer-btns hidden flex items-center gap-1 bg-gnome-sidebar border border-gnome-border rounded p-0.5">
+                <button id="btnPanelBCopy" class="hover:bg-gnome-active hover:text-white px-2 py-0.5 rounded text-[10px] transition-colors" title="Copiar al otro panel">← Copiar</button>
+                <button id="btnPanelBMove" class="hover:bg-gnome-active hover:text-white px-2 py-0.5 rounded text-[10px] transition-colors" title="Mover al otro panel">← Mover</button>
+              </div>
             </div>
           </div>
           

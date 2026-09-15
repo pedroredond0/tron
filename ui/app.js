@@ -500,13 +500,10 @@ function escapeHtml(text) { const div = document.createElement("div"); div.textC
     btnActionDelete: document.getElementById('btnActionDelete'),
     btnActionQuickView: document.getElementById('btnActionQuickView'),
     btnToggleSplitView: document.getElementById('btnToggleSplitView'),
-    splitViewToolbar: document.getElementById('splitViewToolbar'),
-    btnSplitCopy: document.getElementById('btnSplitCopy'),
-    btnSplitMove: document.getElementById('btnSplitMove'),
-    splitCopyText: document.getElementById('splitCopyText'),
-    splitCopyArrow: document.getElementById('splitCopyArrow'),
-    splitMoveText: document.getElementById('splitMoveText'),
-    splitMoveArrow: document.getElementById('splitMoveArrow'),
+    btnPanelACopy: document.getElementById('btnPanelACopy'),
+    btnPanelAMove: document.getElementById('btnPanelAMove'),
+    btnPanelBCopy: document.getElementById('btnPanelBCopy'),
+    btnPanelBMove: document.getElementById('btnPanelBMove'),
     menuToggleSplitView: document.getElementById('menuToggleSplitView'),
     btnActionCalcDirSizes: document.getElementById('btnActionCalcDirSizes'),
     btnOpenAppearance: document.getElementById('btnOpenAppearance'),
@@ -3690,7 +3687,12 @@ async function startTransferOperation(action, sources, targetDir) {
       if (el.pasteProgressLabel) el.pasteProgressLabel.textContent = `${activeCount} tareas`;
     } else if (activeCount === 1) {
       const t = activeTasks[0];
-      const label = t.action === 'compress' ? 'Comprimiendo' : (t.action === 'copy' ? 'Copiando' : 'Moviendo');
+      let label = 'Procesando';
+      if (t.action === 'compress') label = 'Comprimiendo';
+      else if (t.action === 'extract') label = 'Descomprimiendo';
+      else if (t.action === 'copy') label = 'Copiando';
+      else if (t.action === 'move') label = 'Moviendo';
+      
       const detail = t.speed && t.speed !== 'Calculando...' ? ` (${t.speed})` : '';
       if (el.pasteProgressLabel) el.pasteProgressLabel.textContent = `${label} ${t.currentIndex}/${t.totalItems}${detail}`;
     } else {
@@ -3731,7 +3733,11 @@ async function startTransferOperation(action, sources, targetDir) {
         const taskDiv = document.createElement('div');
         taskDiv.className = 'p-3 rounded-lg bg-gnome-sidebar/70 border border-gnome-border space-y-2';
 
-        const actionText = t.action === 'copy' ? 'Copia' : 'Movimiento';
+        let actionText = 'Operación';
+        if (t.action === 'compress') actionText = 'Compresión';
+        else if (t.action === 'extract') actionText = 'Extracción';
+        else if (t.action === 'copy') actionText = 'Copia';
+        else if (t.action === 'move') actionText = 'Movimiento';
         const statusBadge = t.isDone
           ? (t.success ? '<span class="text-emerald-400 font-medium">✓ Listo</span>' : '<span class="text-red-400 font-medium">✕ Error</span>')
           : `<span class="text-blue-400 font-semibold">${t.speed || 'En progreso'}</span>`;
@@ -3856,18 +3862,36 @@ async function startTransferOperation(action, sources, targetDir) {
     if (el.panelAHeader) el.panelAHeader.classList.remove('hidden');
     if (el.panelBHeader) el.panelBHeader.classList.remove('hidden');
     
-    if (el.splitViewToolbar) {
-      el.splitViewToolbar.classList.remove('hidden');
-      el.splitViewToolbar.classList.add('flex');
+    if (activePanel === 0) {
+      el.panelA.classList.add('ring-1', 'ring-inset', 'ring-gnome-active/40');
+      el.panelB.classList.remove('ring-1', 'ring-inset', 'ring-gnome-active/40');
       
-      const isRightActive = activePanel === 1;
-      const arrowRight = '→';
-      const arrowLeft = '←';
+      const btnsA = el.panelAHeader?.querySelector('.split-transfer-btns');
+      const btnsB = el.panelBHeader?.querySelector('.split-transfer-btns');
+      if (btnsA) btnsA.classList.remove('hidden');
+      if (btnsB) btnsB.classList.add('hidden');
+
+      if (el.panelAPathBox) {
+        el.panelAPathBox.className = 'flex items-center gap-1.5 min-w-0 flex-1 px-2.5 py-0.5 rounded text-xs transition-colors bg-gnome-active text-white font-semibold shadow-sm';
+      }
+      if (el.panelBPathBox) {
+        el.panelBPathBox.className = 'flex items-center gap-1.5 min-w-0 flex-1 px-2.5 py-0.5 rounded text-xs transition-colors bg-gnome-sidebar/50 border border-gnome-border/60 text-gnome-textDim hover:text-gnome-text';
+      }
+    } else {
+      el.panelB.classList.add('ring-1', 'ring-inset', 'ring-gnome-active/40');
+      el.panelA.classList.remove('ring-1', 'ring-inset', 'ring-gnome-active/40');
       
-      if (el.splitCopyText) el.splitCopyText.textContent = isRightActive ? 'Copiar a panel izquierdo' : 'Copiar a panel derecho';
-      if (el.splitCopyArrow) el.splitCopyArrow.textContent = isRightActive ? arrowLeft : arrowRight;
-      if (el.splitMoveText) el.splitMoveText.textContent = isRightActive ? 'Mover a panel izquierdo' : 'Mover a panel derecho';
-      if (el.splitMoveArrow) el.splitMoveArrow.textContent = isRightActive ? arrowLeft : arrowRight;
+      const btnsA = el.panelAHeader?.querySelector('.split-transfer-btns');
+      const btnsB = el.panelBHeader?.querySelector('.split-transfer-btns');
+      if (btnsB) btnsB.classList.remove('hidden');
+      if (btnsA) btnsA.classList.add('hidden');
+
+      if (el.panelBPathBox) {
+        el.panelBPathBox.className = 'flex items-center gap-1.5 min-w-0 flex-1 px-2.5 py-0.5 rounded text-xs transition-colors bg-gnome-active text-white font-semibold shadow-sm';
+      }
+      if (el.panelAPathBox) {
+        el.panelAPathBox.className = 'flex items-center gap-1.5 min-w-0 flex-1 px-2.5 py-0.5 rounded text-xs transition-colors bg-gnome-sidebar/50 border border-gnome-border/60 text-gnome-textDim hover:text-gnome-text';
+      }
     }
 
     const dirA = panels[0].currentDirectory || '';
@@ -6630,8 +6654,10 @@ async function startTransferOperation(action, sources, targetDir) {
     el.btnActionDelete.onclick = deleteCurrentItem;
     el.btnActionQuickView.onclick = openQuickView;
     if (el.btnToggleSplitView) el.btnToggleSplitView.onclick = toggleSplitView;
-    if (el.btnSplitCopy) el.btnSplitCopy.onclick = () => doSplitAction('copy');
-    if (el.btnSplitMove) el.btnSplitMove.onclick = () => doSplitAction('cut');
+    if (el.btnPanelACopy) el.btnPanelACopy.onclick = () => { if (activePanel === 0) doSplitAction('copy'); };
+    if (el.btnPanelAMove) el.btnPanelAMove.onclick = () => { if (activePanel === 0) doSplitAction('cut'); };
+    if (el.btnPanelBCopy) el.btnPanelBCopy.onclick = () => { if (activePanel === 1) doSplitAction('copy'); };
+    if (el.btnPanelBMove) el.btnPanelBMove.onclick = () => { if (activePanel === 1) doSplitAction('cut'); };
     if (el.btnToggleMillerView) el.btnToggleMillerView.onclick = toggleMillerView;
 
     // Extract Submenu Event Listeners
