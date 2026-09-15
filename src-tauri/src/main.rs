@@ -794,15 +794,20 @@ fn extract_pptx_content(file_path: &Path) -> Result<String, String> {
     for i in 0..archive.len() {
         if let Ok(entry) = archive.by_index(i) {
             let name = entry.name().to_string();
-            if name.starts_with("ppt/slides/slide") && name.ends_with(".xml") {
+            let name_lower = name.to_lowercase();
+            if name_lower.starts_with("ppt/slides/slide") && name_lower.ends_with(".xml") {
                 slide_names.push(name);
             }
         }
     }
+    
+    if slide_names.is_empty() {
+        return Err("No se encontraron diapositivas (o formato no soportado)".into());
+    }
 
     slide_names.sort_by(|a, b| {
-        let num_a: u32 = a.trim_start_matches("ppt/slides/slide").trim_end_matches(".xml").parse().unwrap_or(0);
-        let num_b: u32 = b.trim_start_matches("ppt/slides/slide").trim_end_matches(".xml").parse().unwrap_or(0);
+        let num_a: u32 = a.to_lowercase().trim_start_matches("ppt/slides/slide").trim_end_matches(".xml").parse().unwrap_or(0);
+        let num_b: u32 = b.to_lowercase().trim_start_matches("ppt/slides/slide").trim_end_matches(".xml").parse().unwrap_or(0);
         num_a.cmp(&num_b)
     });
 
@@ -3751,11 +3756,35 @@ fn launch_with_app(path: String, app_command: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn compress_to_zip(source_paths: Vec<String>, output_zip_path: String) -> Result<usize, String> {
+async fn compress_to_zip(app_handle: tauri::AppHandle, source_paths: Vec<String>, output_zip_path: String) -> Result<usize, String> {
     let out_path = PathBuf::from(&output_zip_path);
     if let Some(parent) = out_path.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
+    
+    let op_id = format!("compress-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis());
+
+    let mut total_files = 0usize;
+    for src_str in &source_paths {
+        let p = PathBuf::from(src_str);
+        if p.is_dir() {
+            let mut stack = vec![p];
+            while let Some(dir) = stack.pop() {
+                if let Ok(entries) = fs::read_dir(dir) {
+                    for entry in entries.flatten() {
+                        if entry.path().is_dir() {
+                            stack.push(entry.path());
+                        } else {
+                            total_files += 1;
+                        }
+                    }
+                }
+            }
+        } else if p.exists() {
+            total_files += 1;
+        }
+    }
+    if total_files == 0 { total_files = 1; }
 
     let file = File::create(&out_path).map_err(|e| format!("No se pudo crear el archivo zip: {}", e))?;
     let mut zip = zip::ZipWriter::new(file);
@@ -3797,6 +3826,19 @@ fn compress_to_zip(source_paths: Vec<String>, output_zip_path: String) -> Result
                             let mut f = File::open(&entry_p).map_err(|e| e.to_string())?;
                             std::io::copy(&mut f, &mut zip).map_err(|e| e.to_string())?;
                             total_added += 1;
+                            
+                            let _ = app_handle.emit("transfer-progress", TransferProgressPayload {
+                                operation_id: op_id.clone(),
+                                action: "compress".into(),
+                                current_item: entry_name,
+                                current_index: total_added,
+                                total_items: total_files,
+                                bytes_copied: 0,
+                                total_bytes: 0,
+                                target_directory: output_zip_path.clone(),
+                                is_done: false,
+                                speed_bytes_per_sec: 0.0, eta_seconds: 0,
+                            });
                         }
                     }
                 }
@@ -3807,8 +3849,29 @@ fn compress_to_zip(source_paths: Vec<String>, output_zip_path: String) -> Result
             let mut f = File::open(&src).map_err(|e| e.to_string())?;
             std::io::copy(&mut f, &mut zip).map_err(|e| e.to_string())?;
             total_added += 1;
+            
+            let _ = app_handle.emit("transfer-progress", TransferProgressPayload {
+                operation_id: op_id.clone(),
+                action: "compress".into(),
+                current_item: base_name,
+                current_index: total_added,
+                total_items: total_files,
+                bytes_copied: 0,
+                total_bytes: 0,
+                target_directory: output_zip_path.clone(),
+                is_done: false,
+                speed_bytes_per_sec: 0.0, eta_seconds: 0,
+            });
         }
     }
+    
+    let _ = app_handle.emit("transfer-finished", TransferFinishedPayload {
+        operation_id: op_id.clone(),
+        success: true,
+        error: None,
+        items_count: total_added, action: "compress".to_string(), target_directory: output_zip_path.clone(),
+        total_bytes: 0,
+    });
 
     zip.finish().map_err(|e| format!("Error al finalizar zip: {}", e))?;
     Ok(total_added)

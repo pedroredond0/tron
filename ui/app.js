@@ -87,7 +87,8 @@ function escapeHtml(text) { const div = document.createElement("div"); div.textC
       name: dir ? getDirBaseName(dir) : 'Inicio',
       currentDirectory: dir,
       items: [],
-      filteredItems: [],
+      baseFilteredItems: [],
+      displayItems: [],
       selectedIndex: -1,
       selectionAnchor: -1,
       selectedItems: new Set(),
@@ -130,8 +131,10 @@ function escapeHtml(text) { const div = document.createElement("div"); div.textC
       },
       get items() { return this.currentTab.items || []; },
       set items(v) { this.currentTab.items = v; },
-      get filteredItems() { return this.currentTab.filteredItems || []; },
-      set filteredItems(v) { this.currentTab.filteredItems = v; },
+      get baseFilteredItems() { return this.currentTab.baseFilteredItems || []; },
+      set baseFilteredItems(v) { this.currentTab.baseFilteredItems = v; },
+      get filteredItems() { return this.currentTab.displayItems || []; },
+      set filteredItems(v) { this.currentTab.displayItems = v; },
       get selectedIndex() { return this.currentTab.selectedIndex; },
       set selectedIndex(v) { this.currentTab.selectedIndex = v; },
       get selectionAnchor() { return this.currentTab.selectionAnchor; },
@@ -360,8 +363,10 @@ function escapeHtml(text) { const div = document.createElement("div"); div.textC
     },
     get items() { return getActiveTabObj().items; },
     set items(v) { getActiveTabObj().items = v; },
-    get filteredItems() { return getActiveTabObj().filteredItems; },
-    set filteredItems(v) { getActiveTabObj().filteredItems = v; },
+    get baseFilteredItems() { return getActiveTabObj().baseFilteredItems; },
+    set baseFilteredItems(v) { getActiveTabObj().baseFilteredItems = v; },
+    get filteredItems() { return getActiveTabObj().displayItems; },
+    set filteredItems(v) { getActiveTabObj().displayItems = v; },
     get selectedIndex() { return getActiveTabObj().selectedIndex; },
     set selectedIndex(v) { getActiveTabObj().selectedIndex = v; },
     get selectionAnchor() { return getActiveTabObj().selectionAnchor; },
@@ -495,6 +500,13 @@ function escapeHtml(text) { const div = document.createElement("div"); div.textC
     btnActionDelete: document.getElementById('btnActionDelete'),
     btnActionQuickView: document.getElementById('btnActionQuickView'),
     btnToggleSplitView: document.getElementById('btnToggleSplitView'),
+    splitViewToolbar: document.getElementById('splitViewToolbar'),
+    btnSplitCopy: document.getElementById('btnSplitCopy'),
+    btnSplitMove: document.getElementById('btnSplitMove'),
+    splitCopyText: document.getElementById('splitCopyText'),
+    splitCopyArrow: document.getElementById('splitCopyArrow'),
+    splitMoveText: document.getElementById('splitMoveText'),
+    splitMoveArrow: document.getElementById('splitMoveArrow'),
     menuToggleSplitView: document.getElementById('menuToggleSplitView'),
     btnActionCalcDirSizes: document.getElementById('btnActionCalcDirSizes'),
     btnOpenAppearance: document.getElementById('btnOpenAppearance'),
@@ -538,6 +550,8 @@ function escapeHtml(text) { const div = document.createElement("div"); div.textC
     btnCloseNewFolderModal: document.getElementById('btnCloseNewFolderModal'),
     modalNetwork: document.getElementById('modalNetwork'),
     inputNetworkPath: document.getElementById('inputNetworkPath'),
+    networkHistoryContainer: document.getElementById('networkHistoryContainer'),
+    networkHistoryList: document.getElementById('networkHistoryList'),
     btnConfirmNetwork: document.getElementById('btnConfirmNetwork'),
     btnCancelNetwork: document.getElementById('btnCancelNetwork'),
     btnCloseNetworkModal: document.getElementById('btnCloseNetworkModal'),
@@ -680,6 +694,9 @@ function escapeHtml(text) { const div = document.createElement("div"); div.textC
     ctxMenuCopyPath: document.getElementById('ctxMenuCopyPath'),
     ctxMenuCopyPosix: document.getElementById('ctxMenuCopyPosix'),
     ctxMenuCopyName: document.getElementById('ctxMenuCopyName'),
+    ctxMenuExtract: document.getElementById('ctxMenuExtract'),
+    btnCtxExtractTrigger: document.getElementById('btnCtxExtractTrigger'),
+    ctxMenuExtractSub: document.getElementById('ctxMenuExtractSub'),
     ctxMenuExtractHere: document.getElementById('ctxMenuExtractHere'),
     ctxMenuExtractToFolder: document.getElementById('ctxMenuExtractToFolder'),
     ctxMenuExtractToFolderText: document.getElementById('ctxMenuExtractToFolderText'),
@@ -1336,7 +1353,7 @@ modalSherlock: document.getElementById('modalSherlock'),
       if (!state.showHiddenFiles) {
         res = res.filter(item => !item.is_hidden);
       }
-      targetPanel.filteredItems = sortItems([...res], pIdx);
+      targetPanel.baseFilteredItems = sortItems([...res], pIdx);
       return;
     }
 
@@ -1345,7 +1362,7 @@ modalSherlock: document.getElementById('modalSherlock'),
       if (!state.showHiddenFiles) {
         res = res.filter(item => !item.is_hidden);
       }
-      targetPanel.filteredItems = sortItems([...res], pIdx);
+      targetPanel.baseFilteredItems = sortItems([...res], pIdx);
       return;
     }
 
@@ -1389,7 +1406,7 @@ modalSherlock: document.getElementById('modalSherlock'),
     if (q) {
       res = res.filter(item => item.name.toLowerCase().includes(q));
     }
-    targetPanel.filteredItems = sortItems([...res], pIdx);
+    targetPanel.baseFilteredItems = sortItems([...res], pIdx);
     if (state.isMillerView && pIdx === 0) {
       renderMillerView();
     }
@@ -1413,7 +1430,7 @@ modalSherlock: document.getElementById('modalSherlock'),
       }
     }
 
-    recurse(p.filteredItems || [], 0);
+    recurse(p.baseFilteredItems || [], 0);
     return list;
   }
 
@@ -1456,6 +1473,7 @@ modalSherlock: document.getElementById('modalSherlock'),
     const prevScrollTop = targetListEl.scrollTop;
     targetListEl.innerHTML = '';
     const displayList = buildDisplayItemList(pIdx);
+    targetPanel.filteredItems = displayList;
 
     if (displayList.length === 0) {
       targetListEl.innerHTML = `<div class="p-8 text-center text-xs text-gnome-textDim">Directorio vacío o sin coincidencias</div>`;
@@ -3524,6 +3542,32 @@ modalSherlock: document.getElementById('modalSherlock'),
     reloadBothPanelsIfNeeded();
   }
 
+  async function doSplitAction(action) {
+    if (!isSplitView) return;
+    const fromPanel = activePanel;
+    const toPanel = activePanel === 0 ? 1 : 0;
+    
+    const selected = Array.from(panels[fromPanel].selectedItems);
+    if (selected.length === 0) {
+      // Si no hay seleccionados, copiamos/movemos el directorio actual? No, mejor avisar.
+      // Wait, maybe we use selectedItems or contextTargetItem? 
+      // Si no hay selecciones, intentamos con selectedIndex.
+      if (panels[fromPanel].selectedIndex >= 0) {
+        const item = panels[fromPanel].displayItems[panels[fromPanel].selectedIndex];
+        if (item) selected.push(item.path);
+      }
+    }
+    
+    if (selected.length === 0) {
+      return;
+    }
+    const targetDir = panels[toPanel].currentDirectory;
+    if (!targetDir) return;
+    
+    await startTransferOperation(action, selected, targetDir);
+    reloadBothPanelsIfNeeded();
+  }
+
   // --- Multi-Task Transfer Progress & Manager ---
   
   function copyToClipboard(text) {
@@ -3646,9 +3690,9 @@ async function startTransferOperation(action, sources, targetDir) {
       if (el.pasteProgressLabel) el.pasteProgressLabel.textContent = `${activeCount} tareas`;
     } else if (activeCount === 1) {
       const t = activeTasks[0];
-      const label = t.action === 'copy' ? 'Copiando' : 'Moviendo';
+      const label = t.action === 'compress' ? 'Comprimiendo' : (t.action === 'copy' ? 'Copiando' : 'Moviendo');
       const detail = t.speed && t.speed !== 'Calculando...' ? ` (${t.speed})` : '';
-      if (el.pasteProgressLabel) el.pasteProgressLabel.textContent = `${label}${detail}`;
+      if (el.pasteProgressLabel) el.pasteProgressLabel.textContent = `${label} ${t.currentIndex}/${t.totalItems}${detail}`;
     } else {
       if (el.pasteProgressLabel) el.pasteProgressLabel.textContent = 'Completado';
     }
@@ -3803,6 +3847,7 @@ async function startTransferOperation(action, sources, targetDir) {
     if (!isSplitView) {
       if (el.panelAHeader) el.panelAHeader.classList.add('hidden');
       if (el.panelBHeader) el.panelBHeader.classList.add('hidden');
+      if (el.splitViewToolbar) el.splitViewToolbar.classList.add('hidden');
       el.panelA.classList.remove('ring-1', 'ring-inset', 'ring-gnome-active/40');
       el.panelB.classList.remove('ring-1', 'ring-inset', 'ring-gnome-active/40');
       return;
@@ -3810,6 +3855,20 @@ async function startTransferOperation(action, sources, targetDir) {
 
     if (el.panelAHeader) el.panelAHeader.classList.remove('hidden');
     if (el.panelBHeader) el.panelBHeader.classList.remove('hidden');
+    
+    if (el.splitViewToolbar) {
+      el.splitViewToolbar.classList.remove('hidden');
+      el.splitViewToolbar.classList.add('flex');
+      
+      const isRightActive = activePanel === 1;
+      const arrowRight = '→';
+      const arrowLeft = '←';
+      
+      if (el.splitCopyText) el.splitCopyText.textContent = isRightActive ? 'Copiar a panel izquierdo' : 'Copiar a panel derecho';
+      if (el.splitCopyArrow) el.splitCopyArrow.textContent = isRightActive ? arrowLeft : arrowRight;
+      if (el.splitMoveText) el.splitMoveText.textContent = isRightActive ? 'Mover a panel izquierdo' : 'Mover a panel derecho';
+      if (el.splitMoveArrow) el.splitMoveArrow.textContent = isRightActive ? arrowLeft : arrowRight;
+    }
 
     const dirA = panels[0].currentDirectory || '';
     const dirB = panels[1].currentDirectory || '';
@@ -3976,21 +4035,14 @@ async function startTransferOperation(action, sources, targetDir) {
     const ext = (item?.extension || '').toLowerCase();
     const isZip = ext === 'zip' || (item?.name || '').toLowerCase().endsWith('.zip');
 
-    if (el.ctxMenuExtractHere) {
-      if (isZip) el.ctxMenuExtractHere.classList.remove('hidden');
-      else el.ctxMenuExtractHere.classList.add('hidden');
+    if (el.ctxMenuExtract) {
+      if (isZip) el.ctxMenuExtract.classList.remove('hidden');
+      else el.ctxMenuExtract.classList.add('hidden');
     }
 
-    if (el.ctxMenuExtractToFolder) {
-      if (isZip) {
-        el.ctxMenuExtractToFolder.classList.remove('hidden');
-        const folderName = (item?.name || 'archivo').replace(/\.zip$/i, '');
-        if (el.ctxMenuExtractToFolderText) {
-          el.ctxMenuExtractToFolderText.textContent = `📦 Extraer en ${folderName}/`;
-        }
-      } else {
-        el.ctxMenuExtractToFolder.classList.add('hidden');
-      }
+    if (el.ctxMenuExtractToFolderText && isZip) {
+      const folderName = (item?.name || 'archivo').replace(/\.zip$/i, '');
+      el.ctxMenuExtractToFolderText.textContent = `📦 Extraer en ${folderName}/`;
     }
 
     if (el.ctxMenuArchiveViewContent) {
@@ -4118,9 +4170,44 @@ async function startTransferOperation(action, sources, targetDir) {
     el.fileContextMenu.style.visibility = 'visible';
   }
 
+  function closePdfToolsSubmenu() {
+    if (el.ctxMenuPdfToolsSub) el.ctxMenuPdfToolsSub.classList.add('hidden');
+  }
+
+  function closeExtractSubmenu() {
+    if (el.ctxMenuExtractSub) el.ctxMenuExtractSub.classList.add('hidden');
+  }
+
+  function openExtractSubmenu() {
+    if (!el.ctxMenuExtractSub || !el.ctxMenuExtract) return;
+    const rect = el.ctxMenuExtract.getBoundingClientRect();
+    const subWidth = 200;
+    const winWidth = window.innerWidth;
+    const winHeight = window.innerHeight;
+
+    let left = rect.right + 4;
+    if (left + subWidth > winWidth - 10) {
+      left = Math.max(10, rect.left - subWidth - 4);
+    }
+    let top = rect.top;
+    el.ctxMenuExtractSub.style.left = `${left}px`;
+    el.ctxMenuExtractSub.style.top = `${top}px`;
+    el.ctxMenuExtractSub.classList.remove('hidden');
+
+    setTimeout(() => {
+      if (!el.ctxMenuExtractSub) return;
+      const subRect = el.ctxMenuExtractSub.getBoundingClientRect();
+      if (subRect.bottom > winHeight - 10) {
+        const diff = subRect.bottom - (winHeight - 10);
+        el.ctxMenuExtractSub.style.top = `${Math.max(10, top - diff)}px`;
+      }
+    }, 0);
+  }
+
   function closeFileContextMenu(force = false) {
     if (isOpeningContextMenu && !force) return;
-    if (el.ctxMenuPdfToolsSub) el.ctxMenuPdfToolsSub.classList.add('hidden');
+    closePdfToolsSubmenu();
+    closeExtractSubmenu();
     if (el.fileContextMenu) {
       el.fileContextMenu.classList.add('hidden');
     }
@@ -5301,6 +5388,30 @@ async function startTransferOperation(action, sources, targetDir) {
   // Network Dialog
   function openNetworkModal() {
     el.inputNetworkPath.value = isMac || (navigator.platform && navigator.platform.includes('Linux')) ? 'smb://' : '\\\\';
+    
+    // Load history
+    let history = [];
+    try {
+      history = JSON.parse(localStorage.getItem('networkHistory') || '[]');
+    } catch(e) {}
+    
+    if (history.length > 0) {
+      el.networkHistoryContainer.classList.remove('hidden');
+      el.networkHistoryList.innerHTML = '';
+      history.forEach(p => {
+        const itemEl = document.createElement('div');
+        itemEl.className = 'px-2 py-1.5 hover:bg-gnome-active hover:text-white cursor-pointer rounded text-xs transition-colors truncate';
+        itemEl.textContent = p;
+        itemEl.onclick = () => {
+          el.inputNetworkPath.value = p;
+          el.inputNetworkPath.focus();
+        };
+        el.networkHistoryList.appendChild(itemEl);
+      });
+    } else {
+      el.networkHistoryContainer.classList.add('hidden');
+    }
+
     el.modalNetwork.classList.remove('hidden');
     el.inputNetworkPath.focus();
   }
@@ -5317,6 +5428,16 @@ async function startTransferOperation(action, sources, targetDir) {
       try {
         const resolved = await invoke('connect_network_share', { path });
         if (resolved) {
+          // Save history
+          let history = [];
+          try {
+            history = JSON.parse(localStorage.getItem('networkHistory') || '[]');
+          } catch(e) {}
+          history = history.filter(p => p !== path);
+          history.unshift(path);
+          if (history.length > 10) history = history.slice(0, 10);
+          localStorage.setItem('networkHistory', JSON.stringify(history));
+          
           await loadDirectory(resolved);
         }
       } catch (err) {
@@ -6509,7 +6630,33 @@ async function startTransferOperation(action, sources, targetDir) {
     el.btnActionDelete.onclick = deleteCurrentItem;
     el.btnActionQuickView.onclick = openQuickView;
     if (el.btnToggleSplitView) el.btnToggleSplitView.onclick = toggleSplitView;
+    if (el.btnSplitCopy) el.btnSplitCopy.onclick = () => doSplitAction('copy');
+    if (el.btnSplitMove) el.btnSplitMove.onclick = () => doSplitAction('cut');
     if (el.btnToggleMillerView) el.btnToggleMillerView.onclick = toggleMillerView;
+
+    // Extract Submenu Event Listeners
+    if (el.ctxMenuExtract) {
+      el.ctxMenuExtract.onmouseenter = openExtractSubmenu;
+    }
+    if (el.btnCtxExtractTrigger) {
+      el.btnCtxExtractTrigger.onclick = (e) => { e.stopPropagation(); openExtractSubmenu(); };
+    }
+    if (el.ctxMenuExtractSub && el.ctxMenuExtract) {
+      let extTimer = null;
+      el.ctxMenuExtract.addEventListener('mouseleave', () => {
+        extTimer = setTimeout(() => {
+          if (el.ctxMenuExtractSub && !el.ctxMenuExtractSub.matches(':hover')) {
+            closeExtractSubmenu();
+          }
+        }, 150);
+      });
+      el.ctxMenuExtractSub.addEventListener('mouseenter', () => {
+        if (extTimer) clearTimeout(extTimer);
+      });
+      el.ctxMenuExtractSub.addEventListener('mouseleave', () => {
+        closeExtractSubmenu();
+      });
+    }
 
     // PdfTools Event Listeners
     if (el.ctxMenuPdfTools) {
